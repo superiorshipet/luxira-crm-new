@@ -5,7 +5,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
   </ItemGroup>
-</Project>
 
+  <ItemGroup>
+    <ProjectReference Include="../Luxira.Infrastructure/Luxira.Infrastructure.csproj" />
+    <ProjectReference Include="../Luxira.ServiceDefaults/Luxira.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>

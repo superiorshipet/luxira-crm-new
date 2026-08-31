@@ -46,6 +46,9 @@ jobs:
       - name: Build
         run: dotnet build Luxira.slnx --no-restore --configuration Release
 
+      - name: Test
+        run: dotnet test Luxira.slnx --no-build --configuration Release
+
       - name: Verify OpenAPI, Postman coverage, and local contracts
         env:
           LUXIRA_BUILD_CONFIGURATION: Release

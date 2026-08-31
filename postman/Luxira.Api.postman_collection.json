@@ -223,6 +223,282 @@
               }
             }
           ]
+        },
+        {
+          "name": "List failure reasons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/reference-data/failure-reasons",
+            "description": "operationId: ReferenceData_GetFailureReasons"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Failure reason display names match the legacy contract', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const reasons = pm.response.json();",
+                  "  pm.expect(reasons).to.have.lengthOf(11);",
+                  "  pm.expect(reasons[8]).to.eql({ id: 9, name: 'تأجيل الاستلام' });",
+                  "  pm.expect(reasons[10]).to.eql({ id: 11, name: 'الطلب غير مطابق للمطلوب' });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List failure reasons - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/DataList/GetAllFailureReasons",
+            "description": "operationId: LegacyDataList_GetAllFailureReasons"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy failure-reason route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.lengthOf(11);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List cities by country",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/reference-data/cities?countryIds=5&countryIds=1",
+            "description": "operationId: ReferenceData_GetCitiesByCountry"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cities preserve country order and remove exact duplicates', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cities = pm.response.json();",
+                  "  pm.expect(cities[0]).to.eql('مسقط');",
+                  "  pm.expect(cities[cities.length - 1]).to.eql('بعقوبة');",
+                  "  pm.expect(new Set(cities).size).to.eql(cities.length);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List cities by country - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/DataList/GetCitiesByCountry?countryIds=5&countryIds=1",
+            "description": "operationId: LegacyDataList_GetCitiesByCountry"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy city route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()[0]).to.eql('مسقط');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List order sources",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/reference-data/order-sources",
+            "description": "operationId: ReferenceData_GetOrderSources"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Order sources preserve the authenticated legacy contract', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const sources = pm.response.json();",
+                  "  pm.expect(sources).to.have.lengthOf(10);",
+                  "  pm.expect(sources[0]).to.eql({ id: 1, name: 'فيسبوك', logoUrl: '/socialmediaicons/facebook.svg' });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List order sources - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/DataList/GetAllOrderSources",
+            "description": "operationId: LegacyDataList_GetAllOrderSources"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy order-source route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.lengthOf(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List role-scoped order statuses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{callCenterAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/reference-data/order-statuses",
+            "description": "operationId: ReferenceData_GetOrderStatuses"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Call Center receives its legacy status catalog', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const statuses = pm.response.json();",
+                  "  pm.expect(statuses).to.have.lengthOf(20);",
+                  "  pm.expect(statuses.find(status => status.id === 10).name).to.eql('أخطاء_التوصيل');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List role-scoped order statuses - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{callCenterAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/DataList/GetAllOrderStatuses",
+            "description": "operationId: LegacyDataList_GetAllOrderStatuses"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy order-status route remains role compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.lengthOf(20);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List delivery companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/delivery-companies?countryIds=1",
+            "description": "operationId: DeliveryCompanies_List"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delivery companies preserve the authenticated read contract', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List delivery companies - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/DataList/GetAllDeliveryCompanies?countryIds=1",
+            "description": "operationId: LegacyDataList_GetAllDeliveryCompanies"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy delivery-company route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

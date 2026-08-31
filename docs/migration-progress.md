@@ -9,9 +9,9 @@ Production database access: Never performed
 | Phase | Status | Evidence / remaining gate |
 |---|---|---|
 | 0. Characterization and inventory | In progress | System, integrations, authentication, Orders lifecycle, and initial database ownership are documented. Full endpoint/table-write catalog and non-production performance baseline remain. |
-| 1. Foundation | In progress | .NET 10 API, OpenAPI import URL, Problem Details, health checks, central packages, Postman coverage gate, and CI are present. Authentication implementation, architecture tests, and remaining deployable projects remain. |
-| 2. Infrastructure | Not started | Requires approved isolated SQL Server/Redis/storage test dependencies; production is prohibited. |
-| 3. Low-risk pilot slices | In progress | Countries reference data is implemented with canonical and legacy-compatible routes and executable contract checks. |
+| 1. Foundation | In progress | .NET 10 API, OpenAPI import URL with Bearer metadata, Default-Deny JWT authentication, Problem Details, health checks, response compression, safe output caching, central packages, OpenTelemetry service defaults, in-memory API integration/architecture tests, Postman coverage gate, and CI are present. Login/refresh-token persistence and remaining deployable projects remain. |
+| 2. Infrastructure | In progress | Query-only SQL Server infrastructure, optional Redis/HybridCache wiring, isolated local containers, and metadata-only mapping tests are present. No database connection has been made; additional adapters and isolated runtime verification remain. |
+| 3. Low-risk pilot slices | In progress | Countries, country cities, failure reasons, authenticated order sources, role-scoped order statuses, and the first SQL-backed delivery-company read contract are implemented with canonical and legacy-compatible routes and executable contract checks. |
 | 4-8 | Not started | These phases stay gated by their prerequisite characterization and isolated tests. |
 
 ## Completed pilot evidence
@@ -21,13 +21,14 @@ Production database access: Never performed
 - Versioned route: `/api/v1/reference-data/countries`.
 - Legacy-compatible route retained for current JavaScript consumers.
 - Both route pairs are present in generated OpenAPI and the curated Postman suite.
-- Local gate verifies 7/7 published operations plus exact country contracts and route parity.
+- Local gate verifies all published operations plus exact public reference-data contracts; integration tests cover JWT and role matrices for protected contracts.
+- Delivery-company tests replace the SQL reader in-memory, preserving database isolation while exercising filtering and legacy media URL normalization.
 - Build passes with zero warnings and zero errors.
 
 ## Next safe execution order
 
-1. Add the remaining small, DB-free reference-data contracts one operation at a time.
-2. Complete the package/native-runtime compatibility matrix for infrastructure choices.
-3. Scaffold `Domain`, `Infrastructure`, `Contracts`, `Worker`, and tests only when the first consumer requires them; do not create empty abstraction projects.
-4. Introduce SQL Server/Redis/S3 adapters against isolated dependencies and prove their failure behavior.
-5. Migrate selected read-only delivery data before any Orders write path.
+1. Complete the remaining read-only delivery/reference contracts one operation at a time.
+2. Prove SQL Server/Redis failure behavior against isolated local dependencies only.
+3. Add `Domain`, `Contracts`, and `Worker` projects only when their first real consumer requires them; do not create empty abstractions.
+4. Introduce storage/integration adapters behind explicit ports with timeouts, retries, and observability.
+5. Characterize Orders writes before migrating any command path.

@@ -13,6 +13,10 @@ countries_document="$temporary_directory/countries.json"
 legacy_countries_document="$temporary_directory/legacy-countries.json"
 preparation_countries_document="$temporary_directory/preparation-countries.json"
 legacy_preparation_countries_document="$temporary_directory/legacy-preparation-countries.json"
+failure_reasons_document="$temporary_directory/failure-reasons.json"
+legacy_failure_reasons_document="$temporary_directory/legacy-failure-reasons.json"
+cities_document="$temporary_directory/cities.json"
+legacy_cities_document="$temporary_directory/legacy-cities.json"
 server_pid=""
 
 cleanup() {
@@ -74,6 +78,22 @@ curl --fail --silent --show-error \
     "$base_url/DataList/GetPfdCountries" \
     --output "$legacy_preparation_countries_document"
 
+curl --fail --silent --show-error \
+    "$base_url/api/v1/reference-data/failure-reasons" \
+    --output "$failure_reasons_document"
+
+curl --fail --silent --show-error \
+    "$base_url/DataList/GetAllFailureReasons" \
+    --output "$legacy_failure_reasons_document"
+
+curl --fail --silent --show-error \
+    "$base_url/api/v1/reference-data/cities?countryIds=5&countryIds=1" \
+    --output "$cities_document"
+
+curl --fail --silent --show-error \
+    "$base_url/DataList/GetCitiesByCountry?countryIds=5&countryIds=1" \
+    --output "$legacy_cities_document"
+
 jq --exit-status '
     length == 16 and
     .[0] == {"id": 1, "name": "العراق", "imageUrl": "/Countries/iraq.svg"} and
@@ -97,6 +117,30 @@ if ! cmp --silent \
     exit 1
 fi
 
+jq --exit-status '
+    .[0] == "مسقط" and
+    .[-1] == "بعقوبة" and
+    length == (unique | length)
+' "$cities_document" >/dev/null
+
+if ! cmp --silent "$cities_document" "$legacy_cities_document"; then
+    echo "The versioned and legacy city contracts do not match." >&2
+    exit 1
+fi
+
+jq --exit-status '
+    length == 11 and
+    .[8] == {"id": 9, "name": "تأجيل الاستلام"} and
+    .[10] == {"id": 11, "name": "الطلب غير مطابق للمطلوب"}
+' "$failure_reasons_document" >/dev/null
+
+if ! cmp --silent \
+    "$failure_reasons_document" \
+    "$legacy_failure_reasons_document"; then
+    echo "The versioned and legacy failure-reason contracts do not match." >&2
+    exit 1
+fi
+
 node tools/check-postman-coverage.mjs \
     "$openapi_document" \
     postman/coverage-manifest.json \
@@ -111,3 +155,5 @@ echo "Verified Postman import document at $base_url/swagger/v1/swagger.json"
 echo "Published operations: $operation_count"
 echo "Verified country contract and legacy-route parity: 16 entries"
 echo "Verified preparation country contract and legacy-route parity: 4 entries"
+echo "Verified failure-reason contract and legacy-route parity: 11 entries"
+echo "Verified city contract, distinct ordering, and legacy-route parity"

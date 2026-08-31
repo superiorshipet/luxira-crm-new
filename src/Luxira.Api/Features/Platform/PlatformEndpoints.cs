@@ -11,7 +11,8 @@ internal static class PlatformEndpoints
     {
         var platform = endpoints
             .MapGroup(string.Empty)
-            .WithTags("Platform");
+            .WithTags("Platform")
+            .AllowAnonymous();
 
         platform.MapGet(
                 "/",
@@ -80,4 +81,3 @@ internal sealed record ApiDiscoveryResponse(
 internal sealed record HealthResponse(
     string Status,
     DateTimeOffset CheckedAtUtc);
-

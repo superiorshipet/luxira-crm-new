@@ -1,0 +1,37 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${LUXIRA_LOCAL_SQL_PASSWORD:?Set LUXIRA_LOCAL_SQL_PASSWORD in .env}
+    ports:
+      - "14339:1433"
+    volumes:
+      - luxira-sql-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes --requirepass ${LUXIRA_LOCAL_REDIS_PASSWORD:?Set LUXIRA_LOCAL_REDIS_PASSWORD in .env}
+    ports:
+      - "16379:6379"
+    volumes:
+      - luxira-redis-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli -a "$${LUXIRA_LOCAL_REDIS_PASSWORD}" ping | grep PONG
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  luxira-sql-data:
+  luxira-redis-data:

@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
 
 namespace Luxira.Api.OpenApi;
 
@@ -25,6 +27,50 @@ internal static class OpenApiExtensions
 
                         return Task.CompletedTask;
                     });
+                options.AddDocumentTransformer(
+                    (document, _, _) =>
+                    {
+                        document.Components ??= new OpenApiComponents();
+                        document.Components.SecuritySchemes ??=
+                            new Dictionary<string, IOpenApiSecurityScheme>();
+                        document.Components.SecuritySchemes["Bearer"] =
+                            new OpenApiSecurityScheme
+                            {
+                                Type = SecuritySchemeType.Http,
+                                Scheme = "bearer",
+                                BearerFormat = "JWT",
+                                Description =
+                                    "Luxira access token. Use the token returned by the explicit authentication endpoint.",
+                            };
+
+                        return Task.CompletedTask;
+                    });
+                options.AddOperationTransformer(
+                    (operation, context, _) =>
+                    {
+                        var metadata = context.Description
+                            .ActionDescriptor
+                            .EndpointMetadata;
+                        var isAnonymous = metadata
+                            .OfType<IAllowAnonymous>()
+                            .Any();
+
+                        if (isAnonymous)
+                        {
+                            return Task.CompletedTask;
+                        }
+
+                        operation.Security ??= [];
+                        operation.Security.Add(
+                            new OpenApiSecurityRequirement
+                            {
+                                [new OpenApiSecuritySchemeReference(
+                                    "Bearer",
+                                    context.Document)] = [],
+                            });
+
+                        return Task.CompletedTask;
+                    });
             });
 
         return services;
@@ -47,4 +93,3 @@ internal static class OpenApiExtensions
         return app;
     }
 }
-
