@@ -50,7 +50,81 @@
     { "key": "apiVersion", "value": "v1" }
   ],
   "item": [
-    { "name": "00 Platform", "item": [] },
+    {
+      "name": "00 Platform",
+      "item": [
+        {
+          "name": "Discover API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/",
+            "description": "operationId: Platform_GetApiDiscovery"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Discovery returns its OpenAPI import URL', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.openApiUrl).to.include('/swagger/v1/swagger.json');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health/live",
+            "description": "operationId: Platform_GetLiveness"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('API is alive', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.eql('Healthy');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health/ready",
+            "description": "operationId: Platform_GetReadiness"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('API is ready', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.eql('Healthy');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     { "name": "01 Authentication", "item": [] },
     { "name": "02 Identity and Access", "item": [] },
     { "name": "03 Orders", "item": [] },
@@ -67,4 +141,3 @@
     { "name": "99 Cleanup", "item": [] }
   ]
 }
-

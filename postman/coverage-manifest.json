@@ -1,6 +1,9 @@
 {
   "schemaVersion": 1,
   "apiVersion": "v1",
-  "operations": []
+  "operations": [
+    "Platform_GetApiDiscovery",
+    "Platform_GetLiveness",
+    "Platform_GetReadiness"
+  ]
 }
-

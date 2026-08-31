@@ -5,12 +5,14 @@ The API itself publishes an OpenAPI document containing every registered endpoin
 For Local development, start the API and import this link in Postman:
 
 ```text
-https://localhost:7100/swagger/v1/swagger.json
+http://localhost:5100/swagger/v1/swagger.json
 ```
+
+The HTTP local URL avoids untrusted-development-certificate errors in Postman. HTTPS is also available at `https://localhost:7100/swagger/v1/swagger.json` after trusting the local .NET development certificate.
 
 Use **Import -> Link**, paste the URL, and select the option that generates a Postman Collection. ASP.NET Core adds every mapped endpoint, HTTP method, parameter, request schema, response schema, tag, and security description to this document automatically.
 
-Opening `https://localhost:7100/` returns a small discovery response containing the current `openApiUrl`.
+Opening `http://localhost:5100/` returns a small discovery response containing the current `openApiUrl`.
 
 Every Minimal API endpoint must use `.WithName("Module_Operation")`; ASP.NET Core uses that endpoint name as the OpenAPI `operationId`. `.WithTags("Module")` controls the generated Postman folders.
 
@@ -69,6 +71,14 @@ The dependency-free coverage checker is:
 ```text
 node tools/check-postman-coverage.mjs <openapi.json> postman/coverage-manifest.json postman/Luxira.Api.postman_collection.json
 ```
+
+To start the already-built API temporarily, fetch its live OpenAPI document, verify full Postman coverage, and stop it automatically:
+
+```text
+./tools/verify-openapi-postman.sh
+```
+
+The verifier uses the `Testing` environment, an isolated localhost port, and no database configuration.
 
 ## Running locally
 
