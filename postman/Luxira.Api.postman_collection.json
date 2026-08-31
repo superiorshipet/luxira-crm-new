@@ -1,0 +1,70 @@
+{
+  "info": {
+    "_postman_id": "ff0d98f4-af06-40f5-bbc7-bec8fc612aca",
+    "name": "Luxira API Regression Suite",
+    "description": "Curated tests complementing the collection generated automatically from the API OpenAPI URL. Local and isolated Test environments only.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const environmentKind = pm.environment.get('environmentKind');",
+          "const baseUrl = (pm.environment.get('baseUrl') || '').toLowerCase();",
+          "const allowedKinds = ['Local', 'Test'];",
+          "const knownProductionHosts = ['luxira.org', 'www.luxira.org'];",
+          "",
+          "if (!allowedKinds.includes(environmentKind)) {",
+          "  throw new Error('Blocked: environmentKind must be Local or Test.');",
+          "}",
+          "",
+          "if (knownProductionHosts.some(host => baseUrl.includes(host))) {",
+          "  throw new Error('Blocked: the Postman suite cannot run against Production.');",
+          "}",
+          "",
+          "if (!pm.environment.get('runId')) {",
+          "  pm.environment.set('runId', pm.variables.replaceIn('{{$guid}}'));",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Response time is recorded', function () {",
+          "  pm.expect(pm.response.responseTime).to.be.a('number');",
+          "});",
+          "",
+          "pm.test('No unhandled server error', function () {",
+          "  pm.expect(pm.response.code).to.be.below(500);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "apiVersion", "value": "v1" }
+  ],
+  "item": [
+    { "name": "00 Platform", "item": [] },
+    { "name": "01 Authentication", "item": [] },
+    { "name": "02 Identity and Access", "item": [] },
+    { "name": "03 Orders", "item": [] },
+    { "name": "04 Fulfillment", "item": [] },
+    { "name": "05 Delivery Integrations", "item": [] },
+    { "name": "06 Finance", "item": [] },
+    { "name": "07 Workforce", "item": [] },
+    { "name": "08 Help Center", "item": [] },
+    { "name": "09 Media", "item": [] },
+    { "name": "10 Store Automation", "item": [] },
+    { "name": "11 Notifications and Realtime", "item": [] },
+    { "name": "12 Reporting", "item": [] },
+    { "name": "13 Administration", "item": [] },
+    { "name": "99 Cleanup", "item": [] }
+  ]
+}
+

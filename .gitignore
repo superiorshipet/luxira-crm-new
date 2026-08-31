@@ -1,0 +1,99 @@
+# .NET build output
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+publish/
+*.dll
+*.exe
+*.pdb
+*.cache
+
+# Test and coverage output
+[Tt]est[Rr]esults/
+coverage/
+coverage.*
+*.trx
+*.coverage
+*.coveragexml
+BenchmarkDotNet.Artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+*.csproj.user
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# VS Code machine-local settings
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and diagnostics
+logs/
+*.log
+*.dmp
+*.stackdump
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+appsettings.*.local.json
+secrets.json
+*.secrets.json
+
+# Certificates and signing material
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+
+# Postman local/current values and generated reports
+postman/local/
+postman/reports/
+postman/*.local.json
+postman/*.postman_environment.local.json
+postman/*-with-secrets.postman_environment.json
+
+# Local databases and restored production snapshots
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.mdf
+*.ldf
+*.bak
+*.bacpac
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
