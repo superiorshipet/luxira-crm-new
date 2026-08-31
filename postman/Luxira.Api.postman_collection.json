@@ -125,19 +125,120 @@
         }
       ]
     },
-    { "name": "01 Authentication", "item": [] },
-    { "name": "02 Identity and Access", "item": [] },
-    { "name": "03 Orders", "item": [] },
-    { "name": "04 Fulfillment", "item": [] },
-    { "name": "05 Delivery Integrations", "item": [] },
-    { "name": "06 Finance", "item": [] },
-    { "name": "07 Workforce", "item": [] },
-    { "name": "08 Help Center", "item": [] },
-    { "name": "09 Media", "item": [] },
-    { "name": "10 Store Automation", "item": [] },
-    { "name": "11 Notifications and Realtime", "item": [] },
-    { "name": "12 Reporting", "item": [] },
-    { "name": "13 Administration", "item": [] },
+    {
+      "name": "01 Reference Data",
+      "item": [
+        {
+          "name": "List countries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/reference-data/countries",
+            "description": "operationId: ReferenceData_GetCountries"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Country contract matches the legacy catalog', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const countries = pm.response.json();",
+                  "  pm.expect(countries).to.have.lengthOf(16);",
+                  "  pm.expect(countries[0]).to.eql({ id: 1, name: 'العراق', imageUrl: '/Countries/iraq.svg' });",
+                  "  pm.expect(countries[15]).to.eql({ id: 16, name: 'مصر', imageUrl: '/Countries/egypt.svg' });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List countries - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/DataList/GetAllCountries",
+            "description": "operationId: LegacyDataList_GetAllCountries"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy country route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.lengthOf(16);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List preparation-for-delivery countries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/reference-data/countries/preparation-for-delivery",
+            "description": "operationId: ReferenceData_GetPreparationForDeliveryCountries"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Preparation-for-delivery country order is preserved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const countries = pm.response.json();",
+                  "  pm.expect(countries.map(country => country.id)).to.eql([1, 4, 5, 2]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List preparation-for-delivery countries - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/DataList/GetPfdCountries",
+            "description": "operationId: LegacyDataList_GetPfdCountries"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy preparation-for-delivery route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().map(country => country.id)).to.eql([1, 4, 5, 2]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    { "name": "02 Authentication", "item": [] },
+    { "name": "03 Identity and Access", "item": [] },
+    { "name": "04 Orders", "item": [] },
+    { "name": "05 Fulfillment", "item": [] },
+    { "name": "06 Delivery Integrations", "item": [] },
+    { "name": "07 Finance", "item": [] },
+    { "name": "08 Workforce", "item": [] },
+    { "name": "09 Help Center", "item": [] },
+    { "name": "10 Media", "item": [] },
+    { "name": "11 Store Automation", "item": [] },
+    { "name": "12 Notifications and Realtime", "item": [] },
+    { "name": "13 Reporting", "item": [] },
+    { "name": "14 Administration", "item": [] },
     { "name": "99 Cleanup", "item": [] }
   ]
 }

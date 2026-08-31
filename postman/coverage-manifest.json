@@ -4,6 +4,10 @@
   "operations": [
     "Platform_GetApiDiscovery",
     "Platform_GetLiveness",
-    "Platform_GetReadiness"
+    "Platform_GetReadiness",
+    "ReferenceData_GetCountries",
+    "LegacyDataList_GetAllCountries",
+    "ReferenceData_GetPreparationForDeliveryCountries",
+    "LegacyDataList_GetPfdCountries"
   ]
 }

@@ -1,0 +1,52 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "postman/**"
+      - "tools/**"
+      - "*.props"
+      - "*.slnx"
+      - "global.json"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "postman/**"
+      - "tools/**"
+      - "*.props"
+      - "*.slnx"
+      - "global.json"
+      - ".github/workflows/backend-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
+
+      - name: Restore
+        run: dotnet restore Luxira.slnx
+
+      - name: Build
+        run: dotnet build Luxira.slnx --no-restore --configuration Release
+
+      - name: Verify OpenAPI, Postman coverage, and local contracts
+        env:
+          LUXIRA_BUILD_CONFIGURATION: Release
+        run: ./tools/verify-openapi-postman.sh
