@@ -7,10 +7,12 @@ using Luxira.Api.Features.DeliveryCompanies.GetDeliveryPrice;
 using Luxira.Api.Features.DeliveryCompanies.ListDeliveryCompanies;
 using Luxira.Api.Features.DeliveryCompanies.ListDeliveryRepresentatives;
 using Luxira.Api.Features.DeliveryCompanies.ListDeliveryOptions;
+using Luxira.Api.Features.SearchKeywords.ListSearchKeywords;
 using Luxira.Infrastructure;
 using Luxira.Api.Authentication;
 using Luxira.Api.OpenApi;
 using Luxira.ServiceDefaults;
+using Luxira.Application;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 builder.Services.AddLuxiraOpenApi();
 builder.Services.AddLuxiraAuthentication();
+builder.Services.AddLuxiraApplication();
 builder.Services.AddLuxiraObservability(
     builder.Configuration,
     builder.Environment,
@@ -51,10 +54,11 @@ app.MapCountryEndpoints();
 app.MapFailureReasonEndpoints();
 app.MapOrderSourceEndpoints();
 app.MapOrderStatusEndpoints();
-app.MapDeliveryCompanyEndpoints();
-app.MapDeliveryRepresentativeEndpoints();
-app.MapDeliveryPriceEndpoints();
-app.MapDeliveryOptionEndpoints();
+app.MapDeliveryCompanyController();
+app.MapDeliveryRepresentativeController();
+app.MapDeliveryPriceController();
+app.MapDeliveryOptionController();
+app.MapSearchKeywordController();
 
 app.Run();
 

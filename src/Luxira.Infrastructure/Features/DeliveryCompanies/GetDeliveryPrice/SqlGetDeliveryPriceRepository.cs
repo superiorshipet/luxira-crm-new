@@ -1,13 +1,14 @@
+using Luxira.Application.Features.DeliveryCompanies.GetDeliveryPrice;
 using Luxira.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Luxira.Infrastructure.DeliveryCompanies;
+namespace Luxira.Infrastructure.Features.DeliveryCompanies.GetDeliveryPrice;
 
-internal sealed class SqlDeliveryPriceReader(
+internal sealed class SqlGetDeliveryPriceRepository(
     IDbContextFactory<LuxiraReadDbContext> contextFactory)
-    : IDeliveryPriceReader
+    : IGetDeliveryPriceRepository
 {
-    public async Task<decimal> GetPriceAsync(
+    public async Task<decimal> GetAsync(
         int deliveryCompanyId,
         int countryId,
         string? cityId,
@@ -25,15 +26,4 @@ internal sealed class SqlDeliveryPriceReader(
             .Select(price => (decimal?)price.Price)
             .FirstOrDefaultAsync(cancellationToken) ?? 0m;
     }
-}
-
-internal sealed class UnavailableDeliveryPriceReader : IDeliveryPriceReader
-{
-    public Task<decimal> GetPriceAsync(
-        int deliveryCompanyId,
-        int countryId,
-        string? cityId,
-        CancellationToken cancellationToken) =>
-        throw new ReadInfrastructureUnavailableException(
-            "The isolated SQL read infrastructure is not configured in this environment.");
 }

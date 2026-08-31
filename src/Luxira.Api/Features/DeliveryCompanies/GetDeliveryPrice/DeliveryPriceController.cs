@@ -1,12 +1,14 @@
-using Luxira.Infrastructure.DeliveryCompanies;
+using Luxira.Api.Errors;
+using Luxira.Application.Abstractions.Persistence;
+using Luxira.Application.Features.DeliveryCompanies.GetDeliveryPrice;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Luxira.Api.Features.DeliveryCompanies.GetDeliveryPrice;
 
-internal static class DeliveryPriceEndpoints
+internal static class DeliveryPriceController
 {
-    internal static IEndpointRouteBuilder MapDeliveryPriceEndpoints(
+    internal static IEndpointRouteBuilder MapDeliveryPriceController(
         this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(
@@ -15,7 +17,7 @@ internal static class DeliveryPriceEndpoints
             .WithName("DeliveryCompanies_GetPrice")
             .WithTags("Delivery Companies")
             .WithSummary("Get the most specific delivery price")
-            .Produces<DeliveryPriceResponse>()
+            .Produces<DeliveryPriceResult>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
@@ -25,7 +27,7 @@ internal static class DeliveryPriceEndpoints
             .WithName("LegacyDataList_GetDeliveryPrice")
             .WithTags("Legacy Compatibility")
             .WithSummary("Get a delivery price using the legacy route")
-            .Produces<DeliveryPriceResponse>()
+            .Produces<DeliveryPriceResult>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
@@ -33,31 +35,26 @@ internal static class DeliveryPriceEndpoints
     }
 
     private static async Task<Results<
-        Ok<DeliveryPriceResponse>,
+        Ok<DeliveryPriceResult>,
         ProblemHttpResult>> GetDeliveryPrice(
         int deliveryCompanyId,
         [FromQuery(Name = "countryId")] int countryId,
         [FromQuery(Name = "cityId")] string? cityId,
-        IDeliveryPriceReader reader,
+        GetDeliveryPriceService service,
         CancellationToken cancellationToken)
     {
         try
         {
-            var price = await reader.GetPriceAsync(
+            var result = await service.ExecuteAsync(
                 deliveryCompanyId,
                 countryId,
                 cityId,
                 cancellationToken);
-            return TypedResults.Ok(new DeliveryPriceResponse(price));
+            return TypedResults.Ok(result);
         }
-        catch (ReadInfrastructureUnavailableException exception)
+        catch (ReadStoreUnavailableException exception)
         {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Read infrastructure unavailable",
-                detail: exception.Message);
+            return ReadStoreProblem.Create(exception);
         }
     }
 }
-
-internal sealed record DeliveryPriceResponse(decimal Price);

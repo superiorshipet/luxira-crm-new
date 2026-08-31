@@ -16,10 +16,10 @@ Build a .NET 10 modular monolith. Organize use cases as feature-based vertical s
 Use module boundaries for business ownership and slice boundaries for individual operations. Keep the common execution path explicit:
 
 ```text
-Endpoint -> Handler -> Domain rule -> DbContext or integration port
+Controller -> Application service -> Domain rule -> Repository/integration port
 ```
 
-Do not introduce a generic repository, mediator, mapping framework, or additional layer by default. Each abstraction must remove a demonstrated source of duplication, coupling, or operational risk.
+Use explicit feature repository ports for persisted use cases, implemented in Infrastructure. Keep transport controllers in API and orchestration services in Application. Do not introduce a generic repository, mediator, or mapping framework; each additional abstraction must carry real behavior.
 
 ## Consequences
 
@@ -28,4 +28,3 @@ Do not introduce a generic repository, mediator, mapping framework, or additiona
 - Transactions remain local and understandable during the high-risk migration period.
 - Modules can be extracted later if load or ownership proves that a separate service is worthwhile.
 - Architecture tests are required to prevent feature and infrastructure boundaries from eroding.
-

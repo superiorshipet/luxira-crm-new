@@ -1,4 +1,13 @@
-using Luxira.Infrastructure.DeliveryCompanies;
+using Luxira.Application.Features.DeliveryCompanies.GetDeliveryPrice;
+using Luxira.Application.Features.DeliveryCompanies.ListDeliveryCompanies;
+using Luxira.Application.Features.DeliveryCompanies.ListDeliveryOptions;
+using Luxira.Application.Features.DeliveryCompanies.ListDeliveryRepresentatives;
+using Luxira.Infrastructure.Features.DeliveryCompanies.GetDeliveryPrice;
+using Luxira.Infrastructure.Features.DeliveryCompanies.ListDeliveryCompanies;
+using Luxira.Infrastructure.Features.DeliveryCompanies.ListDeliveryOptions;
+using Luxira.Infrastructure.Features.DeliveryCompanies.ListDeliveryRepresentatives;
+using Luxira.Application.Features.SearchKeywords.ListSearchKeywords;
+using Luxira.Infrastructure.Features.SearchKeywords.ListSearchKeywords;
 using Luxira.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -27,11 +36,20 @@ public static class InfrastructureExtensions
             }
 
             services.AddSingleton<
-                IDeliveryCompanyReader,
-                UnavailableDeliveryCompanyReader>();
+                IListDeliveryCompaniesRepository,
+                UnavailableListDeliveryCompaniesRepository>();
             services.AddSingleton<
-                IDeliveryPriceReader,
-                UnavailableDeliveryPriceReader>();
+                IListDeliveryRepresentativesRepository,
+                UnavailableListDeliveryRepresentativesRepository>();
+            services.AddSingleton<
+                IGetDeliveryPriceRepository,
+                UnavailableGetDeliveryPriceRepository>();
+            services.AddSingleton<
+                IListDeliveryOptionsRepository,
+                UnavailableListDeliveryOptionsRepository>();
+            services.AddSingleton<
+                IListSearchKeywordsRepository,
+                UnavailableListSearchKeywordsRepository>();
             return services;
         }
 
@@ -43,8 +61,21 @@ public static class InfrastructureExtensions
                         .EnableRetryOnFailure(3)
                         .CommandTimeout(30))
                 .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
-        services.AddScoped<IDeliveryCompanyReader, SqlDeliveryCompanyReader>();
-        services.AddScoped<IDeliveryPriceReader, SqlDeliveryPriceReader>();
+        services.AddScoped<
+            IListDeliveryCompaniesRepository,
+            SqlListDeliveryCompaniesRepository>();
+        services.AddScoped<
+            IListDeliveryRepresentativesRepository,
+            SqlListDeliveryRepresentativesRepository>();
+        services.AddScoped<
+            IGetDeliveryPriceRepository,
+            SqlGetDeliveryPriceRepository>();
+        services.AddScoped<
+            IListDeliveryOptionsRepository,
+            SqlListDeliveryOptionsRepository>();
+        services.AddScoped<
+            IListSearchKeywordsRepository,
+            SqlListSearchKeywordsRepository>();
 
         var redisConnection = configuration.GetConnectionString("LuxiraRedis");
         if (!string.IsNullOrWhiteSpace(redisConnection))

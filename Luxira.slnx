@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="src/Luxira.Api/Luxira.Api.csproj" />
+  <Project Path="src/Luxira.Application/Luxira.Application.csproj" />
   <Project Path="src/Luxira.Infrastructure/Luxira.Infrastructure.csproj" />
   <Project Path="src/Luxira.ServiceDefaults/Luxira.ServiceDefaults.csproj" />
   <Project Path="tests/Luxira.Api.IntegrationTests/Luxira.Api.IntegrationTests.csproj" />

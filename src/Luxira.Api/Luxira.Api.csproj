@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Luxira.Application/Luxira.Application.csproj" />
     <ProjectReference Include="../Luxira.Infrastructure/Luxira.Infrastructure.csproj" />
     <ProjectReference Include="../Luxira.ServiceDefaults/Luxira.ServiceDefaults.csproj" />
   </ItemGroup>

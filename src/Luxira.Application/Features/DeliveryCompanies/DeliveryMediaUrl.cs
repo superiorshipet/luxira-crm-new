@@ -1,8 +1,8 @@
-namespace Luxira.Api.Features.Media;
+namespace Luxira.Application.Features.DeliveryCompanies;
 
-internal static class MediaUrlResolver
+internal static class DeliveryMediaUrl
 {
-    internal static string ResolveLegacyUrl(string? url)
+    internal static string Resolve(string? url)
     {
         if (string.IsNullOrWhiteSpace(url))
         {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Luxira.Infrastructure.Features.SearchKeywords.ListSearchKeywords;
 
 namespace Luxira.Infrastructure.Persistence;
 
@@ -17,6 +18,9 @@ public sealed class LuxiraReadDbContext(
     internal IQueryable<StoreDeliveryAssignmentReadRow> StoreDeliveryAssignments =>
         Set<StoreDeliveryAssignmentReadRow>();
 
+    internal IQueryable<SearchKeywordReadRow> SearchKeywords =>
+        Set<SearchKeywordReadRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(
@@ -26,6 +30,7 @@ public sealed class LuxiraReadDbContext(
         modelBuilder.ApplyConfiguration(new OrderDeliveryReadRowConfiguration());
         modelBuilder.ApplyConfiguration(
             new StoreDeliveryAssignmentReadRowConfiguration());
+        modelBuilder.ApplyConfiguration(new SearchKeywordReadRowConfiguration());
     }
 }
 

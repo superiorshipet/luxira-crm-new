@@ -24,6 +24,8 @@
     "DeliveryCompanies_GetPrice",
     "LegacyDataList_GetDeliveryPrice",
     "DeliveryOptions_List",
-    "LegacyDataList_GetAllDeliveryCompaniesAndRepresentatives"
+    "LegacyDataList_GetAllDeliveryCompaniesAndRepresentatives",
+    "SearchKeywords_List",
+    "LegacyHome_GetSearchKeywords"
   ]
 }

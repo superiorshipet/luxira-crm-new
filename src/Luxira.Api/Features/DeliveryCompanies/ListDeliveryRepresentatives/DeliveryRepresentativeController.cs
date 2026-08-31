@@ -1,13 +1,14 @@
-using Luxira.Api.Features.Media;
-using Luxira.Infrastructure.DeliveryCompanies;
+using Luxira.Application.Abstractions.Persistence;
+using Luxira.Application.Features.DeliveryCompanies.ListDeliveryRepresentatives;
+using Luxira.Api.Errors;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Luxira.Api.Features.DeliveryCompanies.ListDeliveryRepresentatives;
 
-internal static class DeliveryRepresentativeEndpoints
+internal static class DeliveryRepresentativeController
 {
-    internal static IEndpointRouteBuilder MapDeliveryRepresentativeEndpoints(
+    internal static IEndpointRouteBuilder MapDeliveryRepresentativeController(
         this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(
@@ -16,7 +17,7 @@ internal static class DeliveryRepresentativeEndpoints
             .WithName("DeliveryRepresentatives_List")
             .WithTags("Delivery Companies")
             .WithSummary("List visible delivery representatives")
-            .Produces<DeliveryRepresentativeResponse[]>()
+            .Produces<DeliveryRepresentativeResult[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
@@ -26,7 +27,7 @@ internal static class DeliveryRepresentativeEndpoints
             .WithName("LegacyDataList_GetAllDeliveryRepresentatives")
             .WithTags("Legacy Compatibility")
             .WithSummary("List visible delivery representatives using the legacy route")
-            .Produces<DeliveryRepresentativeResponse[]>()
+            .Produces<DeliveryRepresentativeResult[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
@@ -34,38 +35,24 @@ internal static class DeliveryRepresentativeEndpoints
     }
 
     private static async Task<Results<
-        Ok<DeliveryRepresentativeResponse[]>,
+        Ok<IReadOnlyList<DeliveryRepresentativeResult>>,
         ProblemHttpResult>> ListDeliveryRepresentatives(
         [FromQuery(Name = "countryIds")] int[]? countryIds,
         [FromQuery(Name = "cityIds")] string[]? cityIds,
-        IDeliveryCompanyReader reader,
+        ListDeliveryRepresentativesService service,
         CancellationToken cancellationToken)
     {
         try
         {
-            var representatives = await reader.ListRepresentativesAsync(
+            var result = await service.ExecuteAsync(
                 countryIds,
                 cityIds,
                 cancellationToken);
-            return TypedResults.Ok(
-                representatives
-                    .Select(representative => new DeliveryRepresentativeResponse(
-                        representative.Id,
-                        representative.Name,
-                        MediaUrlResolver.ResolveLegacyUrl(representative.LogoUrl)))
-                    .ToArray());
+            return TypedResults.Ok(result);
         }
-        catch (ReadInfrastructureUnavailableException exception)
+        catch (ReadStoreUnavailableException exception)
         {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Read infrastructure unavailable",
-                detail: exception.Message);
+            return ReadStoreProblem.Create(exception);
         }
     }
 }
-
-internal sealed record DeliveryRepresentativeResponse(
-    int Id,
-    string Name,
-    string LogoUrl);

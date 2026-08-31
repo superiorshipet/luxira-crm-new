@@ -46,6 +46,7 @@ Initial deployable processes:
 
 Supporting projects:
 
+- `Luxira.Application`: feature use cases, repository/integration ports, and operation models without HTTP or persistence dependencies.
 - `Luxira.Domain`: business invariants, value objects, and state-transition rules.
 - `Luxira.Infrastructure`: EF Core, Redis, S3, external providers, messaging, and observability implementations.
 - `Luxira.Contracts`: stable API and integration message contracts where sharing is genuinely required.
@@ -73,22 +74,28 @@ Microservices are not an initial target. A module can become a service later onl
 Each operation is kept close to its contract, validation, behavior, and tests.
 
 ```text
-Features/Orders/UpdateStatus/
-├── Endpoint.cs
-├── Request.cs
-├── Response.cs
-├── Handler.cs
-├── StatusTransitionPolicy.cs
-└── Tests.cs
+Luxira.Api/Features/Orders/UpdateStatus/
+├── UpdateStatusController.cs
+└── HTTP request/response models when transport-specific
+
+Luxira.Application/Features/Orders/UpdateStatus/
+├── UpdateStatusRequest.cs
+├── UpdateStatusResult.cs
+├── UpdateStatusService.cs
+├── IUpdateStatusRepository.cs
+└── StatusTransitionPolicy.cs
+
+Luxira.Infrastructure/Features/Orders/UpdateStatus/
+└── SqlUpdateStatusRepository.cs
 ```
 
 The normal execution path should remain visible:
 
 ```text
-Endpoint -> Handler -> Domain rule -> DbContext or integration port
+Controller -> Application service -> Domain rule -> Repository/integration port
 ```
 
-Files are added only when they carry real behavior. A slice does not need empty interfaces, validators, mappers, or services merely to match a template.
+Each persisted feature has an explicit repository port and implementation. A service is added when it owns mapping, orchestration, validation, authorization decisions, or business behavior; empty pass-through layers remain prohibited.
 
 Default exclusions:
 

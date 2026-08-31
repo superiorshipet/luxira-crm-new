@@ -35,5 +35,11 @@ public sealed class PersistenceModelTests
         Assert.Contains(context.Model.GetEntityTypes(), candidate =>
             candidate.GetTableName() == "StoreDeliveryCompanyAssignments" &&
             candidate.FindProperty("IsManualTransfer") is not null);
+
+        var searchKeyword = context.Model.GetEntityTypes()
+            .Single(candidate => candidate.GetTableName() == "HomeSearchKeywords");
+        Assert.Equal(250, searchKeyword.FindProperty("Phrase")!.GetMaxLength());
+        Assert.Equal(50, searchKeyword.FindProperty("TargetType")!.GetMaxLength());
+        Assert.NotNull(searchKeyword.FindProperty("IsSingleResult"));
     }
 }

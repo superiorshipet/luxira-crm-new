@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/Luxira.Application/Luxira.Application.csproj" />
     <ProjectReference Include="../../src/Luxira.Api/Luxira.Api.csproj" />
     <ProjectReference Include="../../src/Luxira.Infrastructure/Luxira.Infrastructure.csproj" />
   </ItemGroup>

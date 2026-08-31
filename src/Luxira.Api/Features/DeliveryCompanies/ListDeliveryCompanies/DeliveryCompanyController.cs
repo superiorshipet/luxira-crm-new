@@ -1,13 +1,14 @@
-using Luxira.Api.Features.Media;
-using Luxira.Infrastructure.DeliveryCompanies;
+using Luxira.Application.Abstractions.Persistence;
+using Luxira.Application.Features.DeliveryCompanies.ListDeliveryCompanies;
+using Luxira.Api.Errors;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Luxira.Api.Features.DeliveryCompanies.ListDeliveryCompanies;
 
-internal static class DeliveryCompanyEndpoints
+internal static class DeliveryCompanyController
 {
-    internal static IEndpointRouteBuilder MapDeliveryCompanyEndpoints(
+    internal static IEndpointRouteBuilder MapDeliveryCompanyController(
         this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(
@@ -16,7 +17,7 @@ internal static class DeliveryCompanyEndpoints
             .WithName("DeliveryCompanies_List")
             .WithTags("Delivery Companies")
             .WithSummary("List visible delivery companies")
-            .Produces<DeliveryCompanyResponse[]>()
+            .Produces<DeliveryCompanyResult[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
@@ -26,7 +27,7 @@ internal static class DeliveryCompanyEndpoints
             .WithName("LegacyDataList_GetAllDeliveryCompanies")
             .WithTags("Legacy Compatibility")
             .WithSummary("List visible delivery companies using the legacy route")
-            .Produces<DeliveryCompanyResponse[]>()
+            .Produces<DeliveryCompanyResult[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
@@ -34,37 +35,20 @@ internal static class DeliveryCompanyEndpoints
     }
 
     private static async Task<Results<
-        Ok<DeliveryCompanyResponse[]>,
+        Ok<IReadOnlyList<DeliveryCompanyResult>>,
         ProblemHttpResult>> ListDeliveryCompanies(
         [FromQuery(Name = "countryIds")] int[]? countryIds,
-        IDeliveryCompanyReader reader,
+        ListDeliveryCompaniesService service,
         CancellationToken cancellationToken)
     {
         try
         {
-            var companies = await reader.ListCompaniesAsync(
-                countryIds,
-                cancellationToken);
-            return TypedResults.Ok(
-                companies
-                    .Select(company => new DeliveryCompanyResponse(
-                        company.Id,
-                        company.Name,
-                        MediaUrlResolver.ResolveLegacyUrl(company.LogoUrl)))
-                    .ToArray());
+            var result = await service.ExecuteAsync(countryIds, cancellationToken);
+            return TypedResults.Ok(result);
         }
-        catch (ReadInfrastructureUnavailableException exception)
+        catch (ReadStoreUnavailableException exception)
         {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Read infrastructure unavailable",
-                detail: exception.Message);
+            return ReadStoreProblem.Create(exception);
         }
     }
-
 }
-
-internal sealed record DeliveryCompanyResponse(
-    int Id,
-    string Name,
-    string LogoUrl);
