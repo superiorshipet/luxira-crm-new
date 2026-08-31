@@ -23,6 +23,7 @@ Production database access: Never performed
 - Both route pairs are present in generated OpenAPI and the curated Postman suite.
 - Local gate verifies all published operations plus exact public reference-data contracts; integration tests cover JWT and role matrices for protected contracts.
 - Delivery-company tests replace the SQL reader in-memory, preserving database isolation while exercising filtering and legacy media URL normalization.
+- Delivery-company, representative, price, and role-sensitive combined-option contracts are characterized in `docs/discovery/delivery-read-contracts.md`; unavailable read infrastructure returns tested RFC Problem Details with HTTP 503.
 - Build passes with zero warnings and zero errors.
 
 ## Next safe execution order

@@ -3,7 +3,10 @@ using Luxira.Api.Features.ReferenceData.Countries;
 using Luxira.Api.Features.ReferenceData.FailureReasons;
 using Luxira.Api.Features.ReferenceData.OrderSources;
 using Luxira.Api.Features.ReferenceData.OrderStatuses;
+using Luxira.Api.Features.DeliveryCompanies.GetDeliveryPrice;
 using Luxira.Api.Features.DeliveryCompanies.ListDeliveryCompanies;
+using Luxira.Api.Features.DeliveryCompanies.ListDeliveryRepresentatives;
+using Luxira.Api.Features.DeliveryCompanies.ListDeliveryOptions;
 using Luxira.Infrastructure;
 using Luxira.Api.Authentication;
 using Luxira.Api.OpenApi;
@@ -49,6 +52,9 @@ app.MapFailureReasonEndpoints();
 app.MapOrderSourceEndpoints();
 app.MapOrderStatusEndpoints();
 app.MapDeliveryCompanyEndpoints();
+app.MapDeliveryRepresentativeEndpoints();
+app.MapDeliveryPriceEndpoints();
+app.MapDeliveryOptionEndpoints();
 
 app.Run();
 

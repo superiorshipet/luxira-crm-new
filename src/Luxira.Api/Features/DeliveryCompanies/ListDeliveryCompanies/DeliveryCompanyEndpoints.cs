@@ -1,3 +1,4 @@
+using Luxira.Api.Features.Media;
 using Luxira.Infrastructure.DeliveryCompanies;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -49,7 +50,7 @@ internal static class DeliveryCompanyEndpoints
                     .Select(company => new DeliveryCompanyResponse(
                         company.Id,
                         company.Name,
-                        NormalizeMediaUrl(company.LogoUrl)))
+                        MediaUrlResolver.ResolveLegacyUrl(company.LogoUrl)))
                     .ToArray());
         }
         catch (ReadInfrastructureUnavailableException exception)
@@ -61,19 +62,6 @@ internal static class DeliveryCompanyEndpoints
         }
     }
 
-    private static string NormalizeMediaUrl(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return "/static/DefaultImage.svg";
-        }
-
-        return url.StartsWith('/') ||
-            url.StartsWith("http://", StringComparison.Ordinal) ||
-            url.StartsWith("https://", StringComparison.Ordinal)
-                ? url
-                : "/" + url;
-    }
 }
 
 internal sealed record DeliveryCompanyResponse(

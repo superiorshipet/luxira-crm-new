@@ -29,6 +29,9 @@ public static class InfrastructureExtensions
             services.AddSingleton<
                 IDeliveryCompanyReader,
                 UnavailableDeliveryCompanyReader>();
+            services.AddSingleton<
+                IDeliveryPriceReader,
+                UnavailableDeliveryPriceReader>();
             return services;
         }
 
@@ -41,6 +44,7 @@ public static class InfrastructureExtensions
                         .CommandTimeout(30))
                 .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
         services.AddScoped<IDeliveryCompanyReader, SqlDeliveryCompanyReader>();
+        services.AddScoped<IDeliveryPriceReader, SqlDeliveryPriceReader>();
 
         var redisConnection = configuration.GetConnectionString("LuxiraRedis");
         if (!string.IsNullOrWhiteSpace(redisConnection))

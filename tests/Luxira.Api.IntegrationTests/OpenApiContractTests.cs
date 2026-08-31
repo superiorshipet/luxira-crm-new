@@ -24,7 +24,7 @@ public sealed class OpenApiContractTests(LuxiraApiFactory factory)
 
         Assert.DoesNotContain(operationIds, string.IsNullOrWhiteSpace);
         Assert.Equal(operationIds.Length, operationIds.Distinct().Count());
-        Assert.Equal(17, operationIds.Length);
+        Assert.Equal(23, operationIds.Length);
     }
 
     [Fact]

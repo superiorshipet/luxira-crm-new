@@ -499,6 +499,180 @@
               }
             }
           ]
+        },
+        {
+          "name": "List delivery representatives",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/delivery-representatives?countryIds=1&cityIds=بغداد",
+            "description": "operationId: DeliveryRepresentatives_List"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delivery representatives preserve country and city filters', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List delivery representatives - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/DataList/GetAllDeliveryRepresentatives?countryIds=1&cityIds=بغداد",
+            "description": "operationId: LegacyDataList_GetAllDeliveryRepresentatives"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy delivery-representative route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get delivery price",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/delivery-companies/1/price?countryId=1&cityId=بغداد",
+            "description": "operationId: DeliveryCompanies_GetPrice"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delivery price returns the legacy response shape', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.property('price');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get delivery price - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/DataList/GetDeliveryPrice?deliveryCompanyId=1&countryId=1&cityId=بغداد",
+            "description": "operationId: LegacyDataList_GetDeliveryPrice"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy delivery-price route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.property('price');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List delivery options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{callCenterAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/delivery-options?countryId=1&cityId=بغداد&orderId=1",
+            "description": "operationId: DeliveryOptions_List"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delivery options return the legacy shape', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List delivery options - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{callCenterAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/DataList/GetAllDeliveryCompaniesAndRepresentatives?countryId=1&cityId=بغداد&orderId=1",
+            "description": "operationId: LegacyDataList_GetAllDeliveryCompaniesAndRepresentatives"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy combined delivery route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

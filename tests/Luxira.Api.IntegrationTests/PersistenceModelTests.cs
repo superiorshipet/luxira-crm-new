@@ -22,5 +22,18 @@ public sealed class PersistenceModelTests
         Assert.NotNull(entity.FindProperty("Country"));
         Assert.NotNull(entity.FindProperty("IsShown"));
         Assert.NotNull(entity.FindProperty("IsRepresentative"));
+
+        var price = context.Model.GetEntityTypes()
+            .Single(candidate =>
+                candidate.GetTableName() == "DeliveryCompanyPrices");
+        Assert.Equal("decimal(18,2)", price.FindProperty("Price")!.GetColumnType());
+        Assert.NotNull(price.FindProperty("DeliveryCompanyId"));
+
+        Assert.Contains(context.Model.GetEntityTypes(), candidate =>
+            candidate.GetTableName() == "Orders" &&
+            candidate.FindProperty("ManufacturingCompanyId") is not null);
+        Assert.Contains(context.Model.GetEntityTypes(), candidate =>
+            candidate.GetTableName() == "StoreDeliveryCompanyAssignments" &&
+            candidate.FindProperty("IsManualTransfer") is not null);
     }
 }

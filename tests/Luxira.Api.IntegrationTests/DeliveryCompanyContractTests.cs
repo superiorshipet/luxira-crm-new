@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net;
 
 namespace Luxira.Api.IntegrationTests;
 
@@ -43,6 +44,26 @@ public sealed class DeliveryCompanyContractTests(LuxiraApiFactory factory)
                 "UAE Express",
                 "/static/DefaultImage.svg"),
             Assert.Single(companies!));
+    }
+
+    [Fact]
+    public async Task MissingReadInfrastructureReturnsProblemDetailsWithoutConnecting()
+    {
+        await using var unavailableFactory =
+            new LuxiraUnavailableInfrastructureFactory();
+        using var client = unavailableFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.Create("CallCenter"));
+
+        using var response = await client.GetAsync(
+            "/api/v1/delivery-companies");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType);
     }
 
     private HttpClient CreateAuthenticatedClient()

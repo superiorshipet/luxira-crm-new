@@ -18,6 +18,12 @@
     "ReferenceData_GetOrderStatuses",
     "LegacyDataList_GetAllOrderStatuses",
     "DeliveryCompanies_List",
-    "LegacyDataList_GetAllDeliveryCompanies"
+    "LegacyDataList_GetAllDeliveryCompanies",
+    "DeliveryRepresentatives_List",
+    "LegacyDataList_GetAllDeliveryRepresentatives",
+    "DeliveryCompanies_GetPrice",
+    "LegacyDataList_GetDeliveryPrice",
+    "DeliveryOptions_List",
+    "LegacyDataList_GetAllDeliveryCompaniesAndRepresentatives"
   ]
 }
