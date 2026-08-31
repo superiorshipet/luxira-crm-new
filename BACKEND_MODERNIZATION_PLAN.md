@@ -59,6 +59,13 @@ Test projects:
 - architecture tests;
 - performance tests.
 
+API verification assets:
+
+- generated OpenAPI documents for every supported version;
+- a Postman collection that covers every published operation;
+- local and isolated-test Postman environments with no committed secrets;
+- an automated collection runner and endpoint-coverage gate in CI.
+
 Microservices are not an initial target. A module can become a service later only when measurements and operational ownership justify the network and consistency costs.
 
 ## 4. Feature slice convention
@@ -290,6 +297,12 @@ Performance targets are set after collecting the legacy baseline. Every migrated
 - Golden-master tests protect invoices and PDFs where pixel-perfect compatibility is required.
 - Load and soak tests run only against isolated environments.
 - Architecture tests enforce module dependency rules.
+- Postman provides executable end-to-end coverage for every published endpoint.
+- Every endpoint has a stable OpenAPI `operationId` that maps to a Postman request.
+- CI compares OpenAPI operations with the Postman coverage manifest and fails when an endpoint is missing.
+- Postman suites include success, validation, authorization, forbidden-role, not-found, conflict/idempotency, and relevant concurrency scenarios.
+- Test runs create uniquely named data and clean it up when safe; they never depend on production records.
+- External providers use sandbox endpoints or controlled fakes during collection runs.
 
 No test is allowed to point at the production database.
 
@@ -312,6 +325,7 @@ Gate: no production feature implementation until the relevant legacy behavior is
 - create the .NET 10 solution and projects;
 - enable central package management, nullable reference types, analyzers, and formatting;
 - add API versioning, OpenAPI, Problem Details, health endpoints, configuration validation, and CI;
+- add Postman collection generation, local/test environments, role-aware authentication setup, and the all-endpoints coverage gate;
 - establish module and slice conventions with architecture tests.
 
 Gate: clean foundation with no legacy business logic copied into shared dumping grounds.
@@ -406,6 +420,7 @@ A feature is migrated only when:
 - data ownership and transaction boundaries are explicit;
 - external side effects are reliable and idempotent;
 - tests cover success, failure, validation, authorization, and concurrency;
+- its endpoint operations and required role scenarios are present in the Postman suite;
 - traces, logs, and metrics exist;
 - measured performance meets its budget;
 - rollback is documented and verified;
@@ -418,4 +433,3 @@ A feature is migrated only when:
 3. Document the Orders lifecycle and side effects first.
 4. Create ADRs for authentication, job scheduling, database coexistence, and API style.
 5. Scaffold the .NET 10 foundation only after the first discovery gate is reviewed.
-
