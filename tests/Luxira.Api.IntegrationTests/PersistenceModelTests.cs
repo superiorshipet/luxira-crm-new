@@ -41,5 +41,17 @@ public sealed class PersistenceModelTests
         Assert.Equal(250, searchKeyword.FindProperty("Phrase")!.GetMaxLength());
         Assert.Equal(50, searchKeyword.FindProperty("TargetType")!.GetMaxLength());
         Assert.NotNull(searchKeyword.FindProperty("IsSingleResult"));
+
+        var profileUser = context.Model.GetEntityTypes()
+            .Single(candidate => candidate.GetTableName() == "AspNetUsers");
+        Assert.Equal("Name", profileUser.FindProperty("DisplayName")!
+            .GetColumnName());
+        var employeeProfile = context.Model.GetEntityTypes()
+            .Single(candidate => candidate.GetTableName() == "Employees");
+        Assert.Equal(100, employeeProfile.FindProperty("JobTitle")!.GetMaxLength());
+        Assert.Contains(context.Model.GetEntityTypes(), candidate =>
+            candidate.GetTableName() == "AspNetUserRoles");
+        Assert.Contains(context.Model.GetEntityTypes(), candidate =>
+            candidate.GetTableName() == "AspNetRoles");
     }
 }

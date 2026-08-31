@@ -677,7 +677,71 @@
       ]
     },
     { "name": "02 Authentication", "item": [] },
-    { "name": "03 Identity and Access", "item": [] },
+    {
+      "name": "03 Identity and Access",
+      "item": [
+        {
+          "name": "Get current user profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/users/me/profile",
+            "description": "operationId: Identity_GetCurrentUserProfile"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Current profile resolves from the access token', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const profile = pm.response.json();",
+                  "  pm.expect(profile).to.have.all.keys('id', 'name', 'avatar', 'role', 'title', 'phone');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get user profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/users/{{profileUserId}}/profile",
+            "description": "operationId: Identity_GetUserProfile"
+          }
+        },
+        {
+          "name": "Get user profile - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/Conference/UserProfile?id={{profileUserId}}",
+            "description": "operationId: LegacyConference_GetUserProfile"
+          }
+        }
+      ]
+    },
     { "name": "04 Orders", "item": [] },
     { "name": "05 Fulfillment", "item": [] },
     { "name": "06 Delivery Integrations", "item": [] },
@@ -688,7 +752,131 @@
     { "name": "11 Store Automation", "item": [] },
     { "name": "12 Notifications and Realtime", "item": [] },
     { "name": "13 Reporting", "item": [] },
-    { "name": "14 Administration", "item": [] },
+    {
+      "name": "14 Administration",
+      "item": [
+        {
+          "name": "List search keywords",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{adminAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/administration/search-keywords?targetType=All&category=All",
+            "description": "operationId: SearchKeywords_List"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Admin search-keyword contract is available', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const result = pm.response.json();",
+                  "  pm.expect(result.ok).to.eql(true);",
+                  "  pm.expect(result.keywords).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List search keywords - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{adminAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/Home/GetSearchKeywords?targetType=All&category=All",
+            "description": "operationId: LegacyHome_GetSearchKeywords"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy search-keyword route remains compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.property('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get search keyword options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{adminAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/administration/search-keywords/options",
+            "description": "operationId: SearchKeywords_GetOptions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Search keyword editor options preserve the catalog', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const result = pm.response.json();",
+                  "  pm.expect(result.targetTypes).to.have.lengthOf(12);",
+                  "  pm.expect(result.typeOptions).to.have.property('OrderStatus');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get search keyword options - legacy compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{adminAccessToken}}", "type": "string" }
+              ]
+            },
+            "url": "{{baseUrl}}/Home/GetSearchKeywordOptions",
+            "description": "operationId: LegacyHome_GetSearchKeywordOptions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Legacy search-keyword options remain compatible', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().ok).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     { "name": "99 Cleanup", "item": [] }
   ]
 }

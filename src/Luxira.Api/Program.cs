@@ -8,6 +8,8 @@ using Luxira.Api.Features.DeliveryCompanies.ListDeliveryCompanies;
 using Luxira.Api.Features.DeliveryCompanies.ListDeliveryRepresentatives;
 using Luxira.Api.Features.DeliveryCompanies.ListDeliveryOptions;
 using Luxira.Api.Features.SearchKeywords.ListSearchKeywords;
+using Luxira.Api.Features.SearchKeywords.GetSearchKeywordOptions;
+using Luxira.Api.Features.Identity.GetUserProfile;
 using Luxira.Infrastructure;
 using Luxira.Api.Authentication;
 using Luxira.Api.OpenApi;
@@ -59,6 +61,8 @@ app.MapDeliveryRepresentativeController();
 app.MapDeliveryPriceController();
 app.MapDeliveryOptionController();
 app.MapSearchKeywordController();
+app.MapSearchKeywordOptionController();
+app.MapUserProfileController();
 
 app.Run();
 

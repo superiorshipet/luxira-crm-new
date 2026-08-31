@@ -21,7 +21,8 @@ public sealed class SearchKeywordContractTests(LuxiraApiFactory factory)
             "/Home/GetSearchKeywords" + query);
 
         Assert.True(canonical!.Ok);
-        Assert.Equal(canonical, legacy);
+        Assert.Equal(canonical.Ok, legacy!.Ok);
+        Assert.Equal(canonical.Keywords, legacy.Keywords);
         var keyword = Assert.Single(canonical.Keywords);
         Assert.Equal(2, keyword.Id);
         Assert.Equal("City", keyword.TargetType);

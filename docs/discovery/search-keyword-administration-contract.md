@@ -24,6 +24,15 @@ Optional filters are `search`, `targetType`, `category`, and `isActive`.
 
 The legacy controller creates/alters/seeds `HomeSearchKeywords` at runtime. The new API must never execute that DDL. The EF mapping is query-only and assumes a reviewed migration has provisioned the table in an approved non-production environment before runtime SQL verification.
 
+## Editor options
+
+| Contract | Method | Route | Authorization |
+|---|---|---|---|
+| Canonical v1 | GET | `/api/v1/administration/search-keywords/options` | Admin only |
+| Legacy compatibility | GET | `/Home/GetSearchKeywordOptions` | Admin only |
+
+Categories are distinct, nonempty SQL values ordered ascending. If the read store is unavailable, the exact seven legacy fallback categories are returned. Target types and their option arrays are immutable legacy catalogs; their declaration order and the duplicate Facebook source entry are intentionally preserved.
+
 ## Deferred commands
 
 Save, toggle, single delete, and bulk delete remain deferred until their validation, normalization, transaction, audit timestamps, duplicate handling, and cache invalidation contracts are fully characterized. They are not silently approximated by this read slice.

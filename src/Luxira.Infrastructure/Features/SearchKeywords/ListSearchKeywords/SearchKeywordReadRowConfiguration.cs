@@ -25,7 +25,11 @@ internal sealed class SearchKeywordReadRowConfiguration
         builder.Property(keyword => keyword.Category)
             .IsRequired()
             .HasMaxLength(100);
+        builder.Property(keyword => keyword.IsActive);
+        builder.Property(keyword => keyword.IsSingleResult);
+        builder.Property(keyword => keyword.CreatedAt);
         builder.Property(keyword => keyword.CreatedBy).HasMaxLength(128);
+        builder.Property(keyword => keyword.UpdatedAt);
         builder.Property(keyword => keyword.UpdatedBy).HasMaxLength(128);
     }
 }

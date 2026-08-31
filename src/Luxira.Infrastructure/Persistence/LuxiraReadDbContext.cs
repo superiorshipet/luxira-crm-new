@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Luxira.Infrastructure.Features.SearchKeywords.ListSearchKeywords;
+using Luxira.Infrastructure.Features.Identity.GetUserProfile;
 
 namespace Luxira.Infrastructure.Persistence;
 
@@ -21,6 +22,16 @@ public sealed class LuxiraReadDbContext(
     internal IQueryable<SearchKeywordReadRow> SearchKeywords =>
         Set<SearchKeywordReadRow>();
 
+    internal IQueryable<UserProfileUserReadRow> ProfileUsers =>
+        Set<UserProfileUserReadRow>();
+
+    internal IQueryable<EmployeeProfileReadRow> EmployeeProfiles =>
+        Set<EmployeeProfileReadRow>();
+
+    internal IQueryable<UserRoleReadRow> UserRoles => Set<UserRoleReadRow>();
+
+    internal IQueryable<RoleReadRow> Roles => Set<RoleReadRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(
@@ -31,6 +42,10 @@ public sealed class LuxiraReadDbContext(
         modelBuilder.ApplyConfiguration(
             new StoreDeliveryAssignmentReadRowConfiguration());
         modelBuilder.ApplyConfiguration(new SearchKeywordReadRowConfiguration());
+        modelBuilder.ApplyConfiguration(new UserProfileUserReadRowConfiguration());
+        modelBuilder.ApplyConfiguration(new EmployeeProfileReadRowConfiguration());
+        modelBuilder.ApplyConfiguration(new UserRoleReadRowConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleReadRowConfiguration());
     }
 }
 

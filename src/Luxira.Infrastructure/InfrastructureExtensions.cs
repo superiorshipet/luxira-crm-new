@@ -8,6 +8,10 @@ using Luxira.Infrastructure.Features.DeliveryCompanies.ListDeliveryOptions;
 using Luxira.Infrastructure.Features.DeliveryCompanies.ListDeliveryRepresentatives;
 using Luxira.Application.Features.SearchKeywords.ListSearchKeywords;
 using Luxira.Infrastructure.Features.SearchKeywords.ListSearchKeywords;
+using Luxira.Application.Features.SearchKeywords.GetSearchKeywordOptions;
+using Luxira.Infrastructure.Features.SearchKeywords.GetSearchKeywordOptions;
+using Luxira.Application.Features.Identity.GetUserProfile;
+using Luxira.Infrastructure.Features.Identity.GetUserProfile;
 using Luxira.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -50,6 +54,12 @@ public static class InfrastructureExtensions
             services.AddSingleton<
                 IListSearchKeywordsRepository,
                 UnavailableListSearchKeywordsRepository>();
+            services.AddSingleton<
+                IGetSearchKeywordOptionsRepository,
+                UnavailableGetSearchKeywordOptionsRepository>();
+            services.AddSingleton<
+                IGetUserProfileRepository,
+                UnavailableGetUserProfileRepository>();
             return services;
         }
 
@@ -76,6 +86,12 @@ public static class InfrastructureExtensions
         services.AddScoped<
             IListSearchKeywordsRepository,
             SqlListSearchKeywordsRepository>();
+        services.AddScoped<
+            IGetSearchKeywordOptionsRepository,
+            SqlGetSearchKeywordOptionsRepository>();
+        services.AddScoped<
+            IGetUserProfileRepository,
+            SqlGetUserProfileRepository>();
 
         var redisConnection = configuration.GetConnectionString("LuxiraRedis");
         if (!string.IsNullOrWhiteSpace(redisConnection))

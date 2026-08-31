@@ -26,6 +26,11 @@
     "DeliveryOptions_List",
     "LegacyDataList_GetAllDeliveryCompaniesAndRepresentatives",
     "SearchKeywords_List",
-    "LegacyHome_GetSearchKeywords"
+    "LegacyHome_GetSearchKeywords",
+    "SearchKeywords_GetOptions",
+    "LegacyHome_GetSearchKeywordOptions",
+    "Identity_GetUserProfile",
+    "Identity_GetCurrentUserProfile",
+    "LegacyConference_GetUserProfile"
   ]
 }

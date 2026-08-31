@@ -3,6 +3,8 @@ using Luxira.Application.Features.DeliveryCompanies.ListDeliveryCompanies;
 using Luxira.Application.Features.DeliveryCompanies.ListDeliveryOptions;
 using Luxira.Application.Features.DeliveryCompanies.ListDeliveryRepresentatives;
 using Luxira.Application.Features.SearchKeywords.ListSearchKeywords;
+using Luxira.Application.Features.SearchKeywords.GetSearchKeywordOptions;
+using Luxira.Application.Features.Identity.GetUserProfile;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -46,6 +48,12 @@ public sealed class LuxiraApiFactory : WebApplicationFactory<Program>
             services.Replace(ServiceDescriptor.Singleton<
                 IListSearchKeywordsRepository,
                 FakeListSearchKeywordsRepository>());
+            services.Replace(ServiceDescriptor.Singleton<
+                IGetSearchKeywordOptionsRepository,
+                FakeGetSearchKeywordOptionsRepository>());
+            services.Replace(ServiceDescriptor.Singleton<
+                IGetUserProfileRepository,
+                FakeGetUserProfileRepository>());
         });
     }
 
@@ -274,5 +282,61 @@ public sealed class LuxiraApiFactory : WebApplicationFactory<Program>
 
         private static bool Contains(string? value, string search) =>
             value?.Contains(search, StringComparison.Ordinal) == true;
+    }
+
+    private sealed class FakeGetSearchKeywordOptionsRepository
+        : IGetSearchKeywordOptionsRepository
+    {
+        private static readonly string[] Categories =
+        [
+            "دول ومناطق",
+            "عام",
+        ];
+
+        public Task<IReadOnlyList<string>> ListCategoriesAsync(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<string>>(Categories);
+        }
+    }
+
+    private sealed class FakeGetUserProfileRepository : IGetUserProfileRepository
+    {
+        public Task<UserProfileSource?> GetAsync(
+            string userId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            UserProfileSource? result = userId switch
+            {
+                "integration-test-user-id" => new UserProfileSource(
+                    userId,
+                    "jwt-user",
+                    "jwt@example.test",
+                    "Application Name",
+                    "000",
+                    "  Employee Display  ",
+                    "Employee Name",
+                    "~\\Employees\\avatar.png",
+                    "SoftwareDeveloper",
+                    "12345678",
+                    "Admin"),
+                "role-user" => new UserProfileSource(
+                    userId,
+                    "role-user-name",
+                    "role@example.test",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "CallCenter"),
+                _ => null,
+            };
+            return Task.FromResult(result);
+        }
     }
 }
