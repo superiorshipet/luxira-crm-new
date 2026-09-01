@@ -49,7 +49,22 @@ public class StoreCodeFolder
 {
     public int Id { get; set; }
     public string FolderName { get; set; } = string.Empty;
+    public string PageType { get; set; } = string.Empty;
     public int ManufacturingCompanyId { get; set; }
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
+    public string? Content { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
+
+    public ICollection<StoreCodeEditHistory> EditHistories { get; set; } = new List<StoreCodeEditHistory>();
 }
 
 public class StoreCodeEditHistory

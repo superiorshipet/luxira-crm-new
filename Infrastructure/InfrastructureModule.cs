@@ -1,4 +1,6 @@
 using Luxira.Api.Core;
+using Luxira.Api.Features.Communication.Hubs;
+using Luxira.Api.Features.ManufacturingCompanies.Hubs;
 using Luxira.Api.Features.Orders.Hubs;
 using Luxira.Api.Infrastructure.BackgroundServices;
 using Luxira.Api.Infrastructure.Email;
@@ -40,8 +42,7 @@ public class InfrastructureModule : IModule
         // 6. SignalR Real-Time Hubs
         services.AddSignalR();
 
-        // 7. Hosted Background Services. They stay disabled by default outside
-        // Production so local/Test DB verification cannot mutate business data.
+        // 7. Hosted Background Services
         var backgroundJobsEnabled = configuration
             .GetValue<bool?>("BackgroundJobs:Enabled") ??
             environment.IsProduction();
@@ -49,6 +50,8 @@ public class InfrastructureModule : IModule
         {
             services.AddHostedService<DeliveredToBalanceAutoTransitionBackgroundService>();
             services.AddHostedService<PendingDownloadReminderBackgroundService>();
+            services.AddHostedService<StoreInvoiceDailyEmailService>();
+            services.AddHostedService<ScreenRecordCleanupService>();
         }
     }
 
@@ -57,6 +60,9 @@ public class InfrastructureModule : IModule
         if (app is IEndpointRouteBuilder endpoints)
         {
             endpoints.MapHub<OrderHub>("/hubs/orders");
+            endpoints.MapHub<MessageHub>("/hubs/messages");
+            endpoints.MapHub<ConferenceHub>("/hubs/conference");
+            endpoints.MapHub<StoreCodeEditorHub>("/hubs/store-code-editor");
         }
     }
 }
