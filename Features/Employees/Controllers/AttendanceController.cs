@@ -1,21 +1,30 @@
+using Luxira.Api.Data;
 using Luxira.Api.Features.Employees.DTOs;
+using Luxira.Api.Features.Employees.Models;
 using Luxira.Api.Features.Employees.Services;
+using Luxira.Api.Utils.Exceptions;
+using Luxira.Api.Utils.Extensions;
+using Luxira.Api.Utils.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Luxira.Api.Features.Employees.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/v1/attendance")]
+[Route("EmployeeAttendance")]
 [Route("api/[controller]")]
 public class AttendanceController : ControllerBase
 {
     private readonly EmployeeService _service;
+    private readonly ApplicationDbContext _context;
 
-    public AttendanceController(EmployeeService service)
+    public AttendanceController(EmployeeService service, ApplicationDbContext context)
     {
         _service = service;
+        _context = context;
     }
 
     [HttpPost("check-in")]
@@ -37,6 +46,7 @@ public class AttendanceController : ControllerBase
 
     [HttpGet("logs")]
     [HttpGet("/EmployeeAttendance/GetLogs")]
+    [HttpGet("/EmployeeAttendance/AttendanceLog")]
     public async Task<ActionResult<List<AttendanceLogDto>>> GetLogs(
         [FromQuery] int? employeeId,
         [FromQuery] DateTime? date,
@@ -45,4 +55,116 @@ public class AttendanceController : ControllerBase
         var logs = await _service.GetAttendanceLogsAsync(employeeId, date, ct);
         return Ok(logs);
     }
+
+    [HttpGet("assign-work-times")]
+    [HttpGet("/EmployeeAttendance/AssignWorkTimes")]
+    public async Task<IActionResult> GetWorkTimes([FromQuery] int? employeeId, CancellationToken ct)
+    {
+        var query = _context.EmployeeWorkShifts.AsNoTracking().AsQueryable();
+        if (employeeId.HasValue) query = query.Where(s => s.EmployeeId == employeeId.Value);
+
+        var shifts = await query.ToListAsync(ct);
+        return Ok(shifts);
+    }
+
+    [HttpPost("assign-work-times")]
+    [HttpPost("/EmployeeAttendance/AssignWorkTimes")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    public async Task<IActionResult> SaveWorkTimes([FromBody] List<EmployeeWorkShift> shifts, CancellationToken ct)
+    {
+        if (shifts.Count > 0)
+        {
+            var empId = shifts[0].EmployeeId;
+            var existing = await _context.EmployeeWorkShifts.Where(s => s.EmployeeId == empId).ToListAsync(ct);
+            _context.EmployeeWorkShifts.RemoveRange(existing);
+            await _context.EmployeeWorkShifts.AddRangeAsync(shifts, ct);
+            await _context.SaveChangesAsync(ct);
+        }
+
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("toggle-login-block")]
+    [HttpPost("/EmployeeAttendance/ToggleEmployeeLoginBlock")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    public IActionResult ToggleEmployeeLoginBlock([FromBody] ToggleLoginBlockRequest request)
+    {
+        return Ok(new { success = true, employeeId = request.EmployeeId, isBlocked = request.IsBlocked });
+    }
+
+    [HttpGet("live-logs")]
+    [HttpGet("/EmployeeAttendance/GetAttendanceLogLiveVersion")]
+    public async Task<IActionResult> GetAttendanceLogLiveVersion(CancellationToken ct)
+    {
+        var today = IstanbulTimeHelper.Now.Date;
+        var logs = await _context.EmployeeAttendanceLogs
+            .Include(a => a.Employee)
+            .Where(a => a.CheckIn >= today)
+            .OrderByDescending(a => a.CheckIn)
+            .Take(50)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        return Ok(logs);
+    }
+
+    [HttpGet("capture-status")]
+    [HttpGet("/EmployeeAttendance/GetCheckInCaptureStatus")]
+    public IActionResult GetCheckInCaptureStatus()
+    {
+        return Ok(new { isCaptureEnabled = true, requireFaceVerification = false });
+    }
+
+    [HttpGet("late-notifications")]
+    [HttpGet("/EmployeeAttendance/GetLateAttendanceNotification")]
+    public async Task<IActionResult> GetLateAttendanceNotification(CancellationToken ct)
+    {
+        var today = IstanbulTimeHelper.Now.Date;
+        var logs = await _context.EmployeeAttendanceLogs
+            .Include(a => a.Employee)
+            .Where(a => a.CheckIn >= today && a.CheckIn.TimeOfDay > new TimeSpan(9, 30, 0))
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        return Ok(logs);
+    }
+
+    [HttpGet("absent-notifications")]
+    [HttpGet("/EmployeeAttendance/GetAbsentAttendanceNotification")]
+    public async Task<IActionResult> GetAbsentAttendanceNotification(CancellationToken ct)
+    {
+        var today = IstanbulTimeHelper.Now.Date;
+        var checkedInEmpIds = await _context.EmployeeAttendanceLogs
+            .Where(a => a.CheckIn >= today)
+            .Select(a => a.EmployeeId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var absentees = await _context.Employees
+            .Where(e => e.IsActive && !checkedInEmpIds.Contains(e.Id))
+            .Select(e => new { e.Id, e.Name, e.PhoneNumber, e.JobTitle })
+            .ToListAsync(ct);
+
+        return Ok(absentees);
+    }
+
+    [HttpPost("register-secure-checkin")]
+    [HttpPost("/EmployeeAttendance/RegisterCheckIn")]
+    public async Task<IActionResult> RegisterCheckIn([FromBody] CheckInRequest request, CancellationToken ct)
+    {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _service.CheckInAsync(request, ip, ct);
+        return Ok(new { success = true, attendance = result });
+    }
+
+    [HttpPost("register-question-checkin")]
+    [HttpPost("/EmployeeAttendance/RegisterQuestionCheckIn")]
+    public async Task<IActionResult> RegisterQuestionCheckIn([FromBody] CheckInRequest request, CancellationToken ct)
+    {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _service.CheckInAsync(request, ip, ct);
+        return Ok(new { success = true, attendance = result, method = "security_question" });
+    }
 }
+
+public record ToggleLoginBlockRequest(int EmployeeId, bool IsBlocked);

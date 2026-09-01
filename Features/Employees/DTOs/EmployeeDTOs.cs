@@ -73,3 +73,17 @@ public record RecordSalaryPaymentRequest(
     decimal Amount,
     string? Notes
 );
+
+public record EmployeeBonusPaymentDto(
+    int Id,
+    int EmployeeId,
+    string? EmployeeName,
+    decimal Amount,
+    DateTime Date
+);
+
+public record AwardBonusRequest(
+    int EmployeeId,
+    decimal Amount,
+    string? Reason
+);

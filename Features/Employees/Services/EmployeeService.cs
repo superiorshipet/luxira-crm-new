@@ -235,6 +235,39 @@ public class EmployeeService
         return summaries;
     }
 
+    public async Task<List<EmployeeBonusPaymentDto>> GetBonusPaymentsAsync(int? employeeId = null, CancellationToken ct = default)
+    {
+        var query = _context.EmployeeBonusPayments.Include(b => b.Employee).AsNoTracking().AsQueryable();
+        if (employeeId.HasValue && employeeId.Value > 0)
+        {
+            query = query.Where(b => b.EmployeeId == employeeId.Value);
+        }
+
+        var list = await query.OrderByDescending(b => b.Date).ToListAsync(ct);
+        return list.Select(b => new EmployeeBonusPaymentDto(b.Id, b.EmployeeId, b.Employee?.Name, b.Amount, b.Date)).ToList();
+    }
+
+    public async Task<EmployeeBonusPaymentDto> AwardBonusAsync(AwardBonusRequest request, CancellationToken ct = default)
+    {
+        var emp = await _context.Employees.FirstOrDefaultAsync(e => e.Id == request.EmployeeId, ct);
+        if (emp == null)
+        {
+            throw new NotFoundException($"Employee {request.EmployeeId} not found.");
+        }
+
+        var payment = new EmployeeBonusPayment
+        {
+            EmployeeId = request.EmployeeId,
+            Amount = request.Amount,
+            Date = DateTime.UtcNow
+        };
+
+        await _context.EmployeeBonusPayments.AddAsync(payment, ct);
+        await _context.SaveChangesAsync(ct);
+
+        return new EmployeeBonusPaymentDto(payment.Id, payment.EmployeeId, emp.Name, payment.Amount, payment.Date);
+    }
+
     private static EmployeeDto MapToDto(Employee e) => new(
         e.Id,
         e.Name,

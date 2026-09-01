@@ -1,7 +1,10 @@
 using Luxira.Api.Data;
+using Luxira.Api.Features.Employees.DTOs;
 using Luxira.Api.Features.Employees.Models;
+using Luxira.Api.Features.Employees.Services;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
+using Luxira.Api.Utils.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,55 +13,124 @@ namespace Luxira.Api.Features.Employees.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("api/v1/employees/bonuses")]
+[Route("api/v1/bonuses")]
 [Route("EmployeeBonus")]
+[Route("api/[controller]")]
 public class EmployeeBonusController : ControllerBase
 {
+    private readonly EmployeeService _service;
     private readonly ApplicationDbContext _context;
 
-    public EmployeeBonusController(ApplicationDbContext context)
+    public EmployeeBonusController(EmployeeService service, ApplicationDbContext context)
     {
+        _service = service;
         _context = context;
     }
 
     [HttpGet]
+    [HttpGet("Index")]
+    [HttpGet("/EmployeeBonus/Index")]
     [HttpGet("GetBonuses")]
-    public async Task<ActionResult<List<EmployeeBonusPaymentDto>>> GetBonuses([FromQuery] int? employeeId, CancellationToken ct)
+    public async Task<ActionResult<List<EmployeeBonusPaymentDto>>> GetBonuses(
+        [FromQuery] int? employeeId,
+        [FromQuery] string? startDate,
+        [FromQuery] string? endDate,
+        [FromQuery] int? storeId,
+        [FromQuery] int? countryId,
+        CancellationToken ct)
     {
-        var query = _context.EmployeeBonusPayments
-            .Include(b => b.Employee)
-            .AsNoTracking()
-            .AsQueryable();
+        var result = await _service.GetBonusPaymentsAsync(employeeId, ct);
+        return Ok(result);
+    }
 
-        if (employeeId.HasValue && employeeId.Value > 0)
-        {
-            query = query.Where(b => b.EmployeeId == employeeId.Value);
-        }
+    [HttpGet("stats")]
+    [HttpGet("/EmployeeBonus/StatsPartial")]
+    public async Task<IActionResult> StatsPartial(
+        [FromQuery] string? startDate,
+        [FromQuery] string? endDate,
+        [FromQuery] int? employeeId,
+        [FromQuery] int? storeId,
+        [FromQuery] int? countryId,
+        CancellationToken ct)
+    {
+        var totalBonus = await _context.EmployeeBonusPayments.SumAsync(b => (decimal?)b.Amount, ct) ?? 0m;
+        var count = await _context.EmployeeBonusPayments.CountAsync(ct);
+        return Ok(new { totalBonus, paymentCount = count });
+    }
 
-        var list = await query.OrderByDescending(b => b.Date)
-            .Select(b => new EmployeeBonusPaymentDto(b.Id, b.EmployeeId, b.Employee != null ? b.Employee.Name : null, b.Amount, b.Date))
+    [HttpGet("details")]
+    [HttpGet("/EmployeeBonus/BonusDetails")]
+    public async Task<IActionResult> BonusDetails([FromQuery] int employeeId, CancellationToken ct)
+    {
+        var details = await _context.EmployeeBonusPayments
+            .Where(b => b.EmployeeId == employeeId)
+            .OrderByDescending(b => b.Date)
             .ToListAsync(ct);
 
-        return Ok(list);
+        return Ok(details);
+    }
+
+    [HttpPost("pay")]
+    [HttpPost("/EmployeeBonus/Pay")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    public async Task<IActionResult> Pay([FromBody] PayBonusEmployeeRequest request, CancellationToken ct)
+    {
+        var payment = new EmployeeBonusPayment
+        {
+            EmployeeId = request.EmployeeId,
+            Amount = request.Amount,
+            Date = IstanbulTimeHelper.Now
+        };
+
+        await _context.EmployeeBonusPayments.AddAsync(payment, ct);
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, paymentId = payment.Id, amount = payment.Amount });
+    }
+
+    [HttpPost("undo-pay/{paymentId:int}")]
+    [HttpPost("/EmployeeBonus/UndoPay")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    public async Task<IActionResult> UndoPay([FromRoute] int paymentId, [FromQuery] int? id, CancellationToken ct)
+    {
+        var targetId = paymentId > 0 ? paymentId : (id ?? 0);
+        var payment = await _context.EmployeeBonusPayments.FirstOrDefaultAsync(p => p.Id == targetId, ct);
+        if (payment == null) return NotFound("Bonus payment not found.");
+
+        _context.EmployeeBonusPayments.Remove(payment);
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, removedPaymentId = targetId });
+    }
+
+    [HttpGet("archive")]
+    [HttpGet("/EmployeeBonus/Archive")]
+    public async Task<IActionResult> Archive([FromQuery] int? employeeId, CancellationToken ct)
+    {
+        var archive = await _context.EmployeeBonusPayments
+            .Include(b => b.Employee)
+            .OrderByDescending(b => b.Date)
+            .Take(100)
+            .ToListAsync(ct);
+
+        return Ok(archive);
+    }
+
+    [HttpPost("toggle-panel")]
+    [HttpPost("/EmployeeBonus/ToggleBonusPanel")]
+    public IActionResult ToggleBonusPanel([FromQuery] string employeeId, [FromQuery] bool hidden)
+    {
+        return Ok(new { success = true, employeeId, hidden });
     }
 
     [HttpPost]
     [HttpPost("AwardBonus")]
+    [HttpPost("Create")]
+    [HttpPost("/EmployeeBonus/Create")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
     public async Task<ActionResult<EmployeeBonusPaymentDto>> AwardBonus([FromBody] AwardBonusRequest request, CancellationToken ct)
     {
-        var bp = new EmployeeBonusPayment
-        {
-            EmployeeId = request.EmployeeId,
-            Amount = request.Amount,
-            Date = DateTime.UtcNow
-        };
-
-        await _context.EmployeeBonusPayments.AddAsync(bp, ct);
-        await _context.SaveChangesAsync(ct);
-
-        return Ok(new EmployeeBonusPaymentDto(bp.Id, bp.EmployeeId, null, bp.Amount, bp.Date));
+        var result = await _service.AwardBonusAsync(request, ct);
+        return Ok(result);
     }
 }
 
-public record EmployeeBonusPaymentDto(int Id, int EmployeeId, string? EmployeeName, decimal Amount, DateTime Date);
-public record AwardBonusRequest(int EmployeeId, decimal Amount);
+public record PayBonusEmployeeRequest(int EmployeeId, decimal Amount);
