@@ -33,10 +33,13 @@ public sealed class InfobipSmsService
     private readonly string _apiKey;
     private readonly string _sender;
 
-    public InfobipSmsService(IConfiguration configuration, ILogger<InfobipSmsService> logger)
+    public InfobipSmsService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<InfobipSmsService> logger)
     {
         _logger = logger;
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        _httpClient = httpClient;
 
         _enabled = configuration.GetValue<bool?>("Sms:Infobip:Enabled") ?? false;
         _baseUrl = configuration["Sms:Infobip:BaseUrl"] ?? "qw48j2.api.infobip.com";
@@ -106,7 +109,10 @@ public sealed class InfobipSmsService
                     if (first.TryGetProperty("status", out var st) && st.TryGetProperty("name", out var sname))
                         result.StatusName = sname.GetString();
                 }
-                _logger.LogInformation("SMS sent to {Phone}", normalizedPhone);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation("SMS sent to {Phone}", normalizedPhone);
+                }
             }
             else
             {

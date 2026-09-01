@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using Luxira.Api.Features.Auth.Models;
 using Microsoft.IdentityModel.Tokens;
 
@@ -9,19 +8,15 @@ namespace Luxira.Api.Features.Auth.Services;
 
 public class JwtService
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtSigningMaterial _signingMaterial;
 
-    public JwtService(IConfiguration configuration)
+    public JwtService(JwtSigningMaterial signingMaterial)
     {
-        _configuration = configuration;
+        _signingMaterial = signingMaterial;
     }
 
     public (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user)
     {
-        var key = _configuration["Jwt:Key"] ?? "super-secret-default-key-luxira-crm-jwt-secret-2026-auth";
-        var issuer = _configuration["Jwt:Issuer"] ?? "Luxira.Api";
-        var audience = _configuration["Jwt:Audience"] ?? "Luxira.Clients";
-
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id),
@@ -49,16 +44,16 @@ public class JwtService
             }
         }
 
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        var securityKey = new SymmetricSecurityKey(_signingMaterial.Key);
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-        var expiresAt = DateTime.UtcNow.AddDays(7);
+        var expiresAt = DateTime.UtcNow.Add(_signingMaterial.AccessTokenLifetime);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
             Expires = expiresAt,
-            Issuer = issuer,
-            Audience = audience,
+            Issuer = _signingMaterial.Issuer,
+            Audience = _signingMaterial.Audience,
             SigningCredentials = credentials
         };
 

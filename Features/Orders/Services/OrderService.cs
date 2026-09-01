@@ -94,7 +94,7 @@ public class OrderService
             CustomerDeliveryPrice = request.CustomerDeliveryPrice,
             Chaturl = request.ChatUrl,
             ApplicationUserId = userId,
-            OrderStatus = 1, // طلب_جديد
+            OrderStatus = OrderStatusCodes.New,
             CreatedDate = DateTime.UtcNow
         };
 
@@ -112,23 +112,26 @@ public class OrderService
             }
         }
 
-        var created = await _repository.CreateAsync(order, ct);
-
-        // Record initial status history
-        await _repository.AddStatusHistoryAsync(new OrderStatusHistory
+        order.StatusHistories.Add(new OrderStatusHistory
         {
-            OrderId = created.Id,
-            OldStatus = 0,
-            NewStatus = 1,
+            OldStatus = OrderStatusCodes.New,
+            NewStatus = OrderStatusCodes.New,
             UserId = userId,
             Note = "Order Created"
-        }, ct);
+        });
+
+        var created = await _repository.CreateAsync(order, ct);
 
         return MapToDto(created);
     }
 
     public async Task<OrderDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request, string userId, CancellationToken ct = default)
     {
+        if (!OrderStatusCodes.IsDefined(request.NewStatus))
+        {
+            throw new BadRequestException($"Order status '{request.NewStatus}' is not part of the legacy status contract.");
+        }
+
         var order = await _repository.GetByIdAsync(orderId, ct);
         if (order == null)
         {
@@ -145,8 +148,7 @@ public class OrderService
         order.LastEditedDate = DateTime.UtcNow;
         order.Editedby = userId;
 
-        // Auto-bonus trigger if order is Delivered (Status 5 = تم التوصيل)
-        if (request.NewStatus == 5 && !order.IsBonusPaidForEmployee)
+        if (request.NewStatus == OrderStatusCodes.Delivered && !order.IsBonusPaidForEmployee)
         {
             var bonusConfig = await _context.OrderBonusConfigurations
                 .FirstOrDefaultAsync(b => b.Country == order.Country && b.IsActive, ct);
@@ -161,9 +163,7 @@ public class OrderService
             }
         }
 
-        await _repository.UpdateAsync(order, ct);
-
-        await _repository.AddStatusHistoryAsync(new OrderStatusHistory
+        await _repository.UpdateWithStatusHistoryAsync(order, new OrderStatusHistory
         {
             OrderId = order.Id,
             OldStatus = oldStatus,
@@ -293,7 +293,7 @@ public class OrderService
         o.CreatedDate,
         o.LastEditedDate,
         o.OrderStatus,
-        GetStatusDisplayName(o.OrderStatus),
+        OrderStatusCodes.GetDisplayName(o.OrderStatus),
         o.TotalPrice,
         o.DeliveryPrice,
         o.CustomerDeliveryPrice,
@@ -305,17 +305,4 @@ public class OrderService
         o.OrderWarehouses.Select(w => new OrderItemDto(w.Id, w.WarehouseId, w.Quantity, w.Price, w.Cost)).ToList()
     );
 
-    private static string GetStatusDisplayName(int status) => status switch
-    {
-        1 => "طلب جديد",
-        2 => "مؤكد",
-        3 => "قيد التجهيز",
-        4 => "جاهز للتسليم",
-        5 => "تم التوصيل",
-        6 => "مؤجل",
-        7 => "مرتجع",
-        8 => "فشل التوصيل",
-        9 => "ملغي",
-        _ => "غير معروف"
-    };
 }

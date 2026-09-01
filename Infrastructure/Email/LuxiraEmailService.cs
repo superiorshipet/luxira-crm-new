@@ -41,7 +41,12 @@ public class LuxiraEmailService
     {
         if (!_enabled)
         {
-            _logger.LogInformation("LuxiraMail is disabled. Skipped sending email to {To}", toEmail);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "LuxiraMail is disabled. Skipped sending email to {To}",
+                    toEmail);
+            }
             return false;
         }
 
@@ -73,7 +78,13 @@ public class LuxiraEmailService
             };
 
             await client.SendMailAsync(message, ct);
-            _logger.LogInformation("Email sent successfully to {To} with subject: {Subject}", targetTo, subject);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "Email sent successfully to {To} with subject: {Subject}",
+                    targetTo,
+                    subject);
+            }
             return true;
         }
         catch (Exception ex)

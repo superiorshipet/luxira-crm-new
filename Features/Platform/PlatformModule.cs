@@ -6,7 +6,8 @@ public class PlatformModule : IModule
 {
     public void Register(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        services.AddHealthChecks();
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
     }
 
     public void Configure(WebApplication app)

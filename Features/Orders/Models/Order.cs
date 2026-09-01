@@ -29,7 +29,7 @@ public class Order
     public DateTime? FixedOrderDate { get; set; }
     public DateTime? InstantAddedDate { get; set; }
 
-    public int OrderStatus { get; set; } = 1; // طلب_جديد
+    public int OrderStatus { get; set; } = OrderStatusCodes.New;
     public decimal TotalPrice { get; set; }
     public decimal DeliveryPrice { get; set; }
     public decimal CustomerDeliveryPrice { get; set; }

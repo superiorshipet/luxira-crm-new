@@ -1,4 +1,5 @@
 using Luxira.Api.Data;
+using Luxira.Api.Features.Orders.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,11 +30,11 @@ public class OperationsCenterController : ControllerBase
         }
 
         int totalOrders = await ordersQuery.CountAsync(ct);
-        int pendingOrders = await ordersQuery.CountAsync(o => o.OrderStatus == 1, ct);
-        int preparedOrders = await ordersQuery.CountAsync(o => o.OrderStatus == 4, ct);
-        int inTransitOrders = await ordersQuery.CountAsync(o => o.OrderStatus == 6, ct);
-        int deliveredOrders = await ordersQuery.CountAsync(o => o.OrderStatus == 5, ct);
-        int returnedOrders = await ordersQuery.CountAsync(o => o.OrderStatus == 7, ct);
+        int pendingOrders = await ordersQuery.CountAsync(o => o.OrderStatus == OrderStatusCodes.New, ct);
+        int preparedOrders = await ordersQuery.CountAsync(o => o.OrderStatus == OrderStatusCodes.Prepared, ct);
+        int inTransitOrders = await ordersQuery.CountAsync(o => o.OrderStatus == OrderStatusCodes.InDelivery, ct);
+        int deliveredOrders = await ordersQuery.CountAsync(o => o.OrderStatus == OrderStatusCodes.Delivered, ct);
+        int returnedOrders = await ordersQuery.CountAsync(o => o.OrderStatus == OrderStatusCodes.Returned, ct);
 
         return Ok(new
         {

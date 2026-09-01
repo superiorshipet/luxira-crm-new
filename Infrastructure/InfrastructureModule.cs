@@ -22,11 +22,14 @@ public class InfrastructureModule : IModule
         services.AddScoped<S3StorageService>();
 
         // 2. WhatsApp Services (Lavva Cloud API + Infobip)
-        services.AddScoped<LavvaWhatsAppService>();
-        services.AddScoped<WhatsAppAutomationService>();
+        services.AddHttpClient<LavvaWhatsAppService>(client =>
+            client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient<WhatsAppAutomationService>(client =>
+            client.Timeout = TimeSpan.FromSeconds(20));
 
         // 3. SMS Service (Infobip)
-        services.AddScoped<InfobipSmsService>();
+        services.AddHttpClient<InfobipSmsService>(client =>
+            client.Timeout = TimeSpan.FromSeconds(20));
 
         // 4. Email / SMTP Service (Gmail Smtp)
         services.AddScoped<LuxiraEmailService>();

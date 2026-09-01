@@ -53,7 +53,9 @@ public sealed class DeliveredToBalanceAutoTransitionBackgroundService : Backgrou
 
         var deliveredOrders = await db.Orders
             .Include(o => o.DeliveryCompany)
-            .Where(o => o.OrderStatus == 5 && o.DeliveryCompany != null && o.DeliveryCompany.AutoConvertDeliveredToBalanceUpdated) // تم_التسليم
+            .Where(o => o.OrderStatus == OrderStatusCodes.Delivered &&
+                        o.DeliveryCompany != null &&
+                        o.DeliveryCompany.AutoConvertDeliveredToBalanceUpdated)
             .Take(50)
             .ToListAsync(token);
 
@@ -62,14 +64,14 @@ public sealed class DeliveredToBalanceAutoTransitionBackgroundService : Backgrou
         var now = IstanbulTimeHelper.Now;
         foreach (var order in deliveredOrders)
         {
-            order.OrderStatus = 8; // تم_تحديث_الرصيد
+            order.OrderStatus = OrderStatusCodes.BalanceUpdated;
             order.LastEditedDate = now;
 
             db.OrderStatusHistories.Add(new OrderStatusHistory
             {
                 OrderId = order.Id,
-                OldStatus = 5,
-                NewStatus = 8,
+                OldStatus = OrderStatusCodes.Delivered,
+                NewStatus = OrderStatusCodes.BalanceUpdated,
                 UserId = "AutoTransitionService",
                 ChangedAt = now,
                 Reason = "Auto Delivered to Balance Updated transition"
@@ -77,6 +79,11 @@ public sealed class DeliveredToBalanceAutoTransitionBackgroundService : Backgrou
         }
 
         await db.SaveChangesAsync(token);
-        _logger.LogInformation("Auto-transitioned {Count} orders from Delivered to BalanceUpdated", deliveredOrders.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "Auto-transitioned {Count} orders from Delivered to BalanceUpdated",
+                deliveredOrders.Count);
+        }
     }
 }

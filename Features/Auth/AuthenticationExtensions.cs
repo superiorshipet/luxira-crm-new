@@ -1,7 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -13,20 +11,22 @@ namespace Luxira.Api.Features.Auth;
 public static class AuthenticationExtensions
 {
     public static IServiceCollection AddLuxiraAuthentication(
-        this IServiceCollection services)
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
+        services.AddSingleton(
+            JwtSigningMaterial.Create(configuration, environment));
+
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer();
 
         services.AddOptions<JwtBearerOptions>(
                 JwtBearerDefaults.AuthenticationScheme)
-            .Configure<IConfiguration, IHostEnvironment>(
-                (options, configuration, environment) =>
+            .Configure<JwtSigningMaterial, IHostEnvironment>(
+                (options, jwt, hostEnvironment) =>
             {
-                var jwtSettings = ResolveJwtSettings(
-                    configuration,
-                    environment);
                 options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -34,9 +34,9 @@ public static class AuthenticationExtensions
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSettings.Issuer,
-                    ValidAudience = jwtSettings.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(jwtSettings.Key),
+                    ValidIssuer = jwt.Issuer,
+                    ValidAudience = jwt.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(jwt.Key),
                     ClockSkew = TimeSpan.FromMinutes(1),
                     NameClaimType = JwtRegisteredClaimNames.Sub,
                     RoleClaimType = "role",
@@ -46,7 +46,7 @@ public static class AuthenticationExtensions
                     OnChallenge = async context =>
                     {
                         context.HandleResponse();
-                        var detail = environment.IsEnvironment("Testing") &&
+                        var detail = hostEnvironment.IsEnvironment("Testing") &&
                             context.AuthenticateFailure is not null
                                 ? context.AuthenticateFailure.Message
                                 : "A valid access token is required.";
@@ -87,43 +87,6 @@ public static class AuthenticationExtensions
 
         return services;
     }
-
-    private static JwtSettings ResolveJwtSettings(
-        IConfiguration configuration,
-        IHostEnvironment environment)
-    {
-        var issuer = configuration["Jwt:Issuer"];
-        var audience = configuration["Jwt:Audience"];
-        var key = configuration["Jwt:Key"];
-
-        if (!string.IsNullOrWhiteSpace(issuer) &&
-            !string.IsNullOrWhiteSpace(audience) &&
-            !string.IsNullOrWhiteSpace(key) &&
-            Encoding.UTF8.GetByteCount(key) >= 32)
-        {
-            return new JwtSettings(
-                issuer,
-                audience,
-                Encoding.UTF8.GetBytes(key));
-        }
-
-        if (!environment.IsDevelopment() &&
-            !environment.IsEnvironment("Testing"))
-        {
-            throw new InvalidOperationException(
-                "Jwt:Issuer, Jwt:Audience, and a Jwt:Key of at least 32 UTF-8 bytes are required outside Development/Testing.");
-        }
-
-        return new JwtSettings(
-            "Luxira.Local",
-            "Luxira.Local.Clients",
-            RandomNumberGenerator.GetBytes(32));
-    }
-
-    private sealed record JwtSettings(
-        string Issuer,
-        string Audience,
-        byte[] Key);
 
     private sealed class JwtConfigurationStartupValidator(
         IOptionsMonitor<JwtBearerOptions> options) : IHostedService

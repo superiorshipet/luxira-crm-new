@@ -140,8 +140,11 @@ public class OrderController : ControllerBase
         if (country.HasValue) query = query.Where(o => o.Country == country.Value);
 
         var total = await query.CountAsync(ct);
-        var active = await query.CountAsync(o => o.OrderStatus != 7 && o.OrderStatus != 8, ct); // Not cancelled or delivered
-        var delivered = await query.CountAsync(o => o.OrderStatus == 5 || o.OrderStatus == 8, ct);
+        var closedStatuses = OrderStatusCodes.ClosedStatuses;
+        var active = await query.CountAsync(o => !closedStatuses.Contains(o.OrderStatus), ct);
+        var delivered = await query.CountAsync(
+            o => o.OrderStatus == OrderStatusCodes.Delivered,
+            ct);
         var delayed = await query.CountAsync(o => o.IsDelayed, ct);
         var complaints = await query.CountAsync(o => o.IsComplaints, ct);
 
@@ -152,9 +155,11 @@ public class OrderController : ControllerBase
     [HttpGet("/Order/GetFailureReasonCounts")]
     public async Task<IActionResult> GetFailureReasonCounts([FromQuery] int? country, CancellationToken ct)
     {
+        var failureStatuses = OrderStatusCodes.FailureStatuses;
         var query = _context.OrderStatusHistories
             .Include(h => h.Order)
-            .Where(h => h.NewStatus == 7 && !string.IsNullOrEmpty(h.Reason)) // Cancelled
+            .Where(h => failureStatuses.Contains(h.NewStatus) &&
+                        !string.IsNullOrEmpty(h.Reason))
             .AsNoTracking()
             .AsQueryable();
 
@@ -187,7 +192,10 @@ public class OrderController : ControllerBase
     [HttpGet("/Order/GetInDeliveryStatusUpdateCount")]
     public async Task<IActionResult> GetInDeliveryStatusUpdateCount([FromQuery] int? deliveryCompanyId, CancellationToken ct)
     {
-        var query = _context.Orders.Where(o => o.OrderStatus == 3).AsNoTracking().AsQueryable(); // قيد_التوصيل
+        var query = _context.Orders
+            .Where(o => o.OrderStatus == OrderStatusCodes.InDelivery)
+            .AsNoTracking()
+            .AsQueryable();
         if (deliveryCompanyId.HasValue) query = query.Where(o => o.DeliveryCompanyId == deliveryCompanyId.Value);
 
         var count = await query.CountAsync(ct);
@@ -359,8 +367,18 @@ public class OrderController : ControllerBase
         var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == targetId, ct);
         if (order == null) return NotFound("Order not found.");
 
-        order.OrderStatus = 7; // ملغي / مكرر
+        var oldStatus = order.OrderStatus;
+        order.OrderStatus = OrderStatusCodes.Cancelled;
         order.Notes = (order.Notes ?? "") + " [Blocked as Duplicate]";
+        _context.OrderStatusHistories.Add(new OrderStatusHistory
+        {
+            OrderId = order.Id,
+            OldStatus = oldStatus,
+            NewStatus = OrderStatusCodes.Cancelled,
+            UserId = User.GetUserId() ?? "system",
+            ChangedAt = IstanbulTimeHelper.Now,
+            Reason = "Blocked as duplicate without deleting data",
+        });
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true });
     }
@@ -380,13 +398,15 @@ public class OrderController : ControllerBase
     public async Task<IActionResult> UpdateDelivered([FromRoute] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
-        var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == targetId, ct);
-        if (order == null) return NotFound("Order not found.");
-
-        order.OrderStatus = 5; // تم_التسليم
-        order.LastEditedDate = IstanbulTimeHelper.Now;
-        await _context.SaveChangesAsync(ct);
-        return Ok(new { success = true, status = order.OrderStatus });
+        var result = await _orderService.UpdateOrderStatusAsync(
+            targetId,
+            new UpdateOrderStatusRequest(
+                OrderStatusCodes.Delivered,
+                "Marked delivered",
+                null),
+            User.GetUserId() ?? "system",
+            ct);
+        return Ok(new { success = true, status = result.OrderStatus });
     }
 
     [HttpPost("{id:int}/failed-delivery")]
@@ -394,20 +414,31 @@ public class OrderController : ControllerBase
     public async Task<IActionResult> UpdateFailedDelivery([FromRoute] int id, [FromQuery] int? orderId, [FromBody] FailedDeliveryRequest request, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
-        var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == targetId, ct);
-        if (order == null) return NotFound("Order not found.");
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            throw new BadRequestException("Failure reason is required.");
+        }
 
-        order.OrderStatus = 4; // فشل_التوصيل
-        order.Notes = (order.Notes ?? "") + $" [Failure Reason: {request.Reason}]";
-        order.LastEditedDate = IstanbulTimeHelper.Now;
-        await _context.SaveChangesAsync(ct);
-        return Ok(new { success = true, status = order.OrderStatus });
+        var result = await _orderService.UpdateOrderStatusAsync(
+            targetId,
+            new UpdateOrderStatusRequest(
+                OrderStatusCodes.FailedDelivery,
+                request.Reason.Trim(),
+                null),
+            User.GetUserId() ?? "system",
+            ct);
+        return Ok(new { success = true, status = result.OrderStatus });
     }
 
     [HttpPost("update-all-statuses")]
     [HttpPost("/Order/UpdateAllStatuses")]
     public async Task<IActionResult> UpdateAllStatuses([FromBody] UpdateAllStatusesRequest request, CancellationToken ct)
     {
+        if (!OrderStatusCodes.IsDefined(request.NewStatus))
+        {
+            throw new BadRequestException($"Order status '{request.NewStatus}' is not part of the legacy status contract.");
+        }
+
         var orders = await _context.Orders.Where(o => request.OrderIds.Contains(o.Id)).ToListAsync(ct);
         var now = IstanbulTimeHelper.Now;
         var userId = User.GetUserId() ?? "system";

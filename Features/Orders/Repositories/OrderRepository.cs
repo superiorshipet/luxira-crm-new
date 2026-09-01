@@ -110,6 +110,16 @@ public class OrderRepository
         await _context.SaveChangesAsync(ct);
     }
 
+    public async Task UpdateWithStatusHistoryAsync(
+        Order order,
+        OrderStatusHistory history,
+        CancellationToken ct = default)
+    {
+        _context.Orders.Update(order);
+        await _context.OrderStatusHistories.AddAsync(history, ct);
+        await _context.SaveChangesAsync(ct);
+    }
+
     public async Task AddStatusHistoryAsync(OrderStatusHistory history, CancellationToken ct = default)
     {
         await _context.OrderStatusHistories.AddAsync(history, ct);
@@ -126,11 +136,13 @@ public class OrderRepository
         }
 
         int total = await query.CountAsync(ct);
-        int newOrders = await query.CountAsync(o => o.OrderStatus == 1, ct);
-        int delivered = await query.CountAsync(o => o.OrderStatus == 5, ct); // تم التوصيل
-        int returned = await query.CountAsync(o => o.OrderStatus == 7, ct);  // مرتجع
-        int cancelled = await query.CountAsync(o => o.OrderStatus == 9, ct); // ملغي
-        decimal revenue = await query.Where(o => o.OrderStatus == 5).SumAsync(o => o.TotalPrice, ct);
+        int newOrders = await query.CountAsync(o => o.OrderStatus == OrderStatusCodes.New, ct);
+        int delivered = await query.CountAsync(o => o.OrderStatus == OrderStatusCodes.Delivered, ct);
+        int returned = await query.CountAsync(o => o.OrderStatus == OrderStatusCodes.Returned, ct);
+        int cancelled = await query.CountAsync(o => o.OrderStatus == OrderStatusCodes.Cancelled, ct);
+        decimal revenue = await query
+            .Where(o => o.OrderStatus == OrderStatusCodes.Delivered)
+            .SumAsync(o => o.TotalPrice, ct);
 
         return new OrderStatsDto(total, newOrders, delivered, returned, cancelled, revenue);
     }

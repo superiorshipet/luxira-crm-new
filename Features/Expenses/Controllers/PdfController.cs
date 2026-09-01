@@ -1,6 +1,7 @@
 using System.Text;
 using Luxira.Api.Data;
 using Luxira.Api.Infrastructure.Pdf;
+using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Utils.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -130,7 +131,8 @@ public class PdfController : ControllerBase
         var orders = await _context.Orders
             .Include(o => o.DeliveryCompany)
             .AsNoTracking()
-            .Where(o => o.DeliveryCompanyId == targetCompanyId && o.OrderStatus == 4) // جاهز للتسليم
+            .Where(o => o.DeliveryCompanyId == targetCompanyId &&
+                        o.OrderStatus == OrderStatusCodes.InDelivery)
             .ToListAsync(ct);
 
         if (downloadPdf)

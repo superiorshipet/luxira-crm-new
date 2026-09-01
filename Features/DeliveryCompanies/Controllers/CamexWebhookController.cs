@@ -1,5 +1,6 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Orders.Services;
+using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Utils.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,13 +39,12 @@ public class CamexWebhookController : ControllerBase
 
         if (order != null)
         {
-            // Map Camex status to Luxira status (e.g. Delivered = 5, Returned = 7)
             int targetStatus = payload.Status?.ToLowerInvariant() switch
             {
-                "delivered" => 5, // تم التوصيل
-                "returned" => 7,  // مرتجع
-                "in_transit" => 6, // تم الشحن
-                "cancelled" => 9,  // ملغي
+                "delivered" => OrderStatusCodes.Delivered,
+                "returned" => OrderStatusCodes.Returned,
+                "in_transit" => OrderStatusCodes.InDelivery,
+                "cancelled" => OrderStatusCodes.Cancelled,
                 _ => order.OrderStatus
             };
 

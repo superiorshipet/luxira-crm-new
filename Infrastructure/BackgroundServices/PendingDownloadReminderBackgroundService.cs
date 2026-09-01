@@ -1,5 +1,6 @@
 using Luxira.Api.Data;
 using Luxira.Api.Infrastructure.Email;
+using Luxira.Api.Features.Orders.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -52,7 +53,7 @@ public sealed class PendingDownloadReminderBackgroundService : BackgroundService
         var emailService = scope.ServiceProvider.GetRequiredService<LuxiraEmailService>();
 
         var pendingOrdersCount = await db.Orders
-            .Where(o => o.OrderStatus == 1) // New orders
+            .Where(o => o.OrderStatus == OrderStatusCodes.New)
             .CountAsync(token);
 
         if (pendingOrdersCount > 50)

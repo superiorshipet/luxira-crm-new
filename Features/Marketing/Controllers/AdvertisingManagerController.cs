@@ -1,5 +1,6 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Marketing.Models;
+using Luxira.Api.Features.Orders.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -70,8 +71,10 @@ public class AdvertisingManagerController : ControllerBase
             .ToListAsync(ct);
 
         int totalOrders = orders.Count;
-        int deliveredOrders = orders.Count(o => o.OrderStatus == 5);
-        decimal totalRevenue = orders.Where(o => o.OrderStatus == 5).Sum(o => o.TotalPrice);
+        int deliveredOrders = orders.Count(o => o.OrderStatus == OrderStatusCodes.Delivered);
+        decimal totalRevenue = orders
+            .Where(o => o.OrderStatus == OrderStatusCodes.Delivered)
+            .Sum(o => o.TotalPrice);
         decimal spent = campaign.Spent > 0 ? campaign.Spent : campaign.Budget;
         decimal cpa = totalOrders > 0 ? Math.Round(spent / totalOrders, 2) : 0;
         decimal roi = spent > 0 ? Math.Round(((totalRevenue - spent) / spent) * 100, 2) : 0;

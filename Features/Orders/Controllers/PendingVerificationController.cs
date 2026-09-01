@@ -1,5 +1,6 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Orders.DTOs;
+using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Features.Orders.Services;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
@@ -55,7 +56,10 @@ public class PendingVerificationController : ControllerBase
         // Progress to Status 3 (قيد التجهيز) or 4 (جاهز للتسليم)
         var updated = await _orderService.UpdateOrderStatusAsync(
             order.Id,
-            new UpdateOrderStatusRequest(3, "Verified and Dispatched to Courier Queue", request.TrackingNumber),
+            new UpdateOrderStatusRequest(
+                OrderStatusCodes.Processed,
+                "Verified and Dispatched to Courier Queue",
+                request.TrackingNumber),
             userId,
             ct);
 

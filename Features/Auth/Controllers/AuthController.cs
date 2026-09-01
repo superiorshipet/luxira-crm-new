@@ -27,7 +27,7 @@ public class AuthController : ControllerBase
         return Ok(response);
     }
 
-    [AllowAnonymous]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request, CancellationToken ct)
     {

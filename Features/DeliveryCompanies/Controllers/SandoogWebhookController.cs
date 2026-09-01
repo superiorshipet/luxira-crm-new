@@ -1,5 +1,6 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Orders.Services;
+using Luxira.Api.Features.Orders.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -37,9 +38,9 @@ public class SandoogWebhookController : ControllerBase
         {
             int targetStatus = payload.Event?.ToLowerInvariant() switch
             {
-                "delivered" => 5,
-                "returned" => 7,
-                "shipped" => 6,
+                "delivered" => OrderStatusCodes.Delivered,
+                "returned" => OrderStatusCodes.Returned,
+                "shipped" => OrderStatusCodes.InDelivery,
                 _ => order.OrderStatus
             };
 

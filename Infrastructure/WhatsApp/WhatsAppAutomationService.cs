@@ -21,13 +21,14 @@ public class WhatsAppAutomationService
     private readonly string _templateName;
 
     public WhatsAppAutomationService(
+        HttpClient httpClient,
         IConfiguration configuration,
         ApplicationDbContext context,
         ILogger<WhatsAppAutomationService> logger)
     {
         _context = context;
         _logger = logger;
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        _httpClient = httpClient;
 
         _enabled = configuration.GetValue<bool?>("WhatsApp:Infobip:Enabled") ?? false;
         _baseUrl = configuration["WhatsApp:Infobip:BaseUrl"] ?? "qw48j2.api.infobip.com";

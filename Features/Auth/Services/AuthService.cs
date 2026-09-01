@@ -3,7 +3,9 @@ using Luxira.Api.Features.Auth.Models;
 using Luxira.Api.Features.Auth.Repositories;
 using Luxira.Api.Utils.Exceptions;
 using Microsoft.AspNetCore.Cryptography.KeyDerivation;
+using Microsoft.AspNetCore.Identity;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Luxira.Api.Features.Auth.Services;
 
@@ -11,19 +13,25 @@ public class AuthService
 {
     private readonly UserRepository _userRepository;
     private readonly JwtService _jwtService;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
     private readonly ILogger<AuthService> _logger;
 
-    public AuthService(UserRepository userRepository, JwtService jwtService, ILogger<AuthService> logger)
+    public AuthService(
+        UserRepository userRepository,
+        JwtService jwtService,
+        IPasswordHasher<ApplicationUser> passwordHasher,
+        ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _jwtService = jwtService;
+        _passwordHasher = passwordHasher;
         _logger = logger;
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
         var user = await _userRepository.GetByUsernameAsync(request.Username, ct);
-        if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
+        if (user == null || !VerifyPassword(user, request.Password))
         {
             throw new UnauthorizedException("Invalid username or password.");
         }
@@ -50,25 +58,42 @@ public class AuthService
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
     {
-        var existing = await _userRepository.GetByUsernameAsync(request.Username, ct);
-        if (existing != null)
+        if (string.IsNullOrWhiteSpace(request.Username) ||
+            string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Password))
+        {
+            throw new BadRequestException("Username, email, and password are required.");
+        }
+
+        if (request.Password.Length < 8)
+        {
+            throw new BadRequestException("Password must be at least 8 characters.");
+        }
+
+        var normalizedUsername = request.Username.Trim().ToUpperInvariant();
+        var normalizedEmail = request.Email.Trim().ToUpperInvariant();
+        var existing = await _userRepository.FindByNormalizedIdentityAsync(
+            normalizedUsername,
+            normalizedEmail,
+            ct);
+        if (existing is not null)
         {
             throw new BadRequestException("Username or email is already registered.");
         }
 
         var user = new ApplicationUser
         {
-            UserName = request.Username,
-            NormalizedUserName = request.Username.ToUpperInvariant(),
-            Email = request.Email,
-            NormalizedEmail = request.Email.ToUpperInvariant(),
+            UserName = request.Username.Trim(),
+            NormalizedUserName = normalizedUsername,
+            Email = request.Email.Trim(),
+            NormalizedEmail = normalizedEmail,
             Name = request.Name,
             Country = request.Country,
             AcessId = request.AccessId,
-            Role = request.Role ?? "Admin",
-            PasswordHash = HashPassword(request.Password),
+            Role = string.IsNullOrWhiteSpace(request.Role) ? "Employee" : request.Role.Trim(),
             IsActive = true
         };
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
         await _userRepository.AddAsync(user, ct);
         var (token, expiresAt) = _jwtService.GenerateToken(user);
@@ -119,34 +144,44 @@ public class AuthService
         return new AuthResponse(token, Guid.NewGuid().ToString(), expiresAt, userDto);
     }
 
-    private static string HashPassword(string password)
+    private bool VerifyPassword(
+        ApplicationUser user,
+        string password)
     {
-        byte[] salt = RandomNumberGenerator.GetBytes(128 / 8);
-        string hashed = Convert.ToBase64String(KeyDerivation.Pbkdf2(
-            password: password,
-            salt: salt,
-            prf: KeyDerivationPrf.HMACSHA256,
-            iterationCount: 100000,
-            numBytesRequested: 256 / 8));
-        return $"{Convert.ToBase64String(salt)}.{hashed}";
-    }
-
-    private static bool VerifyPassword(string password, string? storedHash)
-    {
+        var storedHash = user.PasswordHash;
         if (string.IsNullOrEmpty(storedHash)) return false;
+
+        if (!storedHash.Contains('.', StringComparison.Ordinal))
+        {
+            return _passwordHasher.VerifyHashedPassword(
+                       user,
+                       storedHash,
+                       password) is PasswordVerificationResult.Success or
+                           PasswordVerificationResult.SuccessRehashNeeded;
+        }
+
+        // Compatibility for accounts created by the first .NET 10 scaffold.
         var parts = storedHash.Split('.');
         if (parts.Length != 2) return false;
 
-        byte[] salt = Convert.FromBase64String(parts[0]);
-        string hash = parts[1];
+        try
+        {
+            var salt = Convert.FromBase64String(parts[0]);
+            var expectedHash = Convert.FromBase64String(parts[1]);
+            var computedHash = KeyDerivation.Pbkdf2(
+                password,
+                salt,
+                KeyDerivationPrf.HMACSHA256,
+                100_000,
+                256 / 8);
 
-        string computedHash = Convert.ToBase64String(KeyDerivation.Pbkdf2(
-            password: password,
-            salt: salt,
-            prf: KeyDerivationPrf.HMACSHA256,
-            iterationCount: 100000,
-            numBytesRequested: 256 / 8));
-
-        return hash == computedHash;
+            return CryptographicOperations.FixedTimeEquals(
+                expectedHash,
+                computedHash);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }

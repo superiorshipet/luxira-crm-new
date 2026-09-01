@@ -1,4 +1,5 @@
 using Luxira.Api.Features.Orders.DTOs;
+using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Features.Orders.Services;
 using Luxira.Api.Utils.Extensions;
 using Microsoft.AspNetCore.Authorization;
@@ -37,7 +38,10 @@ public class PrepareForDeliveryController : ControllerBase
         // Mark as Ready for Delivery (Status 4 = جاهز للتسليم)
         var result = await _orderService.UpdateOrderStatusAsync(
             request.OrderId,
-            new UpdateOrderStatusRequest(4, "Scanned and Prepared for Delivery", request.Barcode),
+            new UpdateOrderStatusRequest(
+                OrderStatusCodes.InDelivery,
+                "Scanned and Prepared for Delivery",
+                request.Barcode),
             userId,
             ct);
 

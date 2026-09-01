@@ -20,7 +20,22 @@ public class UserRepository
 
     public async Task<ApplicationUser?> GetByUsernameAsync(string username, CancellationToken ct = default)
     {
-        return await _context.Users.FirstOrDefaultAsync(u => u.UserName == username || u.Email == username, ct);
+        var normalized = username.Trim().ToUpperInvariant();
+        return await _context.Users.FirstOrDefaultAsync(
+            u => u.NormalizedUserName == normalized ||
+                 u.NormalizedEmail == normalized,
+            ct);
+    }
+
+    public async Task<ApplicationUser?> FindByNormalizedIdentityAsync(
+        string normalizedUsername,
+        string normalizedEmail,
+        CancellationToken ct = default)
+    {
+        return await _context.Users.FirstOrDefaultAsync(
+            u => u.NormalizedUserName == normalizedUsername ||
+                 u.NormalizedEmail == normalizedEmail,
+            ct);
     }
 
     public async Task<ApplicationUser> AddAsync(ApplicationUser user, CancellationToken ct = default)

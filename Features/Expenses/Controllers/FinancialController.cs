@@ -29,9 +29,8 @@ public class FinancialController : ControllerBase
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
     public async Task<IActionResult> Countries(CancellationToken ct)
     {
-        // Get all orders with status: تم_تحديث_الرصيد (typically status 6 or similar)
         var orders = await _context.Orders
-            .Where(o => o.OrderStatus == 6 || o.OrderStatus == 1) // Balance updated
+            .Where(o => o.OrderStatus == OrderStatusCodes.BalanceUpdated)
             .Select(o => new { o.Id, o.Country, o.TotalPrice, o.DeliveryPrice })
             .AsNoTracking()
             .ToListAsync(ct);
@@ -108,7 +107,8 @@ public class FinancialController : ControllerBase
                 TotalNetPrice = g.Sum(x => x.NetPrice),
                 TotalGrossPrice = g.Sum(x => x.TotalPrice),
                 TotalDeliveryFee = g.Sum(x => x.DeliveryPrice),
-                BalanceUpdatedOrders = g.Count(x => x.OrderStatus == 6)
+                BalanceUpdatedOrders = g.Count(
+                    x => x.OrderStatus == OrderStatusCodes.BalanceUpdated)
             })
             .ToList();
 
@@ -302,6 +302,7 @@ public class FinancialController : ControllerBase
         var orders = await _context.Orders
             .Where(o => o.DeliveryCompanyId == request.DeliveryCompanyId &&
                         (!request.ManufactureCompanyId.HasValue || o.ManufacturingCompanyId == request.ManufactureCompanyId.Value) &&
+                        o.OrderStatus == OrderStatusCodes.BalanceUpdated &&
                         !o.IsPaid)
             .ToListAsync(ct);
 
@@ -311,22 +312,11 @@ public class FinancialController : ControllerBase
         var now = IstanbulTimeHelper.Now;
         var userId = User.GetUserId() ?? "System";
 
-        foreach (var order in orders)
-        {
-            order.IsPaid = true;
-            order.LastEditedDate = now;
-            order.OrderStatus = 8; // تم_الدفع
-
-            _context.OrderStatusHistories.Add(new OrderStatusHistory
-            {
-                OrderId = order.Id,
-                OldStatus = order.OrderStatus,
-                NewStatus = 8,
-                UserId = userId,
-                ChangedAt = now,
-                Reason = "Marked as paid via Financial Settlement"
-            });
-        }
+        MarkOrdersAsPaid(
+            orders,
+            userId,
+            now,
+            "Marked as paid via Financial Settlement");
 
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, updatedCount = orders.Count, totalAmount = orders.Sum(o => o.TotalPrice) });
@@ -338,7 +328,9 @@ public class FinancialController : ControllerBase
     public async Task<IActionResult> MarkAsPaidAll([FromBody] MarkAsPaidAllRequest request, CancellationToken ct)
     {
         var query = _context.Orders
-            .Where(o => o.DeliveryCompanyId == request.DeliveryCompanyId && !o.IsPaid);
+            .Where(o => o.DeliveryCompanyId == request.DeliveryCompanyId &&
+                        o.OrderStatus == OrderStatusCodes.BalanceUpdated &&
+                        !o.IsPaid);
 
         if (request.ManufacturingCompanyIds != null && request.ManufacturingCompanyIds.Count > 0)
         {
@@ -349,22 +341,7 @@ public class FinancialController : ControllerBase
         var now = IstanbulTimeHelper.Now;
         var userId = User.GetUserId() ?? "System";
 
-        foreach (var order in orders)
-        {
-            order.IsPaid = true;
-            order.LastEditedDate = now;
-            order.OrderStatus = 8;
-
-            _context.OrderStatusHistories.Add(new OrderStatusHistory
-            {
-                OrderId = order.Id,
-                OldStatus = order.OrderStatus,
-                NewStatus = 8,
-                UserId = userId,
-                ChangedAt = now,
-                Reason = "Marked as paid in bulk"
-            });
-        }
+        MarkOrdersAsPaid(orders, userId, now, "Marked as paid in bulk");
 
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, updatedCount = orders.Count, totalAmount = orders.Sum(o => o.TotalPrice) });
@@ -376,7 +353,9 @@ public class FinancialController : ControllerBase
     public async Task<IActionResult> MarkAsPaidAllByCountry([FromBody] MarkAsPaidCountryRequest request, CancellationToken ct)
     {
         var query = _context.Orders
-            .Where(o => o.Country == request.CountryId && !o.IsPaid);
+            .Where(o => o.Country == request.CountryId &&
+                        o.OrderStatus == OrderStatusCodes.BalanceUpdated &&
+                        !o.IsPaid);
 
         if (request.DeliveryCompanyIds != null && request.DeliveryCompanyIds.Count > 0)
             query = query.Where(o => request.DeliveryCompanyIds.Contains(o.DeliveryCompanyId));
@@ -388,12 +367,7 @@ public class FinancialController : ControllerBase
         var now = IstanbulTimeHelper.Now;
         var userId = User.GetUserId() ?? "System";
 
-        foreach (var order in orders)
-        {
-            order.IsPaid = true;
-            order.LastEditedDate = now;
-            order.OrderStatus = 8;
-        }
+        MarkOrdersAsPaid(orders, userId, now, "Marked as paid by country");
 
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, updatedCount = orders.Count });
@@ -405,23 +379,46 @@ public class FinancialController : ControllerBase
     public async Task<IActionResult> MarkAsPaidAllByCity([FromBody] MarkAsPaidCityRequest request, CancellationToken ct)
     {
         var query = _context.Orders
-            .Where(o => o.Country == request.CountryId && !o.IsPaid);
+            .Where(o => o.Country == request.CountryId &&
+                        o.OrderStatus == OrderStatusCodes.BalanceUpdated &&
+                        !o.IsPaid);
 
         if (!string.IsNullOrEmpty(request.CityId))
             query = query.Where(o => o.State == request.CityId);
 
         var orders = await query.ToListAsync(ct);
         var now = IstanbulTimeHelper.Now;
+        var userId = User.GetUserId() ?? "System";
 
-        foreach (var order in orders)
-        {
-            order.IsPaid = true;
-            order.LastEditedDate = now;
-            order.OrderStatus = 8;
-        }
+        MarkOrdersAsPaid(orders, userId, now, "Marked as paid by city");
 
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, updatedCount = orders.Count });
+    }
+
+    private void MarkOrdersAsPaid(
+        IEnumerable<Order> orders,
+        string userId,
+        DateTime changedAt,
+        string reason)
+    {
+        foreach (var order in orders)
+        {
+            var oldStatus = order.OrderStatus;
+            order.IsPaid = true;
+            order.LastEditedDate = changedAt;
+            order.OrderStatus = OrderStatusCodes.Paid;
+
+            _context.OrderStatusHistories.Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                OldStatus = oldStatus,
+                NewStatus = OrderStatusCodes.Paid,
+                UserId = userId,
+                ChangedAt = changedAt,
+                Reason = reason,
+            });
+        }
     }
 
     [HttpGet("OrderReports")]

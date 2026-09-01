@@ -37,10 +37,13 @@ public sealed class LavvaWhatsAppService
     private readonly string _templateName;
     private readonly string _templateLanguageCode;
 
-    public LavvaWhatsAppService(IConfiguration configuration, ILogger<LavvaWhatsAppService> logger)
+    public LavvaWhatsAppService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<LavvaWhatsAppService> logger)
     {
         _logger = logger;
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        _httpClient = httpClient;
 
         _enabled = configuration.GetValue<bool?>("WhatsApp:Lavva:Enabled") ?? false;
         _senderNumber = configuration["WhatsApp:Lavva:SenderNumber"] ?? "+905377144098";
@@ -125,7 +128,13 @@ public sealed class LavvaWhatsAppService
                 {
                     result.MessageId = messagesEl[0].GetProperty("id").GetString();
                 }
-                _logger.LogInformation("WhatsApp template sent to {Phone} for Order {OrderId}", normalizedPhone, request.OrderId);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation(
+                        "WhatsApp template sent to {Phone} for Order {OrderId}",
+                        normalizedPhone,
+                        request.OrderId);
+                }
             }
             else
             {
