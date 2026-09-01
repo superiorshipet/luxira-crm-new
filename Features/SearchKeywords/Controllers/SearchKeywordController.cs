@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Luxira.Api.Features.SearchKeywords.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/v1/administration/search-keywords")]
 [Route("api/[controller]")]
 public class SearchKeywordController : ControllerBase
@@ -30,7 +31,7 @@ public class SearchKeywordController : ControllerBase
         return Ok(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,Administrator")]
     [HttpPost]
     public async Task<ActionResult<SearchKeywordRecord>> CreateKeyword(
         [FromBody] CreateSearchKeywordRequest request,

@@ -27,13 +27,23 @@ public class MarketingLead
 public class StoreScript
 {
     public int Id { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public string Content { get; set; } = string.Empty;
-    public string Category { get; set; } = "General"; // Greeting, Objections, Closing, Upsell
-    public int? ProductId { get; set; }
-    public int? Country { get; set; }
+    public int StoreCodeFolderId { get; set; }
+    public int ManufacturingCompanyId { get; set; }
+    public string Platform { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string EngineVersion { get; set; } = string.Empty;
+    public long RevisionStamp { get; set; }
+    public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
 }
 
 public class WebsiteDomain

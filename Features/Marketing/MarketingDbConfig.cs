@@ -31,9 +31,10 @@ public class StoreScriptDbConfig : IDbConfig<StoreScript>
 {
     public void Configure(EntityTypeBuilder<StoreScript> builder)
     {
-        builder.ToTable("StoreScripts");
+        builder.ToTable("ScriptDefinitions");
         builder.HasKey(s => s.Id);
-        builder.Property(s => s.Title).HasMaxLength(255).IsRequired();
+        builder.Property(s => s.Platform).HasMaxLength(40).IsRequired();
+        builder.Property(s => s.EngineVersion).HasMaxLength(40).IsRequired();
     }
 }
 

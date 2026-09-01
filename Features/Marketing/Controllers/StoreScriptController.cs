@@ -21,15 +21,30 @@ public class StoreScriptController : ControllerBase
 
     [HttpGet]
     [HttpGet("GetScripts")]
-    public async Task<ActionResult<List<StoreScript>>> GetScripts([FromQuery] string? category, CancellationToken ct)
+    public async Task<ActionResult<List<StoreScript>>> GetScripts(
+        [FromQuery] int? manufacturingCompanyId,
+        [FromQuery] string? platform,
+        CancellationToken ct)
     {
-        var query = _context.Set<StoreScript>().AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(category))
+        var query = _context.Set<StoreScript>()
+            .AsNoTracking()
+            .Where(script => !script.IsDeleted)
+            .AsQueryable();
+
+        if (manufacturingCompanyId.HasValue && manufacturingCompanyId.Value > 0)
         {
-            query = query.Where(s => s.Category == category);
+            query = query.Where(script => script.ManufacturingCompanyId == manufacturingCompanyId.Value);
         }
 
-        var list = await query.ToListAsync(ct);
+        if (!string.IsNullOrWhiteSpace(platform))
+        {
+            query = query.Where(script => script.Platform == platform);
+        }
+
+        var list = await query
+            .OrderByDescending(script => script.UpdatedAt)
+            .Take(200)
+            .ToListAsync(ct);
         return Ok(list);
     }
 }
