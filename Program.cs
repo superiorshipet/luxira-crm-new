@@ -136,9 +136,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ─── Health Checks ────────────────────────────────────────────────────────────
-builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ApplicationDbContext>("database");
+// Health Checks registered by PlatformModule (DatabaseHealthCheck with "database" tag)
 
 // ════════════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
