@@ -292,6 +292,39 @@ public class OrderService
         return MapToDto(order);
     }
 
+    public async Task<OrderDto> MarkAsBankTransferAsync(
+        int orderId,
+        string userId,
+        CancellationToken ct = default)
+    {
+        var order = await _context.Orders
+            .Include(item => item.OrderWarehouses)
+            .Include(item => item.DeliveryCompany)
+            .FirstOrDefaultAsync(item => item.Id == orderId, ct);
+        if (order is null)
+        {
+            throw new NotFoundException($"Order with ID {orderId} was not found.");
+        }
+
+        if (order.IsPaid)
+        {
+            return MapToDto(order);
+        }
+
+        var nextEditNumber = (await _context.OrderEditHistories
+            .Where(history => history.OrderId == order.Id)
+            .MaxAsync(history => (int?)history.EditNumber, ct) ?? 0) + 1;
+        await _context.OrderEditHistories.AddAsync(
+            CreateEditSnapshot(order, nextEditNumber, userId),
+            ct);
+
+        order.IsPaid = true;
+        order.LastEditedDate = DateTime.UtcNow;
+        order.Editedby = userId;
+        await _context.SaveChangesAsync(ct);
+        return MapToDto(order);
+    }
+
     private static OrderEditHistory CreateEditSnapshot(
         Order order,
         int editNumber,

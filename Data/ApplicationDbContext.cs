@@ -70,8 +70,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<SalesIndicator> SalesIndicators => Set<SalesIndicator>();
-    public DbSet<Invoice> Invoices => Set<Invoice>();
-    public DbSet<FinancialTransfer> FinancialTransfers => Set<FinancialTransfer>();
 
     // Warehouses & Inventory
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();

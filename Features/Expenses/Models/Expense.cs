@@ -31,30 +31,3 @@ public class SalesIndicator
     public int Year { get; set; }
 }
 
-public class Invoice
-{
-    public int Id { get; set; }
-    public string InvoiceNumber { get; set; } = string.Empty;
-    public string CustomerName { get; set; } = string.Empty;
-    public decimal TotalAmount { get; set; }
-    public decimal DiscountAmount { get; set; }
-    public decimal FinalAmount { get; set; }
-    public int Country { get; set; }
-    public string CreatedByUserId { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public string? PdfUrl { get; set; }
-}
-
-public class FinancialTransfer
-{
-    public int Id { get; set; }
-    public string FromAccount { get; set; } = string.Empty;
-    public string ToAccount { get; set; } = string.Empty;
-    public decimal Amount { get; set; }
-    public string Currency { get; set; } = "IQD";
-    public decimal ExchangeRate { get; set; } = 1.0m;
-    public string TransferredByUserId { get; set; } = string.Empty;
-    public DateTime TransferredAt { get; set; } = DateTime.UtcNow;
-    public string? Note { get; set; }
-}
-
