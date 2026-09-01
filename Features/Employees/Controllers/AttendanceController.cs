@@ -87,9 +87,34 @@ public class AttendanceController : ControllerBase
     [HttpPost("toggle-login-block")]
     [HttpPost("/EmployeeAttendance/ToggleEmployeeLoginBlock")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
-    public IActionResult ToggleEmployeeLoginBlock([FromBody] ToggleLoginBlockRequest request)
+    public async Task<IActionResult> ToggleEmployeeLoginBlock([FromBody] ToggleLoginBlockRequest request, CancellationToken ct)
     {
-        return Ok(new { success = true, employeeId = request.EmployeeId, isBlocked = request.IsBlocked });
+        var shift = await _context.EmployeeWorkShifts
+            .FirstOrDefaultAsync(item => item.Id == request.ShiftId && item.IsActive, ct);
+        if (shift is null) throw new NotFoundException("Active employee shift was not found.");
+
+        var now = IstanbulTimeHelper.Now;
+        shift.IsLoginBlocked = request.IsBlocked;
+        shift.LoginBlockedAt = request.IsBlocked ? now : null;
+        shift.LoginBlockReason = request.IsBlocked
+            ? "تم عمل بلوك يدوي من الإدارة"
+            : "تم فك البلوك يدويًا من الإدارة";
+        shift.AdminUnblockedAt = request.IsBlocked ? null : now;
+        shift.AdminUnblockedByUserId = request.IsBlocked ? null : User.GetUserId();
+        shift.AdminUnblockedUntil = null;
+        shift.UpdatedAt = now;
+
+        if (request.IsBlocked)
+        {
+            var openLog = await _context.EmployeeAttendanceLogs
+                .Where(log => log.EmployeeId == shift.EmployeeId && log.CheckOutAt == null)
+                .OrderByDescending(log => log.CheckInAt)
+                .FirstOrDefaultAsync(ct);
+            if (openLog is not null) openLog.CheckOutAt = now;
+        }
+
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, shiftId = shift.Id, isBlocked = shift.IsLoginBlocked });
     }
 
     [HttpGet("live-logs")]
@@ -110,9 +135,22 @@ public class AttendanceController : ControllerBase
 
     [HttpGet("capture-status")]
     [HttpGet("/EmployeeAttendance/GetCheckInCaptureStatus")]
-    public IActionResult GetCheckInCaptureStatus()
+    public async Task<IActionResult> GetCheckInCaptureStatus(CancellationToken ct)
     {
-        return Ok(new { isCaptureEnabled = true, requireFaceVerification = false });
+        var userId = User.GetUserId();
+        var employee = await _context.Employees.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.ApplicationUserId == userId, ct);
+        if (employee is null)
+            return Ok(new { shouldCapture = false, hasOpenLog = false, reason = "employee_not_found" });
+
+        var hasOpenLog = await _context.EmployeeAttendanceLogs.AsNoTracking()
+            .AnyAsync(log => log.EmployeeId == employee.Id && log.CheckOutAt == null, ct);
+        return Ok(new
+        {
+            shouldCapture = !hasOpenLog,
+            requireFaceVerification = employee.HasFacePrint,
+            hasOpenLog
+        });
     }
 
     [HttpGet("late-notifications")]
@@ -167,4 +205,4 @@ public class AttendanceController : ControllerBase
     }
 }
 
-public record ToggleLoginBlockRequest(int EmployeeId, bool IsBlocked);
+public record ToggleLoginBlockRequest(int ShiftId, bool IsBlocked);

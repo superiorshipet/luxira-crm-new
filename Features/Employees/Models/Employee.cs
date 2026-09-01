@@ -20,6 +20,23 @@ public class Employee
     public string? JobTitle { get; set; }
     public DateTime HireDate { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+    public bool IsShown { get; set; } = true;
+    public bool AllowMobileOrTabletLogin { get; set; }
+    public bool ApplyShiftAccess { get; set; } = true;
+    public bool? AllowScreenRecording { get; set; }
+    public bool IsNotificationCenterBlocked { get; set; }
+    public bool CanHandleUrgentReports { get; set; }
+    public bool EnableOrderPackaging { get; set; }
+    public TimeSpan? OrderPackagingNotificationTime { get; set; }
+    public int? OrderPackagingDeliveryCompanyId { get; set; }
+    public string? OrderPackagingDeliveryCompanyIds { get; set; }
+    public int OrderPackagingStartGraceMinutes { get; set; } = 20;
+    public DateTime? OrderPackagingTriggeredAt { get; set; }
+    public DateTime? OrderPackagingFirstPreparedAt { get; set; }
+    public DateTime? OrderPackagingCompletedAt { get; set; }
+    public DateTime? OrderPackagingLastEmployeeReminderAt { get; set; }
+    public DateTime? OrderPackagingLastAdminReminderAt { get; set; }
+    public DateTime? OrderPackagingCompletionNotifiedAt { get; set; }
     public string? FaceDescriptor { get; set; }
     public bool HasFacePrint { get; set; }
 

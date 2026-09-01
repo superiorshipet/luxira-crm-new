@@ -4,6 +4,8 @@ using Luxira.Api.Features.Orders.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Luxira.Api.Infrastructure.Webhooks;
+using Luxira.Api.Utils.Exceptions;
 
 namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 
@@ -15,17 +17,23 @@ public class SandoogWebhookController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly OrderService _orderService;
+    private readonly WebhookSecurity _webhookSecurity;
 
-    public SandoogWebhookController(ApplicationDbContext context, OrderService orderService)
+    public SandoogWebhookController(
+        ApplicationDbContext context,
+        OrderService orderService,
+        WebhookSecurity webhookSecurity)
     {
         _context = context;
         _orderService = orderService;
+        _webhookSecurity = webhookSecurity;
     }
 
     [HttpPost]
     [HttpPost("ProcessWebhook")]
     public async Task<IActionResult> ProcessWebhook([FromBody] SandoogWebhookPayload payload, CancellationToken ct)
     {
+        _webhookSecurity.ValidateSharedSecret(Request, "Sandoog");
         if (payload == null || string.IsNullOrWhiteSpace(payload.ShipmentId))
         {
             return BadRequest(new { message = "Invalid payload" });
@@ -39,24 +47,27 @@ public class SandoogWebhookController : ControllerBase
             });
         }
 
-        var order = await _context.Orders
-            .Include(o => o.DeliveryCompany)
-            .FirstOrDefaultAsync(o => o.Id == payload.OrderId.Value, ct);
-
-        if (order != null)
+        var normalizedEvent = payload.Event?.Trim().ToLowerInvariant();
+        var targetStatus = normalizedEvent switch
         {
+            "delivered" => OrderStatusCodes.Delivered,
+            "returned" => OrderStatusCodes.Returned,
+            "shipped" => OrderStatusCodes.InDelivery,
+            _ => throw new BadRequestException("Unsupported Sandoog webhook event.")
+        };
+        var eventKey = payload.EventId ??
+            $"{payload.ShipmentId}|{normalizedEvent}|{payload.Date:O}|{payload.ReasonCode}";
+
+        await _webhookSecurity.ExecuteOnceAsync("Sandoog", eventKey, async cancellationToken =>
+        {
+            var order = await _context.Orders
+                .Include(o => o.DeliveryCompany)
+                .FirstOrDefaultAsync(o => o.Id == payload.OrderId.Value, cancellationToken)
+                ?? throw new NotFoundException("Order for Sandoog shipment was not found.");
             if (!string.IsNullOrWhiteSpace(payload.ReasonCode))
             {
                 order.SandoogReasonCode = payload.ReasonCode.Trim();
             }
-
-            int targetStatus = payload.Event?.ToLowerInvariant() switch
-            {
-                "delivered" => OrderStatusCodes.Delivered,
-                "returned" => OrderStatusCodes.Returned,
-                "shipped" => OrderStatusCodes.InDelivery,
-                _ => order.OrderStatus
-            };
 
             if (targetStatus != order.OrderStatus)
             {
@@ -64,13 +75,13 @@ public class SandoogWebhookController : ControllerBase
                     order.Id,
                     new Orders.DTOs.UpdateOrderStatusRequest(targetStatus, $"Sandoog Webhook: {payload.Event}", payload.Reason),
                     OrderStatusActor.TrustedSystem("sandoog-webhook"),
-                    ct);
+                    cancellationToken);
             }
             else if (_context.Entry(order).Property(o => o.SandoogReasonCode).IsModified)
             {
-                await _context.SaveChangesAsync(ct);
+                await _context.SaveChangesAsync(cancellationToken);
             }
-        }
+        }, ct);
 
         return Ok(new { success = true, shipmentId = payload.ShipmentId });
     }
@@ -82,4 +93,5 @@ public record SandoogWebhookPayload(
     string? Reason,
     DateTime? Date,
     int? OrderId = null,
-    string? ReasonCode = null);
+    string? ReasonCode = null,
+    string? EventId = null);

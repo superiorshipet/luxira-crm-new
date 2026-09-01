@@ -41,6 +41,29 @@ public sealed class LuxiraCacheService
     public ValueTask InvalidateAsync(string key, CancellationToken ct = default) =>
         _cache.RemoveAsync(key, ct);
 
+    public ValueTask SetAsync<T>(
+        string key,
+        T value,
+        TimeSpan? expiration = null,
+        IEnumerable<string>? tags = null,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        var effectiveExpiration = expiration ?? DefaultExpiration;
+        return _cache.SetAsync(
+            key,
+            value,
+            new HybridCacheEntryOptions
+            {
+                Expiration = effectiveExpiration,
+                LocalCacheExpiration = effectiveExpiration < DefaultLocalExpiration
+                    ? effectiveExpiration
+                    : DefaultLocalExpiration
+            },
+            tags,
+            ct);
+    }
+
     public ValueTask InvalidateByTagAsync(string tag, CancellationToken ct = default) =>
         _cache.RemoveByTagAsync(tag, ct);
 }

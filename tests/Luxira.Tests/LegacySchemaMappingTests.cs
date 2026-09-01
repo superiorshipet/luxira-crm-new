@@ -45,6 +45,21 @@ public sealed class LegacySchemaMappingTests
         Assert.NotNull(employee?.FindProperty(nameof(Employee.HasFacePrint)));
     }
 
+    [Fact]
+    public void SalaryPayment_MapsLegacyPayrollAndSoftDeleteColumns()
+    {
+        using var context = CreateContext();
+        var payment = context.Model.FindEntityType(typeof(EmployeeSalaryPayment));
+
+        Assert.Equal("EmployeeSalaryPayments", payment?.GetTableName());
+        Assert.NotNull(payment?.FindProperty(nameof(EmployeeSalaryPayment.SalaryMonth)));
+        Assert.NotNull(payment?.FindProperty(nameof(EmployeeSalaryPayment.RemainingAmount)));
+        Assert.NotNull(payment?.FindProperty(nameof(EmployeeSalaryPayment.IsDeleted)));
+        Assert.NotNull(payment?.FindProperty(nameof(EmployeeSalaryPayment.IsPermanentlyDeleted)));
+        Assert.Null(payment?.FindProperty("Amount"));
+        Assert.Null(payment?.FindProperty("PaymentDate"));
+    }
+
     private static ApplicationDbContext CreateContext() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase($"legacy-schema-tests-{Guid.NewGuid():N}")

@@ -313,20 +313,88 @@ public partial class OrderService
         if (request.OrderIds == null || request.OrderIds.Count == 0)
             return 0;
 
-        int updated = 0;
-        foreach (var id in request.OrderIds)
+        var ids = request.OrderIds.Where(id => id > 0).Distinct().ToList();
+        if (ids.Count == 0) return 0;
+        if (ids.Count > 500)
+            throw new BadRequestException("A maximum of 500 orders can be updated per request.");
+
+        var orders = await _context.Orders
+            .Include(order => order.DeliveryCompany)
+            .Where(order => ids.Contains(order.Id))
+            .ToListAsync(ct);
+        if (orders.Count != ids.Count)
+        {
+            var found = orders.Select(order => order.Id).ToHashSet();
+            var missing = ids.Where(id => !found.Contains(id));
+            throw new NotFoundException($"Orders were not found: {string.Join(',', missing)}.");
+        }
+
+        foreach (var order in orders)
+            _statusTransitionPolicy.EnsureAllowed(order, request.NewStatus, request.Reason, actor);
+
+        HashSet<int> bonusCountries = [];
+        if (request.NewStatus == OrderStatusCodes.Delivered)
+        {
+            var countries = orders.Select(order => order.Country).Distinct().ToList();
+            bonusCountries = (await _context.OrderBonusConfigurations.AsNoTracking()
+                .Where(config => countries.Contains(config.Country) && config.IsActive && config.BonusAmount > 0)
+                .Select(config => config.Country)
+                .ToListAsync(ct)).ToHashSet();
+        }
+
+        var now = IstanbulTimeHelper.Now;
+        var changed = new List<(Order Order, int PreviousStatus)>();
+        foreach (var order in orders)
+        {
+            var previousStatus = order.OrderStatus;
+            if (previousStatus == request.NewStatus) continue;
+
+            order.OrderStatus = request.NewStatus;
+            order.LastEditedDate = now;
+            order.Editedby = actor.UserId;
+            if (request.NewStatus == OrderStatusCodes.Delivered &&
+                !order.IsBonusPaidForEmployee && bonusCountries.Contains(order.Country))
+                order.IsBonus = true;
+
+            _context.OrderStatusHistories.Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = request.NewStatus,
+                CreatedAt = now,
+                ApplicationUserId = actor.UserId,
+                Reason = CombineHistoryReason(
+                    request.Reason ?? $"تغيير الحالة من {OrderStatusCodes.GetDisplayName(previousStatus)} إلى {OrderStatusCodes.GetDisplayName(request.NewStatus)}",
+                    request.Note),
+                Name = $"PreviousStatus:{previousStatus}",
+                IsHidden = false
+            });
+            changed.Add((order, previousStatus));
+        }
+
+        if (changed.Count == 0) return 0;
+        await _context.SaveChangesAsync(ct);
+
+        foreach (var (order, previousStatus) in changed)
         {
             try
             {
-                await UpdateOrderStatusAsync(id, new UpdateOrderStatusRequest(request.NewStatus, request.Reason, request.Note), actor, ct);
-                updated++;
+                await _orderHub.Clients.Group("UsersExpectDelivery").SendAsync("OrderStatusUpdated", new
+                {
+                    OrderId = order.Id,
+                    PreviousStatus = previousStatus,
+                    NewStatus = order.OrderStatus,
+                    StatusName = OrderStatusCodes.GetDisplayName(order.OrderStatus),
+                    UpdatedBy = actor.UserId,
+                    UpdatedAt = now
+                }, ct);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed batch update status for Order {OrderId}", id);
+                _logger.LogError(ex, "Failed to broadcast batch OrderStatusUpdated for Order {OrderId}", order.Id);
             }
         }
-        return updated;
+
+        return changed.Count;
     }
 
     public async Task<OrderDto> UpdateInlineFieldAsync(int orderId, string fieldName, string? newValue, string userId, CancellationToken ct = default)

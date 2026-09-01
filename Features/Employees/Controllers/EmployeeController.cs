@@ -1,6 +1,7 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Employees.DTOs;
 using Luxira.Api.Features.Employees.Services;
+using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
@@ -125,15 +126,60 @@ public class EmployeeController : ControllerBase
             employee.Id,
             employee.Name,
             UserId = employee.ApplicationUserId,
-            UserName = employee.ApplicationUser?.UserName
+            UserName = employee.ApplicationUser?.UserName,
+            employee.IsShown,
+            employee.AllowMobileOrTabletLogin,
+            employee.ApplyShiftAccess,
+            employee.AllowScreenRecording,
+            employee.IsNotificationCenterBlocked,
+            employee.CanHandleUrgentReports,
+            employee.EnableOrderPackaging,
+            employee.OrderPackagingNotificationTime,
+            employee.OrderPackagingDeliveryCompanyIds,
+            employee.OrderPackagingStartGraceMinutes
         });
     }
 
     [HttpPost("update-permissions-modal")]
     [HttpPost("/Employee/UpdateEmployeePermissionsModal")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
-    public IActionResult UpdateEmployeePermissionsModal([FromBody] object permissions)
+    public async Task<IActionResult> UpdateEmployeePermissionsModal(
+        [FromBody] UpdateEmployeePermissionsRequest request,
+        CancellationToken ct)
     {
+        var employee = await _context.Employees.FirstOrDefaultAsync(item => item.Id == request.Id, ct);
+        if (employee is null) throw new NotFoundException("Employee not found.");
+
+        var deliveryCompanyIds = (request.OrderPackagingDeliveryCompanyIds ?? [])
+            .Where(id => id > 0).Distinct().OrderBy(id => id).ToList();
+        if (request.EnableOrderPackaging)
+        {
+            if (!request.OrderPackagingNotificationTime.HasValue || deliveryCompanyIds.Count == 0)
+                throw new BadRequestException("Packaging time and at least one delivery company are required.");
+            var validCount = await _context.DeliveryCompanies.AsNoTracking().CountAsync(
+                company => deliveryCompanyIds.Contains(company.Id) && company.IsActive && company.Country == 2,
+                ct);
+            if (validCount != deliveryCompanyIds.Count)
+                throw new BadRequestException("Every packaging delivery company must be an active Turkey company.");
+        }
+
+        employee.AllowScreenRecording = request.AllowScreenRecording;
+        employee.IsNotificationCenterBlocked = request.IsNotificationCenterBlocked;
+        employee.AllowMobileOrTabletLogin = request.AllowMobileOrTabletLogin;
+        employee.CanHandleUrgentReports = request.CanHandleUrgentReports;
+        employee.ApplyShiftAccess = request.ApplyShiftAccess;
+        employee.EnableOrderPackaging = request.EnableOrderPackaging;
+        employee.OrderPackagingNotificationTime = request.EnableOrderPackaging
+            ? request.OrderPackagingNotificationTime
+            : null;
+        employee.OrderPackagingDeliveryCompanyIds = request.EnableOrderPackaging
+            ? string.Join(',', deliveryCompanyIds)
+            : null;
+        employee.OrderPackagingDeliveryCompanyId = request.EnableOrderPackaging
+            ? deliveryCompanyIds.FirstOrDefault()
+            : null;
+        employee.OrderPackagingStartGraceMinutes = Math.Clamp(request.OrderPackagingStartGraceMinutes, 1, 180);
+        await _context.SaveChangesAsync(ct);
         return Ok(new { success = true });
     }
 
@@ -155,6 +201,10 @@ public class EmployeeController : ControllerBase
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
     public async Task<IActionResult> SetIsShown([FromQuery] int id, [FromQuery] bool isShown, CancellationToken ct)
     {
+        var employee = await _context.Employees.FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (employee is null) throw new NotFoundException("Employee not found.");
+        employee.IsShown = isShown;
+        await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, id, isShown });
     }
 
@@ -176,18 +226,65 @@ public class EmployeeController : ControllerBase
 
     [HttpGet("packaging-gate-status")]
     [HttpGet("/Employee/GetOrderPackagingGateStatus")]
-    public IActionResult GetOrderPackagingGateStatus()
+    public async Task<IActionResult> GetOrderPackagingGateStatus(CancellationToken ct)
     {
-        return Ok(new { isOpen = true, message = "Packaging gate is operational." });
+        var userId = User.GetUserId();
+        var employee = await _context.Employees.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.ApplicationUserId == userId, ct);
+        var deliveryCompanyIds = ParseIds(employee?.OrderPackagingDeliveryCompanyIds);
+        if (employee is null || !employee.IsActive || !employee.EnableOrderPackaging ||
+            !employee.OrderPackagingNotificationTime.HasValue || deliveryCompanyIds.Count == 0)
+            return Ok(new { enabled = false });
+
+        var now = IstanbulTimeHelper.Now;
+        var scheduledAt = now.Date.Add(employee.OrderPackagingNotificationTime.Value);
+        var query = _context.Orders.AsNoTracking().Where(order =>
+            !order.IsHidden && order.Country == 2 && deliveryCompanyIds.Contains(order.DeliveryCompanyId));
+        var newCount = await query.CountAsync(order => order.OrderStatus == OrderStatusCodes.New, ct);
+        var preparedCount = await query.CountAsync(order => order.OrderStatus == OrderStatusCodes.Prepared, ct);
+        return Ok(new
+        {
+            enabled = now >= scheduledAt && (newCount > 0 || preparedCount > 0),
+            scheduledAt,
+            newCount,
+            preparedCount,
+            deliveryCompanyIds,
+            redirectUrl = "/Order/UpdateAllStatuses?orderPackaging=1"
+        });
     }
 
     [HttpPost("allow-mobile-login")]
     [HttpPost("/Employee/SetAllowMobileOrTabletLogin")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
-    public IActionResult SetAllowMobileOrTabletLogin([FromQuery] int id, [FromQuery] bool isAllowed)
+    public async Task<IActionResult> SetAllowMobileOrTabletLogin(
+        [FromQuery] int id,
+        [FromQuery] bool isAllowed,
+        CancellationToken ct)
     {
+        var employee = await _context.Employees.FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (employee is null) throw new NotFoundException("Employee not found.");
+        employee.AllowMobileOrTabletLogin = isAllowed;
+        await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, id, isAllowed });
     }
+
+    private static List<int> ParseIds(string? value) => (value ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(item => int.TryParse(item, out var id) ? id : 0)
+        .Where(id => id > 0)
+        .Distinct()
+        .ToList();
 }
 
 public record UpdateEmployeeBasicModalRequest(int Id, string Name, string PhoneNumber, decimal Salary, string? JobTitle);
+public record UpdateEmployeePermissionsRequest(
+    int Id,
+    bool ApplyShiftAccess,
+    bool? AllowScreenRecording,
+    bool IsNotificationCenterBlocked,
+    bool AllowMobileOrTabletLogin,
+    bool CanHandleUrgentReports,
+    bool EnableOrderPackaging,
+    TimeSpan? OrderPackagingNotificationTime,
+    List<int>? OrderPackagingDeliveryCompanyIds,
+    int OrderPackagingStartGraceMinutes = 20);

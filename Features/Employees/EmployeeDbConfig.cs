@@ -18,6 +18,7 @@ public class EmployeeDbConfig : IDbConfig<Employee>
         builder.Property(e => e.PhoneNumber).HasMaxLength(20).IsRequired();
         builder.Property(e => e.Address).HasMaxLength(255).IsRequired();
         builder.Property(e => e.Salary).HasPrecision(18, 2);
+        builder.Property(e => e.OrderPackagingDeliveryCompanyIds).HasMaxLength(1000);
 
         builder.HasMany(e => e.AttendanceLogs)
             .WithOne(a => a.Employee)

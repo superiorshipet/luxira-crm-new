@@ -8,6 +8,7 @@ using Luxira.Api.Infrastructure.Pdf;
 using Luxira.Api.Infrastructure.S3;
 using Luxira.Api.Infrastructure.Sms;
 using Luxira.Api.Infrastructure.WhatsApp;
+using Luxira.Api.Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -42,6 +43,7 @@ public class InfrastructureModule : IModule
         }
         services.AddHybridCache();
         services.AddSingleton<Luxira.Api.Infrastructure.Caching.LuxiraCacheService>();
+        services.AddSingleton<WebhookSecurity>();
 
         // 2. WhatsApp Services (Lavva Cloud API + Infobip)
         services.AddHttpClient<LavvaWhatsAppService>(client =>

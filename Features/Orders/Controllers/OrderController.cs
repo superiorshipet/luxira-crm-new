@@ -5,6 +5,7 @@ using Luxira.Api.Features.Orders.Services;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
+using Luxira.Api.Infrastructure.Caching;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,11 +23,13 @@ public class OrderController : ControllerBase
 {
     private readonly OrderService _orderService;
     private readonly ApplicationDbContext _context;
+    private readonly LuxiraCacheService _cache;
 
-    public OrderController(OrderService orderService, ApplicationDbContext context)
+    public OrderController(OrderService orderService, ApplicationDbContext context, LuxiraCacheService cache)
     {
         _orderService = orderService;
         _context = context;
+        _cache = cache;
     }
 
     [HttpGet]
@@ -314,37 +317,81 @@ public class OrderController : ControllerBase
 
     [HttpPost("status-selection/save")]
     [HttpPost("/Order/SaveStatusUpdateSelection")]
-    public IActionResult SaveStatusUpdateSelection([FromBody] StatusSelectionRequest request)
+    public async Task<IActionResult> SaveStatusUpdateSelection(
+        [FromBody] StatusSelectionRequest request,
+        CancellationToken ct)
     {
-        return Ok(new { success = true, selectedCount = request.OrderIds.Count });
+        var selections = request.OrderIds.Where(id => id > 0).Distinct().Take(5_000).ToList();
+        await _cache.SetAsync(StatusSelectionKey(), selections, TimeSpan.FromHours(8), ct: ct);
+        return Ok(new { success = true, selectedCount = selections.Count });
     }
 
     [HttpPost("status-selection/clear-mine")]
     [HttpPost("/Order/ClearMyStatusUpdateSelections")]
-    public IActionResult ClearMyStatusUpdateSelections()
+    public async Task<IActionResult> ClearMyStatusUpdateSelections(CancellationToken ct)
     {
+        await _cache.InvalidateAsync(StatusSelectionKey(), ct);
         return Ok(new { success = true });
     }
 
     [HttpPost("status-selection/clear/{orderId:int}")]
     [HttpPost("/Order/ClearStatusUpdateSelection")]
-    public IActionResult ClearStatusUpdateSelection([FromRoute] int orderId)
+    public async Task<IActionResult> ClearStatusUpdateSelection([FromRoute] int orderId, CancellationToken ct)
     {
+        var key = StatusSelectionKey();
+        var selections = await _cache.GetOrCreateAsync(
+            key,
+            _ => Task.FromResult(new List<int>()),
+            TimeSpan.FromHours(8),
+            ct: ct);
+        if (selections.Remove(orderId))
+            await _cache.SetAsync(key, selections, TimeSpan.FromHours(8), ct: ct);
         return Ok(new { success = true, clearedOrderId = orderId });
     }
 
     [HttpGet("status-selections")]
     [HttpGet("/Order/GetStatusUpdateSelections")]
-    public IActionResult GetStatusUpdateSelections()
+    public async Task<IActionResult> GetStatusUpdateSelections(CancellationToken ct)
     {
-        return Ok(new List<int>());
+        var selections = await _cache.GetOrCreateAsync(
+            StatusSelectionKey(),
+            _ => Task.FromResult(new List<int>()),
+            TimeSpan.FromHours(8),
+            ct: ct);
+        return Ok(selections);
     }
 
     [HttpPost("draft-field")]
     [HttpPost("/Order/SaveCreateOrderDraftField")]
-    public IActionResult SaveCreateOrderDraftField([FromBody] OrderDraftFieldRequest request)
+    public async Task<IActionResult> SaveCreateOrderDraftField(
+        [FromBody] OrderDraftFieldRequest request,
+        CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(request.FieldName) || request.FieldName.Length > 100)
+            throw new BadRequestException("Invalid draft field name.");
+        if (request.Value?.Length > 10_000)
+            throw new BadRequestException("Draft field value is too long.");
+
+        var key = DraftKey();
+        var draft = await _cache.GetOrCreateAsync(
+            key,
+            _ => Task.FromResult(new Dictionary<string, string?>()),
+            TimeSpan.FromDays(1),
+            ct: ct);
+        draft[request.FieldName.Trim()] = request.Value;
+        await _cache.SetAsync(key, draft, TimeSpan.FromDays(1), ct: ct);
         return Ok(new { success = true, field = request.FieldName, savedAt = IstanbulTimeHelper.Now });
+    }
+
+    [HttpGet("draft-fields")]
+    public async Task<IActionResult> GetCreateOrderDraft(CancellationToken ct)
+    {
+        var draft = await _cache.GetOrCreateAsync(
+            DraftKey(),
+            _ => Task.FromResult(new Dictionary<string, string?>()),
+            TimeSpan.FromDays(1),
+            ct: ct);
+        return Ok(draft);
     }
 
     [HttpPost("{id:int}/move-to-yesterday-ratings")]
@@ -435,34 +482,11 @@ public class OrderController : ControllerBase
     [HttpPost("/Order/UpdateAllStatuses")]
     public async Task<IActionResult> UpdateAllStatuses([FromBody] UpdateAllStatusesRequest request, CancellationToken ct)
     {
-        if (!OrderStatusCodes.IsDefined(request.NewStatus))
-        {
-            throw new BadRequestException($"Order status '{request.NewStatus}' is not part of the legacy status contract.");
-        }
-
-        var orders = await _context.Orders.Where(o => request.OrderIds.Contains(o.Id)).ToListAsync(ct);
-        var now = IstanbulTimeHelper.Now;
-        var userId = User.GetUserId() ?? "system";
-
-        foreach (var order in orders)
-        {
-            var oldStatus = order.OrderStatus;
-            order.OrderStatus = request.NewStatus;
-            order.LastEditedDate = now;
-
-            _context.OrderStatusHistories.Add(new OrderStatusHistory
-            {
-                OrderId = order.Id,
-                Status = request.NewStatus,
-                ApplicationUserId = userId,
-                CreatedAt = now,
-                Reason = request.Reason ?? "Bulk Status Update",
-                Name = $"PreviousStatus:{oldStatus}",
-            });
-        }
-
-        await _context.SaveChangesAsync(ct);
-        return Ok(new { success = true, updatedCount = orders.Count });
+        var updated = await _orderService.BatchUpdateOrderStatusAsync(
+            new BatchUpdateOrderStatusRequest(request.OrderIds, request.NewStatus, request.Reason, null),
+            OrderStatusActor.FromPrincipal(User),
+            ct);
+        return Ok(new { success = true, updatedCount = updated });
     }
 
     [HttpGet("{orderId:int}/inline-options")]
@@ -494,6 +518,11 @@ public class OrderController : ControllerBase
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, storeId = order.ManufacturingCompanyId });
     }
+
+    private string StatusSelectionKey() => $"orders:status-selection:{CurrentUserCacheId()}";
+    private string DraftKey() => $"orders:create-draft:{CurrentUserCacheId()}";
+    private string CurrentUserCacheId() => User.GetUserId() ??
+        throw new UnauthorizedAccessException("Authenticated user ID is missing.");
 }
 
 public record StatusSelectionRequest(List<int> OrderIds, int Status);
