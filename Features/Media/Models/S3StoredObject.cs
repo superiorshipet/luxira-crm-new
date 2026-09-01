@@ -5,12 +5,12 @@ public class S3StoredObject
     public int Id { get; set; }
     public string Key { get; set; } = string.Empty;
     public string Prefix { get; set; } = string.Empty;
-    public string ContentType { get; set; } = string.Empty;
+    public string? ContentType { get; set; }
     public long SizeBytes { get; set; }
     public string? OriginalFileName { get; set; }
     public string? ETag { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
-    public string UploadedByUserId { get; set; } = string.Empty;
+    public string? UploadedByUserId { get; set; }
     public string? UploadedByUserName { get; set; }
     public int? OrderId { get; set; }
     public bool IsDeleted { get; set; }

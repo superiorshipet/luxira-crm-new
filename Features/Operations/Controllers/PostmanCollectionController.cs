@@ -139,7 +139,7 @@ public class PostmanCollectionController : ControllerBase
                 ((Dictionary<string, object>)requestItem["request"])["body"] = new Dictionary<string, object>
                 {
                     ["mode"] = "raw",
-                    ["raw"] = "{\n  \"username\": \"admin\",\n  \"password\": \"AdminPassword123!\"\n}",
+                    ["raw"] = "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
                     ["options"] = new Dictionary<string, object>
                     {
                         ["raw"] = new Dictionary<string, string> { ["language"] = "json" }
@@ -223,6 +223,18 @@ public class PostmanCollectionController : ControllerBase
                 new Dictionary<string, string>
                 {
                     ["key"] = "bearer_token",
+                    ["value"] = "",
+                    ["type"] = "string"
+                },
+                new Dictionary<string, string>
+                {
+                    ["key"] = "username",
+                    ["value"] = "",
+                    ["type"] = "string"
+                },
+                new Dictionary<string, string>
+                {
+                    ["key"] = "password",
                     ["value"] = "",
                     ["type"] = "string"
                 }

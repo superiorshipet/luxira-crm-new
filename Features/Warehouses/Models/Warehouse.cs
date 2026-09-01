@@ -50,7 +50,7 @@ public class SubWarehouse
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public int MainWarehouseId { get; set; }
+    public int? MainWarehouseId { get; set; }
     public MainWarehouse? MainWarehouse { get; set; }
 }
 

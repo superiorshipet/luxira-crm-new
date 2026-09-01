@@ -39,8 +39,11 @@ catch (Exception exception)
 var databaseColumns = await ReadColumnsAsync(context.Database.GetDbConnection());
 Console.WriteLine($"Database target: {context.Database.GetDbConnection().Database}");
 var relationalModel = context.Model.GetRelationalModel();
+var runSelectSmoke = args.Any(argument =>
+    argument.Equals("--smoke-select", StringComparison.OrdinalIgnoreCase));
 var missingTables = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 var missingColumns = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+var unsafeNullability = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 var mismatchedTableKeys = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
 foreach (var table in relationalModel.Tables)
@@ -67,6 +70,18 @@ foreach (var table in relationalModel.Tables)
             missingColumns.Add($"{tableKey}.{column.Name}");
             mismatchedTableKeys.Add(tableKey);
         }
+        else
+        {
+            var databaseColumn = databaseColumns.First(item =>
+                item.Schema.Equals(schema, StringComparison.OrdinalIgnoreCase) &&
+                item.Table.Equals(table.Name, StringComparison.OrdinalIgnoreCase) &&
+                item.Column.Equals(column.Name, StringComparison.OrdinalIgnoreCase));
+            if (databaseColumn.IsNullable && !column.IsNullable)
+            {
+                unsafeNullability.Add($"{tableKey}.{column.Name}");
+                mismatchedTableKeys.Add(tableKey);
+            }
+        }
     }
 }
 
@@ -75,6 +90,8 @@ Console.WriteLine($"Missing tables: {missingTables.Count}");
 foreach (var table in missingTables) Console.WriteLine($"TABLE {table}");
 Console.WriteLine($"Missing columns: {missingColumns.Count}");
 foreach (var column in missingColumns) Console.WriteLine($"COLUMN {column}");
+Console.WriteLine($"Unsafe nullable columns: {unsafeNullability.Count}");
+foreach (var column in unsafeNullability) Console.WriteLine($"NULLABILITY {column}");
 Console.WriteLine("Actual columns for mismatched existing tables:");
 foreach (var tableKey in mismatchedTableKeys.Except(missingTables, StringComparer.OrdinalIgnoreCase))
 {
@@ -88,13 +105,35 @@ foreach (var tableKey in mismatchedTableKeys.Except(missingTables, StringCompare
     Console.WriteLine($"ACTUAL {tableKey}: {string.Join(',', actual)}");
 }
 
-return missingTables.Count == 0 && missingColumns.Count == 0 ? 0 : 1;
+if (missingTables.Count == 0 && missingColumns.Count == 0 && unsafeNullability.Count == 0 && runSelectSmoke)
+{
+    var selectedTables = 0;
+    foreach (var table in relationalModel.Tables)
+    {
+        var schema = EscapeIdentifier(table.Schema ?? "dbo");
+        var tableName = EscapeIdentifier(table.Name);
+        var columns = string.Join(", ", table.Columns.Select(column => EscapeIdentifier(column.Name)));
+
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"SELECT TOP (1) {columns} FROM {schema}.{tableName};";
+        await using var reader = await command.ExecuteReaderAsync();
+        await reader.ReadAsync();
+        selectedTables++;
+    }
+
+    Console.WriteLine($"Read-only SELECT smoke checks passed: {selectedTables}");
+}
+
+return missingTables.Count == 0 && missingColumns.Count == 0 && unsafeNullability.Count == 0 ? 0 : 1;
+
+static string EscapeIdentifier(string identifier) =>
+    $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
 
 static async Task<List<DatabaseColumn>> ReadColumnsAsync(DbConnection connection)
 {
     await using var command = connection.CreateCommand();
     command.CommandText = """
-        SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME
+        SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, IS_NULLABLE
         FROM INFORMATION_SCHEMA.COLUMNS
         ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION;
         """;
@@ -105,9 +144,10 @@ static async Task<List<DatabaseColumn>> ReadColumnsAsync(DbConnection connection
         columns.Add(new DatabaseColumn(
             reader.GetString(0),
             reader.GetString(1),
-            reader.GetString(2)));
+            reader.GetString(2),
+            reader.GetString(3).Equals("YES", StringComparison.OrdinalIgnoreCase)));
     }
     return columns;
 }
 
-internal sealed record DatabaseColumn(string Schema, string Table, string Column);
+internal sealed record DatabaseColumn(string Schema, string Table, string Column, bool IsNullable);

@@ -17,16 +17,6 @@ internal static class OrderSourceEndpoints
             .Produces<OrderSourceResponse[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
-        endpoints.MapGet(
-                "/DataList/GetAllOrderSources",
-                GetOrderSources)
-            .WithName("LegacyDataList_GetAllOrderSources")
-            .WithTags("Legacy Compatibility")
-            .WithSummary("List order sources using the authenticated legacy route")
-            .CacheOutput("ReferenceData")
-            .Produces<OrderSourceResponse[]>()
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
-
         return endpoints;
     }
 

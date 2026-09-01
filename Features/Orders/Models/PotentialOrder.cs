@@ -3,7 +3,7 @@ namespace Luxira.Api.Features.Orders.Models;
 public class PotentialOrder
 {
     public int Id { get; set; }
-    public string CustomerName { get; set; } = string.Empty;
+    public string? CustomerName { get; set; }
     public string? PhoneNumber { get; set; }
     public int Country { get; set; }
     public string? ChatUrl { get; set; }

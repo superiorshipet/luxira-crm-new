@@ -42,11 +42,4 @@ public class WarehouseController : ControllerBase
         return CreatedAtAction(nameof(GetWarehouseById), new { id = result.Id }, result);
     }
 
-    [HttpGet("main")]
-    [HttpGet("/MainWarehouse/GetMainWarehouses")]
-    public async Task<ActionResult<List<MainWarehouseDto>>> GetMainWarehouses([FromQuery] int? countryId, CancellationToken ct)
-    {
-        var result = await _service.GetMainWarehousesAsync(countryId, ct);
-        return Ok(result);
-    }
 }

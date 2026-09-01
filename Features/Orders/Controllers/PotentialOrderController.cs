@@ -82,7 +82,7 @@ public class PotentialOrderController : ControllerBase
             DeliveryCompanyId: request.DeliveryCompanyId,
             TelephoneNumber: pot.PhoneNumber ?? string.Empty,
             SecondTelephoneNumber: request.SecondTelephoneNumber,
-            CustomerName: pot.CustomerName,
+            CustomerName: pot.CustomerName ?? string.Empty,
             Notes: request.Notes,
             Address: request.Address,
             TotalPrice: request.TotalPrice,

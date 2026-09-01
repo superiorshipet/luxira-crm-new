@@ -18,15 +18,6 @@ internal static class FailureReasonController
             .CacheOutput("ReferenceData")
             .Produces<FailureReason[]>();
 
-        publicEndpoints.MapGet(
-                "/DataList/GetAllFailureReasons",
-                GetFailureReasons)
-            .WithName("LegacyDataList_GetAllFailureReasons")
-            .WithTags("Legacy Compatibility")
-            .WithSummary("List delivery failure reasons using the legacy route")
-            .CacheOutput("ReferenceData")
-            .Produces<FailureReason[]>();
-
         return endpoints;
     }
 

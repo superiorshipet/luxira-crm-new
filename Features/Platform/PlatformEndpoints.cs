@@ -16,6 +16,13 @@ internal static class PlatformEndpoints
 
         platform.MapGet(
                 "/",
+                () => TypedResults.Redirect(OpenApiExtensions.V1DocumentPath))
+            .WithName("Platform_RedirectToOpenApi")
+            .WithSummary("Import the project base URL directly into Postman")
+            .Produces(StatusCodes.Status302Found);
+
+        platform.MapGet(
+                "/api",
                 (HttpRequest request) =>
                 {
                     var openApiUrl = new Uri(

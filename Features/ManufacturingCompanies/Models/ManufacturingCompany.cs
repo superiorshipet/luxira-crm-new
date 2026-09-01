@@ -116,7 +116,7 @@ public class StoreCodeEditHistory
     public int Id { get; set; }
     public int StoreCodeFolderId { get; set; }
     public int ManufacturingCompanyId { get; set; }
-    public string FileName { get; set; } = string.Empty;
+    public string? FileName { get; set; }
     public int LineNumber { get; set; }
     public string? OldValue { get; set; }
     public string? NewValue { get; set; }

@@ -597,7 +597,7 @@ public partial class OrderService
         o.IsPinned,
         o.IsPaid,
         o.IsDelayed,
-        o.OrderWarehouses.Select(w => new OrderItemDto(w.OrderId, w.WarehouseId, w.Amount, w.UnitPrice)).ToList()
+        o.OrderWarehouses.Select(w => new OrderItemDto(w.OrderId, w.WarehouseId, w.Amount, w.UnitPrice ?? 0m)).ToList()
     );
 
     [GeneratedRegex(@"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")]

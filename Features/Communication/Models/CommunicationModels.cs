@@ -6,7 +6,7 @@ public class HelpCenterChatMessage
     public string SenderUserId { get; set; } = string.Empty;
     public string? SenderName { get; set; }
     public string? SenderImageUrl { get; set; }
-    public string MessageText { get; set; } = string.Empty;
+    public string? MessageText { get; set; }
     public string MessageKind { get; set; } = "Text";
     public string? AttachmentStoragePath { get; set; }
     public string? AttachmentOriginalName { get; set; }

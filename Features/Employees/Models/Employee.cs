@@ -114,16 +114,16 @@ public class EmployeeActivityLog
     public DateTime ActivityDate { get; set; }
     public DateTime FirstSeenAt { get; set; }
     public DateTime LastSeenAt { get; set; }
-    public DateTime LastActivityAt { get; set; }
+    public DateTime? LastActivityAt { get; set; }
     public string? CurrentPage { get; set; }
     public bool IsTabActive { get; set; }
     public int TotalOnlineSeconds { get; set; }
     public int TotalActiveSeconds { get; set; }
-    public DateTime LastHeartbeatAt { get; set; }
+    public DateTime? LastHeartbeatAt { get; set; }
     public string? IpAddress { get; set; }
     public string? UserAgent { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
 
 public class EmployeeSalaryPayment
@@ -304,7 +304,7 @@ public class ManagementRequest
     public int Id { get; set; }
     public string ApplicationUserId { get; set; } = string.Empty;
     public string EmployeeName { get; set; } = string.Empty;
-    public string EmployeeEmail { get; set; } = string.Empty;
+    public string? EmployeeEmail { get; set; }
     public string RequestType { get; set; } = "Leave"; // Leave, Advance, Expense, ShiftSwap, Resignation
     public string Reason { get; set; } = string.Empty;
     public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected

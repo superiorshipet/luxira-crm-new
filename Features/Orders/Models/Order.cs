@@ -74,7 +74,7 @@ public class OrderWarehouse
     public Order? Order { get; set; }
     public int WarehouseId { get; set; }
     public int Amount { get; set; }
-    public decimal UnitPrice { get; set; }
+    public decimal? UnitPrice { get; set; }
 }
 
 public class OrderStatusHistory

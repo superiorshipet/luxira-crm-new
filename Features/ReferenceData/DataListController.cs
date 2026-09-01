@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.ReferenceData;
 
 [ApiController]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v1/reference-data/datalist")]
 [Route("DataList")]
 [Route("Api")]
@@ -24,13 +24,22 @@ public class DataListController : ControllerBase
     }
 
     [HttpGet("GetAllCountries")]
+    [AllowAnonymous]
     public IActionResult GetAllCountries() => Ok(CountryCatalog.All);
 
     [HttpGet("GetPfdCountries")]
+    [AllowAnonymous]
     public IActionResult GetPfdCountries() => Ok(CountryCatalog.PreparationForDelivery);
 
     [HttpGet("GetAllFailureReasons")]
+    [AllowAnonymous]
     public IActionResult GetAllFailureReasons() => Ok(FailureReasonCatalog.All);
+
+    [HttpGet("GetCitiesByCountry")]
+    [AllowAnonymous]
+    public IActionResult GetCitiesByCountry(
+        [FromQuery(Name = "countryIds")] int[]? countryIds) =>
+        Ok(CountryCityCatalog.GetDistinctCities(countryIds));
 
     [HttpGet("GetAllOrderSources")]
     public IActionResult GetAllOrderSources() => Ok(OrderSourceCatalog.All);

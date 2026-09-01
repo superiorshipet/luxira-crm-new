@@ -20,17 +20,6 @@ internal static class OrderStatusEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
-        endpoints.MapGet(
-                "/DataList/GetAllOrderStatuses",
-                GetOrderStatuses)
-            .WithName("LegacyDataList_GetAllOrderStatuses")
-            .WithTags("Legacy Compatibility")
-            .WithSummary("List role-scoped order statuses using the legacy route")
-            .RequireAuthorization(LuxiraPolicies.ReadOrderStatuses)
-            .Produces<OrderStatusResponse[]>()
-            .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .ProducesProblem(StatusCodes.Status403Forbidden);
-
         return endpoints;
     }
 

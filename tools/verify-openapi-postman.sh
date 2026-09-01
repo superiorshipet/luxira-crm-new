@@ -9,6 +9,7 @@ base_url="http://127.0.0.1:${verification_port}"
 temporary_directory="$(mktemp -d)"
 server_log="$temporary_directory/server.log"
 openapi_document="$temporary_directory/openapi-v1.json"
+root_import_document="$temporary_directory/root-import.json"
 postman_document="$temporary_directory/postman-collection.json"
 countries_document="$temporary_directory/countries.json"
 legacy_countries_document="$temporary_directory/legacy-countries.json"
@@ -62,6 +63,15 @@ done
 curl --fail --silent --show-error \
     "$base_url/swagger/v1/swagger.json" \
     --output "$openapi_document"
+
+curl --location --fail --silent --show-error \
+    "$base_url/" \
+    --output "$root_import_document"
+
+if ! cmp --silent "$openapi_document" "$root_import_document"; then
+    echo "The project base URL does not resolve to the OpenAPI import document." >&2
+    exit 1
+fi
 
 curl --fail --silent --show-error \
     "$base_url/postman/collection.json" \
@@ -147,7 +157,7 @@ if ! cmp --silent \
 fi
 
 operation_count="$(
-    jq '[.paths[] | to_entries[] | select(.value.operationId != null)] | length' \
+    jq '[.paths[] | to_entries[] | select(.key | IN("get", "post", "put", "patch", "delete", "head", "options", "trace"))] | length' \
         "$openapi_document"
 )"
 
@@ -162,6 +172,7 @@ jq --exit-status '
 ' "$postman_document" >/dev/null
 
 echo "Verified Postman import document at $base_url/swagger/v1/swagger.json"
+echo "Verified direct Postman import through project URL $base_url/"
 echo "Published operations: $operation_count"
 echo "Generated Postman requests: $postman_request_count"
 echo "Verified country contract and legacy-route parity: 16 entries"

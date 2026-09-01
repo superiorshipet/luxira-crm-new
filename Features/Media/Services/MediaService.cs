@@ -34,7 +34,7 @@ public class MediaService
             item.Id,
             item.Key,
             bucketName,
-            item.ContentType,
+            item.ContentType ?? "application/octet-stream",
             item.SizeBytes,
             item.OriginalFileName,
             publicUrl,
