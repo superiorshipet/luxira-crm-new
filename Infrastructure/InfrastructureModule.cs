@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Luxira.Api.Infrastructure;
 
@@ -23,8 +24,23 @@ public class InfrastructureModule : IModule
         // 1. AWS S3 Storage Service
         services.AddScoped<S3StorageService>();
 
-        // Cache
-        services.AddMemoryCache(opts => { opts.SizeLimit = 10_000; });
+        // Hybrid cache uses fast local memory and adds Redis as a shared L2 cache
+        // whenever a Redis connection is configured. Local development still works
+        // without an external dependency.
+        var redisConnection = configuration.GetConnectionString("LuxiraRedis");
+        if (string.IsNullOrWhiteSpace(redisConnection))
+        {
+            services.AddDistributedMemoryCache();
+        }
+        else
+        {
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnection;
+                options.InstanceName = "luxira:";
+            });
+        }
+        services.AddHybridCache();
         services.AddSingleton<Luxira.Api.Infrastructure.Caching.LuxiraCacheService>();
 
         // 2. WhatsApp Services (Lavva Cloud API + Infobip)
@@ -45,6 +61,7 @@ public class InfrastructureModule : IModule
 
         // 6. SignalR Real-Time Hubs
         services.AddSignalR();
+        services.AddSingleton<IUserIdProvider, ClaimsUserIdProvider>();
 
         // 7. Hosted Background Services
         // Jobs can mutate data or contact external recipients. They are opt-in per job

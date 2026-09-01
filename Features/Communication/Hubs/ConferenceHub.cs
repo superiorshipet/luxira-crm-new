@@ -28,12 +28,19 @@ public class ConferenceHub : Hub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         ConnectedUsers.TryRemove(Context.ConnectionId, out _);
+        foreach (var room in RoomInviters.Where(entry => entry.Value == Context.ConnectionId).ToArray())
+        {
+            RoomInviters.TryRemove(room.Key, out _);
+        }
         await base.OnDisconnectedAsync(exception);
     }
 
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task InviteUsers(string[] userIds, string roomId)
     {
-        if (userIds == null || string.IsNullOrWhiteSpace(roomId)) return;
+        if (userIds == null || userIds.Length == 0 || userIds.Length > 100 ||
+            string.IsNullOrWhiteSpace(roomId) || roomId.Length > 128)
+            throw new HubException("Invalid conference invitation.");
 
         var adminId = Context.UserIdentifier;
         RoomInviters[roomId] = Context.ConnectionId;
@@ -47,9 +54,13 @@ public class ConferenceHub : Hub
 
     public async Task DeclineCall(string roomId, string reason)
     {
-        if (RoomInviters.TryGetValue(roomId, out var inviterConnectionId))
+        if (string.IsNullOrWhiteSpace(roomId) || roomId.Length > 128)
+            throw new HubException("Invalid room ID.");
+
+        if (RoomInviters.TryRemove(roomId, out var inviterConnectionId))
         {
-            await Clients.Client(inviterConnectionId).SendAsync("CallDeclined", Context.UserIdentifier, reason);
+            var safeReason = reason?.Length > 500 ? reason[..500] : reason;
+            await Clients.Client(inviterConnectionId).SendAsync("CallDeclined", Context.UserIdentifier, safeReason);
         }
     }
 }

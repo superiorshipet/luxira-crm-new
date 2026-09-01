@@ -45,11 +45,31 @@ public class OrderHub : Hub
 
     public async Task JoinDeliveryCompanyGroup(int deliveryCompanyId)
     {
+        if (!await CanAccessDeliveryCompanyAsync(deliveryCompanyId))
+            throw new HubException("You do not have access to this delivery company.");
+
         await Groups.AddToGroupAsync(Context.ConnectionId, $"deliveryCompany_{deliveryCompanyId}");
     }
 
     public async Task LeaveDeliveryCompanyGroup(int deliveryCompanyId)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"deliveryCompany_{deliveryCompanyId}");
+    }
+
+    private async Task<bool> CanAccessDeliveryCompanyAsync(int deliveryCompanyId)
+    {
+        if (deliveryCompanyId <= 0) return false;
+
+        var user = Context.User;
+        if (user is null) return false;
+        if (user.IsInRole("Admin") || user.IsInRole("Administrator") ||
+            user.IsInRole("ExecutiveDirector") || user.IsInRole("Accountant"))
+            return true;
+
+        var userId = user.GetUserId();
+        return !string.IsNullOrWhiteSpace(userId) &&
+            await _context.DeliveryCompanies.AsNoTracking().AnyAsync(
+                company => company.Id == deliveryCompanyId && company.UserId == userId,
+                Context.ConnectionAborted);
     }
 }
