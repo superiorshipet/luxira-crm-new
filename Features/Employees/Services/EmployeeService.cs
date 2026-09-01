@@ -239,8 +239,8 @@ public class EmployeeService
             decimal earnedSalary = Math.Round(dailyRate * effectiveDays, 2);
 
             decimal bonuses = await _context.EmployeeBonusPayments
-                .Where(b => b.EmployeeId == emp.Id && b.Date >= startDate && b.Date < endDate)
-                .SumAsync(b => (decimal?)b.Amount, ct) ?? 0;
+                .Where(b => b.EmployeeId == emp.Id && b.DatePaid >= startDate && b.DatePaid < endDate)
+                .SumAsync(b => (decimal?)b.AmountPaid, ct) ?? 0;
 
             decimal deductions = await _context.EmployeeViolations
                 .Where(v => v.EmployeeId == emp.Id && v.OccurredAt >= startDate && v.OccurredAt < endDate)
@@ -296,8 +296,8 @@ public class EmployeeService
             query = query.Where(b => b.EmployeeId == employeeId.Value);
         }
 
-        var list = await query.OrderByDescending(b => b.Date).ToListAsync(ct);
-        return list.Select(b => new EmployeeBonusPaymentDto(b.Id, b.EmployeeId, b.Employee?.Name, b.Amount, b.Date)).ToList();
+        var list = await query.OrderByDescending(b => b.DatePaid).ToListAsync(ct);
+        return list.Select(b => new EmployeeBonusPaymentDto(b.Id, b.EmployeeId, b.Employee?.Name, b.AmountPaid, b.DatePaid)).ToList();
     }
 
     public async Task<EmployeeBonusPaymentDto> AwardBonusAsync(AwardBonusRequest request, CancellationToken ct = default)
@@ -311,14 +311,14 @@ public class EmployeeService
         var payment = new EmployeeBonusPayment
         {
             EmployeeId = request.EmployeeId,
-            Amount = request.Amount,
-            Date = DateTime.UtcNow
+            AmountPaid = request.Amount,
+            DatePaid = DateTime.UtcNow
         };
 
         await _context.EmployeeBonusPayments.AddAsync(payment, ct);
         await _context.SaveChangesAsync(ct);
 
-        return new EmployeeBonusPaymentDto(payment.Id, payment.EmployeeId, emp.Name, payment.Amount, payment.Date);
+        return new EmployeeBonusPaymentDto(payment.Id, payment.EmployeeId, emp.Name, payment.AmountPaid, payment.DatePaid);
     }
 
     private static EmployeeDto MapToDto(Employee e) => new(

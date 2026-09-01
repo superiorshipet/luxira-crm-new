@@ -28,7 +28,7 @@ public class PersonalNotesController : ControllerBase
         var userId = User.GetUserId() ?? "system";
         var notes = await _context.PersonalNotes
             .AsNoTracking()
-            .Where(n => n.UserId == userId)
+            .Where(n => n.ApplicationUserId == userId && !n.IsDeleted)
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync(ct);
 
@@ -42,10 +42,9 @@ public class PersonalNotesController : ControllerBase
         var userId = User.GetUserId() ?? "system";
         var note = new PersonalNote
         {
-            UserId = userId,
-            Title = request.Title,
-            Content = request.Content,
-            ReminderAt = request.ReminderAt,
+            ApplicationUserId = userId,
+            HtmlContent = request.HtmlContent,
+            PlainText = request.PlainText,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -56,4 +55,4 @@ public class PersonalNotesController : ControllerBase
     }
 }
 
-public record SavePersonalNoteRequest(string Title, string Content, DateTime? ReminderAt);
+public sealed record SavePersonalNoteRequest(string HtmlContent, string PlainText);

@@ -30,7 +30,7 @@ public class ExchangeRateController : ControllerBase
         var query = _context.ExchangeRates.AsNoTracking();
         var total = await query.CountAsync(ct);
         var rates = await query
-            .OrderByDescending(r => r.UpdatedAt)
+            .OrderBy(r => r.Country)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -54,10 +54,9 @@ public class ExchangeRateController : ControllerBase
     {
         var rate = new ExchangeRate
         {
-            FromCurrency = request.FromCurrency ?? "USD",
-            ToCurrency = request.ToCurrency ?? "TRY",
-            Rate = request.Rate,
-            UpdatedAt = IstanbulTimeHelper.Now
+            Country = request.Country,
+            BuyToUSD = request.BuyToUSD,
+            SellToUSD = request.SellToUSD
         };
 
         await _context.ExchangeRates.AddAsync(rate, ct);
@@ -74,14 +73,13 @@ public class ExchangeRateController : ControllerBase
         var rate = await _context.ExchangeRates.FirstOrDefaultAsync(r => r.Id == id, ct);
         if (rate == null) return NotFound("Exchange rate not found.");
 
-        rate.FromCurrency = request.FromCurrency ?? rate.FromCurrency;
-        rate.ToCurrency = request.ToCurrency ?? rate.ToCurrency;
-        rate.Rate = request.Rate;
-        rate.UpdatedAt = IstanbulTimeHelper.Now;
+        rate.Country = request.Country;
+        rate.BuyToUSD = request.BuyToUSD;
+        rate.SellToUSD = request.SellToUSD;
 
         await _context.SaveChangesAsync(ct);
         return Ok(rate);
     }
 }
 
-public record CreateExchangeRateRequest(string? FromCurrency, string? ToCurrency, decimal Rate);
+public sealed record CreateExchangeRateRequest(int Country, decimal BuyToUSD, decimal SellToUSD);

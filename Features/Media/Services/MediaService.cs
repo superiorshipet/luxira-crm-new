@@ -24,14 +24,20 @@ public class MediaService
             throw new NotFoundException($"Media object with key {s3Key} not found.");
         }
 
+        var bucketName = _configuration["AWS:S3:BucketName"] ?? string.Empty;
+        var region = _configuration["AWS:Region"] ?? "eu-central-1";
+        var publicUrl = string.IsNullOrEmpty(bucketName)
+            ? null
+            : $"https://{bucketName}.s3.{region}.amazonaws.com/{item.Key}";
+
         return new MediaObjectDto(
             item.Id,
-            item.S3Key,
-            item.BucketName,
+            item.Key,
+            bucketName,
             item.ContentType,
             item.SizeBytes,
             item.OriginalFileName,
-            item.PublicUrl,
+            publicUrl,
             item.UploadedAt
         );
     }
@@ -51,6 +57,7 @@ public class MediaService
         var entity = new S3StoredObject
         {
             S3Key = s3Key,
+            Prefix = s3Key.Contains('/') ? s3Key[..s3Key.LastIndexOf('/')] : string.Empty,
             BucketName = bucketName,
             ContentType = contentType,
             SizeBytes = sizeBytes,

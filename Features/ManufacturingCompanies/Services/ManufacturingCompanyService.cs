@@ -131,15 +131,14 @@ public class ManufacturingCompanyService
     public async Task<List<ProductMinimumPriceDto>> GetMinimumPricesAsync(int? productId = null, int? countryId = null, CancellationToken ct = default)
     {
         var list = await _repository.GetMinimumPricesAsync(productId, countryId, ct);
-        var products = await _repository.GetProductsAsync(null, ct);
-        var productMap = products.ToDictionary(p => p.Id, p => p.Name);
-
         return list.Select(m => new ProductMinimumPriceDto(
             m.Id,
-            m.MainProductId,
-            productMap.TryGetValue(m.MainProductId, out var name) ? name : string.Empty,
             m.Country,
-            m.MinimumPrice
+            m.ManufacturingCompanyId,
+            m.MainWarehouseId,
+            m.MinimumSellingPrice,
+            m.CreatedAt,
+            m.UpdatedAt
         )).ToList();
     }
 
@@ -147,9 +146,11 @@ public class ManufacturingCompanyService
     {
         var minPrice = new ProductMinimumSellingPrice
         {
-            MainProductId = request.MainProductId,
             Country = request.Country,
-            MinimumPrice = request.MinimumPrice
+            ManufacturingCompanyId = request.ManufacturingCompanyId,
+            MainWarehouseId = request.MainWarehouseId,
+            MinimumSellingPrice = request.MinimumSellingPrice,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _repository.SetMinimumPriceAsync(minPrice, ct);

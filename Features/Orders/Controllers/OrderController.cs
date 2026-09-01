@@ -219,7 +219,7 @@ public class OrderController : ControllerBase
     public async Task<IActionResult> ValidateProductMinimumSellingPrice([FromQuery] int productId, [FromQuery] int country, [FromQuery] decimal price, CancellationToken ct)
     {
         var minSetting = await _context.ProductMinimumSellingPrices
-            .FirstOrDefaultAsync(p => p.MainProductId == productId && p.Country == country, ct);
+            .FirstOrDefaultAsync(p => p.MainWarehouseId == productId && p.Country == country, ct);
 
         if (minSetting != null && price < minSetting.MinimumPrice)
         {
@@ -256,8 +256,8 @@ public class OrderController : ControllerBase
     public async Task<IActionResult> GetCreateOrderWarehouses([FromQuery] int? country, CancellationToken ct)
     {
         var warehouses = await _context.Warehouses
-            .Where(w => w.IsActive)
-            .Select(w => new { w.Id, w.Name, w.Country, w.Address })
+            .Where(w => w.IsShown)
+            .Select(w => new { w.Id, w.Name, Country = w.Countries, Address = string.Empty })
             .AsNoTracking()
             .ToListAsync(ct);
 

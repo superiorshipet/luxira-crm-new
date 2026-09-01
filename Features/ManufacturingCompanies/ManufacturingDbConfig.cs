@@ -59,7 +59,7 @@ public class ProductMinimumSellingPriceDbConfig : IDbConfig<ProductMinimumSellin
     {
         builder.ToTable("ProductMinimumSellingPrices");
         builder.HasKey(p => p.Id);
-        builder.Property(p => p.MinimumPrice).HasPrecision(18, 2);
+        builder.Property(p => p.MinimumSellingPrice).HasPrecision(18, 2);
     }
 }
 

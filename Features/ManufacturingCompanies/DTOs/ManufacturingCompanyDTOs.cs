@@ -52,14 +52,17 @@ public record CreateProductRequest(
 
 public record ProductMinimumPriceDto(
     int Id,
-    int MainProductId,
-    string ProductName,
     int Country,
-    decimal MinimumPrice
+    int ManufacturingCompanyId,
+    int MainWarehouseId,
+    decimal MinimumSellingPrice,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt
 );
 
 public record SetProductMinimumPriceRequest(
-    int MainProductId,
     int Country,
-    decimal MinimumPrice
+    int ManufacturingCompanyId,
+    int MainWarehouseId,
+    decimal MinimumSellingPrice
 );

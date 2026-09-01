@@ -11,8 +11,8 @@ public class WarehouseDbConfig : IDbConfig<Warehouse>
     {
         builder.ToTable("Warehouses");
         builder.HasKey(w => w.Id);
-        builder.Property(w => w.Name).HasMaxLength(100).IsRequired();
-        builder.Property(w => w.Address).HasMaxLength(255);
+        builder.Property(w => w.Name).HasMaxLength(255);
+        builder.Property(w => w.Price).HasPrecision(18, 2);
         builder.Property(w => w.City).HasMaxLength(100);
 
         builder.HasOne(w => w.MainWarehouse)
@@ -29,6 +29,7 @@ public class MainWarehouseDbConfig : IDbConfig<MainWarehouse>
         builder.ToTable("MainWarehouses");
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Name).HasMaxLength(100).IsRequired();
+        builder.Property(m => m.ImageS3Key).HasMaxLength(450);
     }
 }
 

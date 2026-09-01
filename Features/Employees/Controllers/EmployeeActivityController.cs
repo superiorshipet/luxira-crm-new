@@ -50,9 +50,9 @@ public class EmployeeActivityController : ControllerBase
 
         var activeEmployees = await _context.EmployeeActivityLogs
             .Include(a => a.Employee)
-            .Where(a => a.Timestamp >= fiveMinutesAgo)
+            .Where(a => a.LastHeartbeatAt >= fiveMinutesAgo)
             .GroupBy(a => a.EmployeeId)
-            .Select(g => g.OrderByDescending(x => x.Timestamp).First())
+            .Select(g => g.OrderByDescending(x => x.LastHeartbeatAt).First())
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -65,8 +65,8 @@ public class EmployeeActivityController : ControllerBase
     public async Task<IActionResult> HourlyStatus([FromQuery] int employeeId, [FromQuery] DateTime activityDate, [FromQuery] string time, CancellationToken ct = default)
     {
         var logs = await _context.EmployeeActivityLogs
-            .Where(a => a.EmployeeId == employeeId && a.Timestamp.Date == activityDate.Date)
-            .OrderBy(a => a.Timestamp)
+            .Where(a => a.EmployeeId == employeeId && a.ActivityDate == activityDate.Date)
+            .OrderBy(a => a.FirstSeenAt)
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -81,18 +81,33 @@ public class EmployeeActivityController : ControllerBase
         var employee = await _context.Employees.FirstOrDefaultAsync(e => e.ApplicationUserId == currentUserId || e.Id == request.EmployeeId, ct);
         if (employee == null) return NotFound("Employee not found.");
 
-        var log = new EmployeeActivityLog
+        var now = IstanbulTimeHelper.Now;
+        var activityDate = now.Date;
+        var log = await _context.EmployeeActivityLogs.FirstOrDefaultAsync(
+            item => item.EmployeeId == employee.Id && item.ActivityDate == activityDate, ct);
+        if (log is null)
         {
-            EmployeeId = employee.Id,
-            ActivityType = request.ActivityType ?? "Online",
-            Details = request.Details ?? "Browser active",
-            Timestamp = IstanbulTimeHelper.Now
-        };
+            log = new EmployeeActivityLog
+            {
+                EmployeeId = employee.Id,
+                UserId = currentUserId ?? string.Empty,
+                EmployeeName = employee.DisplayName ?? employee.Name,
+                ActivityDate = activityDate,
+                FirstSeenAt = now,
+                CreatedAt = now
+            };
+            await _context.EmployeeActivityLogs.AddAsync(log, ct);
+        }
 
-        await _context.EmployeeActivityLogs.AddAsync(log, ct);
+        log.LastSeenAt = now;
+        log.LastActivityAt = now;
+        log.LastHeartbeatAt = now;
+        log.CurrentPage = request.CurrentPage;
+        log.IsTabActive = request.IsTabActive;
+        log.UpdatedAt = now;
         await _context.SaveChangesAsync(ct);
-        return Ok(new { success = true, timestamp = log.Timestamp });
+        return Ok(new { success = true, timestamp = log.LastHeartbeatAt });
     }
 }
 
-public record EmployeeActivityHeartbeatRequest(int? EmployeeId, string? ActivityType, string? Details);
+public sealed record EmployeeActivityHeartbeatRequest(int? EmployeeId, string? CurrentPage, bool IsTabActive = true);

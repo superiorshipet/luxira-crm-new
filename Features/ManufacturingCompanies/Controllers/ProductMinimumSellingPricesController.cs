@@ -37,9 +37,11 @@ public class CountryMinimumPricesController : ControllerBase
     {
         var minPrice = new ProductMinimumSellingPrice
         {
-            MainProductId = request.MainProductId,
             Country = request.Country,
-            MinimumPrice = request.MinimumPrice
+            ManufacturingCompanyId = request.ManufacturingCompanyId,
+            MainWarehouseId = request.MainWarehouseId,
+            MinimumSellingPrice = request.MinimumSellingPrice,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _context.ProductMinimumSellingPrices.AddAsync(minPrice, ct);
@@ -76,9 +78,11 @@ public class ProductMinimumSellingPricesController : ControllerBase
     {
         var minPrice = new ProductMinimumSellingPrice
         {
-            MainProductId = request.MainProductId,
             Country = request.Country,
-            MinimumPrice = request.MinimumPrice
+            ManufacturingCompanyId = request.ManufacturingCompanyId,
+            MainWarehouseId = request.MainWarehouseId,
+            MinimumSellingPrice = request.MinimumSellingPrice,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _context.ProductMinimumSellingPrices.AddAsync(minPrice, ct);
@@ -94,8 +98,11 @@ public class ProductMinimumSellingPricesController : ControllerBase
         var minPrice = await _context.ProductMinimumSellingPrices.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (minPrice == null) return NotFound("Minimum price configuration not found.");
 
-        minPrice.MinimumPrice = request.MinimumPrice;
+        minPrice.MinimumSellingPrice = request.MinimumSellingPrice;
         minPrice.Country = request.Country;
+        minPrice.ManufacturingCompanyId = request.ManufacturingCompanyId;
+        minPrice.MainWarehouseId = request.MainWarehouseId;
+        minPrice.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(ct);
         return Ok(minPrice);
@@ -115,4 +122,8 @@ public class ProductMinimumSellingPricesController : ControllerBase
     }
 }
 
-public record CreateMinimumPriceRequest(int MainProductId, int Country, decimal MinimumPrice);
+public sealed record CreateMinimumPriceRequest(
+    int Country,
+    int ManufacturingCompanyId,
+    int MainWarehouseId,
+    decimal MinimumSellingPrice);

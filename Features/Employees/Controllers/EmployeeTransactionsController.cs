@@ -72,7 +72,7 @@ public class EmployeeTransactionsController : ControllerBase
             EmployeeId = request.EmployeeId,
             Amount = request.Amount,
             TransactionType = request.TransactionType, // Advance, Bonus, Deduction, Loan
-            Note = request.Note,
+            Reason = request.Note,
             Date = DateTime.UtcNow
         };
 

@@ -5,29 +5,31 @@ public class Expense
     public int Id { get; set; }
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
-    public int Country { get; set; }
-    public string? Category { get; set; }
-    public DateTime Date { get; set; } = DateTime.UtcNow;
-    public string CreatedByUserId { get; set; } = string.Empty;
-    public string? AttachmentUrl { get; set; }
-    public string? Notes { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 }
 
 public class ExchangeRate
 {
     public int Id { get; set; }
-    public string FromCurrency { get; set; } = "USD";
-    public string ToCurrency { get; set; } = "TRY";
-    public decimal Rate { get; set; }
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public int Country { get; set; }
+    public decimal BuyToUSD { get; set; }
+    public decimal SellToUSD { get; set; }
 }
 
 public class SalesIndicator
 {
     public int Id { get; set; }
     public int Country { get; set; }
-    public decimal TargetAmount { get; set; }
-    public int Month { get; set; }
-    public int Year { get; set; }
+    public int MainWarehouseId { get; set; }
+    public int Quantity { get; set; }
+    public decimal MinimumSellingFrom { get; set; }
+    public decimal MinimumSellingTo { get; set; }
+    public decimal BasicSellingFrom { get; set; }
+    public decimal BasicSellingTo { get; set; }
+    public decimal MiddleSellingFrom { get; set; }
+    public decimal MiddleSellingTo { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
-

@@ -15,98 +15,70 @@ namespace Luxira.Api.Features.Orders.Controllers;
 public class UrgentReportController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-
-    public UrgentReportController(ApplicationDbContext context)
-    {
-        _context = context;
-    }
+    public UrgentReportController(ApplicationDbContext context) => _context = context;
 
     [HttpGet]
     [HttpGet("GetReports")]
-    public async Task<ActionResult<List<UrgentReportDto>>> GetReports([FromQuery] string? status, CancellationToken ct)
+    public async Task<ActionResult<List<UrgentReport>>> GetReports(
+        [FromQuery] string? status,
+        CancellationToken ct)
     {
-        var query = _context.UrgentReports
-            .Include(r => r.Order)
-            .AsNoTracking()
-            .AsQueryable();
-
+        var query = _context.UrgentReports.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(status))
-        {
-            query = query.Where(r => r.Status == status);
-        }
+            query = query.Where(report => report.Status == status);
 
-        var reports = await query.OrderByDescending(r => r.CreatedAt)
-            .Select(r => new UrgentReportDto(
-                r.Id,
-                r.OrderId,
-                r.Order != null ? r.Order.CustomerName : null,
-                r.Title,
-                r.Description,
-                r.Priority,
-                r.Status,
-                r.ReportedByUserId,
-                r.AssignedToUserId,
-                r.ResolutionNote,
-                r.CreatedAt,
-                r.ResolvedAt))
-            .ToListAsync(ct);
-
-        return Ok(reports);
+        return Ok(await query.OrderByDescending(report => report.CreatedAt).ToListAsync(ct));
     }
 
     [HttpPost]
     [HttpPost("Create")]
-    public async Task<ActionResult<UrgentReportDto>> CreateReport([FromBody] CreateUrgentReportRequest request, CancellationToken ct)
+    public async Task<ActionResult<UrgentReport>> CreateReport(
+        [FromBody] CreateUrgentReportRequest request,
+        CancellationToken ct)
     {
+        var userId = User.GetUserId();
+        var employeeId = await _context.Employees.AsNoTracking()
+            .Where(employee => employee.ApplicationUserId == userId)
+            .Select(employee => (int?)employee.Id)
+            .FirstOrDefaultAsync(ct);
+        if (!employeeId.HasValue)
+            return BadRequest(new { message = "The current user is not linked to an employee." });
+
         var report = new UrgentReport
         {
-            OrderId = request.OrderId,
-            Title = request.Title,
+            ReportType = request.ReportType,
             Description = request.Description,
-            Priority = request.Priority ?? "High",
+            ScreenshotPath = request.ScreenshotPath,
+            ScreenshotS3Key = request.ScreenshotS3Key,
+            EmployeeId = employeeId.Value,
             Status = "Open",
-            ReportedByUserId = User.GetUserId() ?? "system",
             CreatedAt = DateTime.UtcNow
         };
 
         await _context.UrgentReports.AddAsync(report, ct);
         await _context.SaveChangesAsync(ct);
-
-        return Ok(new UrgentReportDto(
-            report.Id,
-            report.OrderId,
-            null,
-            report.Title,
-            report.Description,
-            report.Priority,
-            report.Status,
-            report.ReportedByUserId,
-            null,
-            null,
-            report.CreatedAt,
-            null));
+        return Ok(report);
     }
 
     [HttpPost("{id:int}/resolve")]
     [HttpPost("Resolve/{id:int}")]
-    public async Task<IActionResult> ResolveReport([FromRoute] int id, [FromBody] ResolveUrgentReportRequest request, CancellationToken ct)
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    public async Task<IActionResult> ResolveReport([FromRoute] int id, CancellationToken ct)
     {
         var report = await _context.UrgentReports.FindAsync([id], ct);
-        if (report == null)
-        {
+        if (report is null)
             throw new NotFoundException($"Urgent report {id} not found.");
-        }
 
         report.Status = "Resolved";
-        report.ResolutionNote = request.ResolutionNote;
-        report.ResolvedAt = DateTime.UtcNow;
-        report.AssignedToUserId = User.GetUserId();
-
+        report.HandledByAdminName = User.Identity?.Name;
+        report.HandledAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
         return Ok(new { message = "Report marked as resolved." });
     }
 }
 
-public record UrgentReportDto(int Id, int? OrderId, string? CustomerName, string Title, string Description, string Priority, string Status, string ReportedByUserId, string? AssignedToUserId, string? ResolutionNote, DateTime CreatedAt, DateTime? ResolvedAt);
-public record CreateUrgentReportRequest(int? OrderId, string Title, string Description, string? Priority);
-public record ResolveUrgentReportRequest(string ResolutionNote);
+public sealed record CreateUrgentReportRequest(
+    string ReportType,
+    string Description,
+    string? ScreenshotPath,
+    string? ScreenshotS3Key);

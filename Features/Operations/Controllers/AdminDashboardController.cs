@@ -24,7 +24,7 @@ public class AdminDashboardController : ControllerBase
     {
         int activeUsers = await _context.Users.CountAsync(u => u.IsActive, ct);
         int totalEmployees = await _context.Employees.CountAsync(e => e.IsActive, ct);
-        int totalWarehouses = await _context.Warehouses.CountAsync(w => w.IsActive, ct);
+        int totalWarehouses = await _context.Warehouses.CountAsync(w => w.IsShown, ct);
         int totalStores = await _context.ManufacturingCompanies.CountAsync(m => m.IsShown, ct);
         int totalDeliveryCompanies = await _context.DeliveryCompanies.CountAsync(d => d.IsActive, ct);
 

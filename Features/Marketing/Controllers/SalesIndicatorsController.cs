@@ -39,22 +39,37 @@ public class SalesIndicatorsController : ControllerBase
     public async Task<IActionResult> Save([FromBody] SalesIndicatorViewModel model, CancellationToken ct = default)
     {
         var indicator = await _context.SalesIndicators
-            .FirstOrDefaultAsync(s => s.Country == model.Country && s.Month == model.Month && s.Year == model.Year, ct);
+            .FirstOrDefaultAsync(s => s.Country == model.Country && s.MainWarehouseId == model.MainWarehouseId, ct);
 
         if (indicator == null)
         {
             indicator = new SalesIndicator
             {
                 Country = model.Country,
-                Month = model.Month,
-                Year = model.Year,
-                TargetAmount = model.TargetAmount
+                MainWarehouseId = model.MainWarehouseId,
+                Quantity = model.Quantity,
+                MinimumSellingFrom = model.MinimumSellingFrom,
+                MinimumSellingTo = model.MinimumSellingTo,
+                BasicSellingFrom = model.BasicSellingFrom,
+                BasicSellingTo = model.BasicSellingTo,
+                MiddleSellingFrom = model.MiddleSellingFrom,
+                MiddleSellingTo = model.MiddleSellingTo,
+                CreatedByUserId = User.GetUserId(),
+                CreatedAt = IstanbulTimeHelper.Now
             };
             await _context.SalesIndicators.AddAsync(indicator, ct);
         }
         else
         {
-            indicator.TargetAmount = model.TargetAmount;
+            indicator.Quantity = model.Quantity;
+            indicator.MinimumSellingFrom = model.MinimumSellingFrom;
+            indicator.MinimumSellingTo = model.MinimumSellingTo;
+            indicator.BasicSellingFrom = model.BasicSellingFrom;
+            indicator.BasicSellingTo = model.BasicSellingTo;
+            indicator.MiddleSellingFrom = model.MiddleSellingFrom;
+            indicator.MiddleSellingTo = model.MiddleSellingTo;
+            indicator.UpdatedByUserId = User.GetUserId();
+            indicator.UpdatedAt = IstanbulTimeHelper.Now;
         }
 
         await _context.SaveChangesAsync(ct);
@@ -75,4 +90,13 @@ public class SalesIndicatorsController : ControllerBase
     }
 }
 
-public record SalesIndicatorViewModel(int Country, int Month, int Year, decimal TargetAmount);
+public sealed record SalesIndicatorViewModel(
+    int Country,
+    int MainWarehouseId,
+    int Quantity,
+    decimal MinimumSellingFrom,
+    decimal MinimumSellingTo,
+    decimal BasicSellingFrom,
+    decimal BasicSellingTo,
+    decimal MiddleSellingFrom,
+    decimal MiddleSellingTo);

@@ -162,8 +162,8 @@ public class PotentialOrderDbConfig : IDbConfig<PotentialOrder>
         builder.ToTable("PotentialOrders");
         builder.HasKey(p => p.Id);
         builder.Property(p => p.CustomerName).HasMaxLength(255);
-        builder.Property(p => p.TelephoneNumber).HasMaxLength(255);
-        builder.Property(p => p.TotalPrice).HasPrecision(18, 2);
+        builder.Property(p => p.PhoneNumber).HasMaxLength(50);
+        builder.Property(p => p.StoreName).HasMaxLength(255).IsRequired();
     }
 }
 
@@ -173,8 +173,8 @@ public class UrgentReportDbConfig : IDbConfig<UrgentReport>
     {
         builder.ToTable("UrgentReports");
         builder.HasKey(r => r.Id);
-        builder.Property(r => r.Title).HasMaxLength(255);
-        builder.Property(r => r.Priority).HasMaxLength(50);
+        builder.Property(r => r.ReportType).HasMaxLength(100).IsRequired();
         builder.Property(r => r.Status).HasMaxLength(50);
+        builder.Property(r => r.ScreenshotS3Key).HasMaxLength(450);
     }
 }

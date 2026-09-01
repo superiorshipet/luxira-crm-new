@@ -21,12 +21,7 @@ public class ExpenseService
             e.Id,
             e.Description,
             e.Amount,
-            e.Country,
-            e.Category,
-            e.Date,
-            e.CreatedByUserId,
-            e.AttachmentUrl,
-            e.Notes
+            e.CreatedDate
         )).ToList();
     }
 
@@ -46,12 +41,7 @@ public class ExpenseService
         {
             Description = request.Description,
             Amount = request.Amount,
-            Country = request.Country,
-            Category = request.Category,
-            Date = request.Date ?? DateTime.UtcNow,
-            CreatedByUserId = userId,
-            AttachmentUrl = request.AttachmentUrl,
-            Notes = request.Notes
+            CreatedDate = request.CreatedDate ?? DateTime.UtcNow
         };
 
         var created = await _repository.AddAsync(expense, ct);
@@ -59,34 +49,28 @@ public class ExpenseService
             created.Id,
             created.Description,
             created.Amount,
-            created.Country,
-            created.Category,
-            created.Date,
-            created.CreatedByUserId,
-            created.AttachmentUrl,
-            created.Notes
+            created.CreatedDate
         );
     }
 
     public async Task<List<ExchangeRateDto>> GetExchangeRatesAsync(CancellationToken ct = default)
     {
         var rates = await _repository.GetExchangeRatesAsync(ct);
-        return rates.Select(r => new ExchangeRateDto(r.Id, r.FromCurrency, r.ToCurrency, r.Rate, r.UpdatedAt)).ToList();
+        return rates.Select(r => new ExchangeRateDto(r.Id, r.Country, r.BuyToUSD, r.SellToUSD)).ToList();
     }
 
     public async Task UpdateExchangeRateAsync(UpdateExchangeRateRequest request, CancellationToken ct = default)
     {
-        if (request.Rate <= 0)
+        if (request.BuyToUSD <= 0 || request.SellToUSD <= 0)
         {
             throw new BadRequestException("Exchange rate must be positive.");
         }
 
         var rate = new ExchangeRate
         {
-            FromCurrency = request.FromCurrency.ToUpperInvariant(),
-            ToCurrency = request.ToCurrency.ToUpperInvariant(),
-            Rate = request.Rate,
-            UpdatedAt = DateTime.UtcNow
+            Country = request.Country,
+            BuyToUSD = request.BuyToUSD,
+            SellToUSD = request.SellToUSD
         };
 
         await _repository.UpdateExchangeRateAsync(rate, ct);

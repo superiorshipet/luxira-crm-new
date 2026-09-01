@@ -232,8 +232,8 @@ public class FinancialController : ControllerBase
             var advances = transactions.Where(t => t.TransactionType == "سلفة" || t.TransactionType == "Advance").Sum(t => t.Amount);
 
             var bonuses = await _context.EmployeeBonusPayments
-                .Where(b => b.EmployeeId == emp.Id && b.Date >= sDate && b.Date <= eDate)
-                .SumAsync(b => (decimal?)b.Amount, ct) ?? 0m;
+                .Where(b => b.EmployeeId == emp.Id && b.DatePaid >= sDate && b.DatePaid <= eDate)
+                .SumAsync(b => (decimal?)b.AmountPaid, ct) ?? 0m;
 
             var salary = emp.Salary;
             var netPayable = salary - deductions + rewards - advances + bonuses;
@@ -286,7 +286,7 @@ public class FinancialController : ControllerBase
 
         var bonuses = await _context.EmployeeBonusPayments
             .Where(b => b.EmployeeId == employeeId)
-            .OrderByDescending(b => b.Date)
+            .OrderByDescending(b => b.DatePaid)
             .AsNoTracking()
             .ToListAsync(ct);
 

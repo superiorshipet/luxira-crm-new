@@ -117,7 +117,7 @@ public partial class OrderService
         {
             var minPrice = await _context.ProductMinimumSellingPrices
                 .Where(p => p.Country == request.Country)
-                .Select(p => p.MinimumPrice)
+                .Select(p => p.MinimumSellingPrice)
                 .FirstOrDefaultAsync(ct);
 
             foreach (var item in request.Items)

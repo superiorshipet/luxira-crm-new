@@ -15,134 +15,71 @@ namespace Luxira.Api.Features.Employees.Controllers;
 public class ManagementRequestsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-
-    public ManagementRequestsController(ApplicationDbContext context)
-    {
-        _context = context;
-    }
+    public ManagementRequestsController(ApplicationDbContext context) => _context = context;
 
     [HttpGet]
     [HttpGet("GetRequests")]
-    public async Task<ActionResult<List<ManagementRequestDto>>> GetRequests([FromQuery] int? employeeId, [FromQuery] string? status, CancellationToken ct)
+    public async Task<ActionResult<List<ManagementRequest>>> GetRequests(
+        [FromQuery] string? applicationUserId,
+        [FromQuery] string? status,
+        CancellationToken ct)
     {
-        var query = _context.ManagementRequests
-            .Include(m => m.Employee)
-            .AsNoTracking()
-            .AsQueryable();
-
-        if (employeeId.HasValue && employeeId.Value > 0)
-        {
-            query = query.Where(m => m.EmployeeId == employeeId.Value);
-        }
-
+        var query = _context.ManagementRequests.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(applicationUserId))
+            query = query.Where(request => request.ApplicationUserId == applicationUserId);
         if (!string.IsNullOrWhiteSpace(status))
-        {
-            query = query.Where(m => m.Status == status);
-        }
+            query = query.Where(request => request.Status == status);
 
-        var list = await query.OrderByDescending(m => m.CreatedAt)
-            .Select(m => new ManagementRequestDto(
-                m.Id,
-                m.EmployeeId,
-                m.Employee != null ? m.Employee.Name : null,
-                m.RequestType,
-                m.Title,
-                m.Description,
-                m.RequestedAmount,
-                m.StartDate,
-                m.EndDate,
-                m.Status,
-                m.ManagerFeedback,
-                m.ReviewedByUserId,
-                m.CreatedAt,
-                m.ReviewedAt))
-            .ToListAsync(ct);
-
-        return Ok(list);
+        return Ok(await query.OrderByDescending(request => request.CreatedAt).ToListAsync(ct));
     }
 
     [HttpPost]
     [HttpPost("SubmitRequest")]
-    public async Task<ActionResult<ManagementRequestDto>> SubmitRequest([FromBody] SubmitManagementRequest request, CancellationToken ct)
+    public async Task<ActionResult<ManagementRequest>> SubmitRequest(
+        [FromBody] SubmitManagementRequest request,
+        CancellationToken ct)
     {
+        var userId = User.GetUserId() ?? "system";
+        var employee = await _context.Employees.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.ApplicationUserId == userId, ct);
+
         var item = new ManagementRequest
         {
-            EmployeeId = request.EmployeeId,
+            ApplicationUserId = userId,
+            EmployeeName = employee?.DisplayName ?? employee?.Name ?? User.Identity?.Name ?? string.Empty,
+            EmployeeEmail = User.Identity?.Name ?? string.Empty,
             RequestType = request.RequestType,
-            Title = request.Title,
-            Description = request.Description,
-            RequestedAmount = request.RequestedAmount,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
+            Reason = request.Reason,
             Status = "Pending",
             CreatedAt = DateTime.UtcNow
         };
 
         await _context.ManagementRequests.AddAsync(item, ct);
         await _context.SaveChangesAsync(ct);
-
-        return Ok(new ManagementRequestDto(
-            item.Id,
-            item.EmployeeId,
-            null,
-            item.RequestType,
-            item.Title,
-            item.Description,
-            item.RequestedAmount,
-            item.StartDate,
-            item.EndDate,
-            item.Status,
-            null,
-            null,
-            item.CreatedAt,
-            null));
+        return Ok(item);
     }
 
     [HttpPost("{id:int}/review")]
     [HttpPost("ReviewRequest/{id:int}")]
-    public async Task<IActionResult> ReviewRequest([FromRoute] int id, [FromBody] ReviewManagementRequest request, CancellationToken ct)
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    public async Task<IActionResult> ReviewRequest(
+        [FromRoute] int id,
+        [FromBody] ReviewManagementRequest request,
+        CancellationToken ct)
     {
         var item = await _context.ManagementRequests.FindAsync([id], ct);
-        if (item == null)
-        {
+        if (item is null)
             throw new NotFoundException($"Management request {id} not found.");
-        }
 
         item.Status = request.Approved ? "Approved" : "Rejected";
-        item.ManagerFeedback = request.Feedback;
-        item.ReviewedByUserId = User.GetUserId();
-        item.ReviewedAt = DateTime.UtcNow;
-
+        item.DecidedByUserId = User.GetUserId();
+        item.DecidedByName = User.Identity?.Name;
+        item.DecidedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
-        return Ok(new { status = item.Status, message = $"Request marked as {item.Status}." });
+
+        return Ok(new { status = item.Status });
     }
 }
 
-public record ManagementRequestDto(
-    int Id,
-    int EmployeeId,
-    string? EmployeeName,
-    string RequestType,
-    string Title,
-    string Description,
-    decimal? RequestedAmount,
-    DateTime? StartDate,
-    DateTime? EndDate,
-    string Status,
-    string? ManagerFeedback,
-    string? ReviewedByUserId,
-    DateTime CreatedAt,
-    DateTime? ReviewedAt
-);
-
-public record SubmitManagementRequest(
-    int EmployeeId,
-    string RequestType,
-    string Title,
-    string Description,
-    decimal? RequestedAmount,
-    DateTime? StartDate,
-    DateTime? EndDate
-);
-
-public record ReviewManagementRequest(bool Approved, string? Feedback);
+public sealed record SubmitManagementRequest(string RequestType, string Reason);
+public sealed record ReviewManagementRequest(bool Approved);

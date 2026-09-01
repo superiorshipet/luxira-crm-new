@@ -101,7 +101,7 @@ public class PdfController : ControllerBase
 
             foreach (var item in order.OrderWarehouses)
             {
-                htmlBuilder.Append($@"<tr><td>{item.Quantity}</td><td>{item.Price:N0}</td><td>{(item.Quantity * item.Price):N0}</td></tr>");
+                htmlBuilder.Append($@"<tr><td>{item.Amount}</td><td>{item.UnitPrice:N0}</td><td>{(item.Amount * item.UnitPrice):N0}</td></tr>");
             }
 
             htmlBuilder.Append($@"

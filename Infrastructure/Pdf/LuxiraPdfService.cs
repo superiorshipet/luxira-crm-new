@@ -56,9 +56,9 @@ public class LuxiraPdfService
 
                             foreach (var item in order.OrderWarehouses)
                             {
-                                table.Cell().Text(item.Quantity.ToString());
-                                table.Cell().Text($"{item.Price:N0}");
-                                table.Cell().Text($"{(item.Quantity * item.Price):N0}");
+                                table.Cell().Text(item.Amount.ToString());
+                                table.Cell().Text($"{item.UnitPrice:N0}");
+                                table.Cell().Text($"{(item.Amount * item.UnitPrice):N0}");
                             }
                         });
 

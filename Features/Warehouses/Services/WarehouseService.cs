@@ -67,7 +67,7 @@ public class WarehouseService
 
     private static WarehouseDto MapToDto(Warehouse w) => new(
         w.Id,
-        w.Name,
+        w.Name ?? string.Empty,
         w.DisplayName,
         w.Address,
         w.Country,

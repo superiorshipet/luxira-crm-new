@@ -49,18 +49,30 @@ public class StoreScript
 public class WebsiteDomain
 {
     public int Id { get; set; }
-    public string DomainName { get; set; } = string.Empty;
-    public string? TargetStore { get; set; }
+    public string Domain { get; set; } = string.Empty;
+    public int ManufacturingCompanyId { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public bool IsDeleted { get; set; }
+    public bool IsPinned { get; set; }
 }
 
 public class VideoLink
 {
     public int Id { get; set; }
-    public string Title { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
-    public int? ProductId { get; set; }
-    public string Platform { get; set; } = "YouTube";
+    public int ManufacturingCompanyId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
 }

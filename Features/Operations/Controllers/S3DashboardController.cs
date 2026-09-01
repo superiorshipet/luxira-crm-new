@@ -131,5 +131,5 @@ public class S3DashboardController : ControllerBase
         });
 
     private Task<int> CountIndexedPrefixAsync(string prefix, CancellationToken ct) =>
-        _context.S3StoredObjects.AsNoTracking().CountAsync(item => item.S3Key.StartsWith(prefix), ct);
+        _context.S3StoredObjects.AsNoTracking().CountAsync(item => item.Key.StartsWith(prefix), ct);
 }

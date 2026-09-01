@@ -37,6 +37,7 @@ catch (Exception exception)
 }
 
 var databaseColumns = await ReadColumnsAsync(context.Database.GetDbConnection());
+Console.WriteLine($"Database target: {context.Database.GetDbConnection().Database}");
 var relationalModel = context.Model.GetRelationalModel();
 var missingTables = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 var missingColumns = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);

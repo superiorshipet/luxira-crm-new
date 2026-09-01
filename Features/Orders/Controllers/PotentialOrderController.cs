@@ -35,8 +35,7 @@ public class PotentialOrderController : ControllerBase
             query = query.Where(p => p.Country == country.Value);
         }
 
-        var list = await query.Where(p => !p.IsConverted)
-            .OrderByDescending(p => p.CreatedDate)
+        var list = await query.OrderByDescending(p => p.CreatedDate)
             .ToListAsync(ct);
 
         return Ok(list);
@@ -49,15 +48,13 @@ public class PotentialOrderController : ControllerBase
         var pot = new PotentialOrder
         {
             CustomerName = request.CustomerName,
-            TelephoneNumber = request.TelephoneNumber,
-            Address = request.Address,
-            Notes = request.Notes,
+            PhoneNumber = request.PhoneNumber,
             Country = request.Country,
-            TotalPrice = request.TotalPrice,
             ChatUrl = request.ChatUrl,
-            PageName = request.PageName,
-            PostUrl = request.PostUrl,
-            AssignedUserId = User.GetUserId(),
+            StoreName = request.StoreName,
+            Status = request.Status,
+            OrderSource = request.OrderSource,
+            ApplicationUserId = User.GetUserId() ?? "system",
             CreatedDate = DateTime.UtcNow
         };
 
@@ -80,15 +77,15 @@ public class PotentialOrderController : ControllerBase
             Country: pot.Country,
             State: request.State,
             OrderSource: request.OrderSource,
-            SourceName: pot.PageName,
+            SourceName: pot.StoreName,
             ManufacturingCompanyId: request.ManufacturingCompanyId,
             DeliveryCompanyId: request.DeliveryCompanyId,
-            TelephoneNumber: pot.TelephoneNumber,
+            TelephoneNumber: pot.PhoneNumber ?? string.Empty,
             SecondTelephoneNumber: request.SecondTelephoneNumber,
             CustomerName: pot.CustomerName,
-            Notes: pot.Notes,
-            Address: pot.Address ?? request.Address,
-            TotalPrice: pot.TotalPrice ?? request.TotalPrice,
+            Notes: request.Notes,
+            Address: request.Address,
+            TotalPrice: request.TotalPrice,
             DeliveryPrice: request.DeliveryPrice,
             CustomerDeliveryPrice: request.CustomerDeliveryPrice,
             ChatUrl: pot.ChatUrl,
@@ -98,13 +95,31 @@ public class PotentialOrderController : ControllerBase
         var userId = User.GetUserId() ?? "system";
         var order = await _orderService.CreateOrderAsync(createReq, userId, ct);
 
-        pot.IsConverted = true;
-        pot.ConvertedOrderId = order.Id;
+        pot.LastEditedDate = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
 
         return Ok(order);
     }
 }
 
-public record CreatePotentialOrderRequest(string CustomerName, string TelephoneNumber, string? Address, string? Notes, int Country, decimal? TotalPrice, string? ChatUrl, string? PageName, string? PostUrl);
-public record ConvertPotentialOrderRequest(string State, int OrderSource, int? ManufacturingCompanyId, int DeliveryCompanyId, string? SecondTelephoneNumber, string Address, decimal TotalPrice, decimal DeliveryPrice, decimal CustomerDeliveryPrice, List<CreateOrderItemRequest>? Items);
+public sealed record CreatePotentialOrderRequest(
+    string CustomerName,
+    string? PhoneNumber,
+    int Country,
+    string? ChatUrl,
+    string StoreName,
+    int OrderSource,
+    int Status = 0);
+
+public sealed record ConvertPotentialOrderRequest(
+    string State,
+    int OrderSource,
+    int? ManufacturingCompanyId,
+    int DeliveryCompanyId,
+    string? SecondTelephoneNumber,
+    string Address,
+    string? Notes,
+    decimal TotalPrice,
+    decimal DeliveryPrice,
+    decimal CustomerDeliveryPrice,
+    List<CreateOrderItemRequest>? Items);

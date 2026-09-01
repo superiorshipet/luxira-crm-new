@@ -22,12 +22,12 @@ public class WarehouseRepository
 
         if (countryId.HasValue && countryId.Value > 0)
         {
-            query = query.Where(w => w.Country == countryId.Value);
+            query = query.Where(w => w.Countries == countryId.Value);
         }
 
         if (isActive.HasValue)
         {
-            query = query.Where(w => w.IsActive == isActive.Value);
+            query = query.Where(w => w.IsShown == isActive.Value);
         }
 
         return await query.OrderBy(w => w.Name).ToListAsync(ct);
@@ -56,7 +56,7 @@ public class WarehouseRepository
 
         if (countryId.HasValue && countryId.Value > 0)
         {
-            query = query.Where(m => m.Country == countryId.Value);
+            query = query.Where(m => m.SubWarehouses.Any(w => w.Countries == countryId.Value));
         }
 
         return await query.OrderBy(m => m.Name).ToListAsync(ct);

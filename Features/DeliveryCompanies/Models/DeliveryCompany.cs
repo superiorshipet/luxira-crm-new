@@ -52,29 +52,47 @@ public class DeliveryCompanyPrice
 public class StoreDeliveryCompanyAssignment
 {
     public int Id { get; set; }
-    public int StoreId { get; set; }
+    public int ManufacturingCompanyId { get; set; }
     public int DeliveryCompanyId { get; set; }
     public DeliveryCompany? DeliveryCompany { get; set; }
+    public bool IsManualTransfer { get; set; }
+    public string? Notes { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class CamexCity
 {
-    public int Id { get; set; }
+    public int CamexCityId { get; set; }
     public string CityName { get; set; } = string.Empty;
-    public string? CityCode { get; set; }
+    public string? AreaName { get; set; }
+    public decimal TotalCost { get; set; }
+    public bool HasConversion { get; set; }
+    public int? RelatedId { get; set; }
+    public string? NormalizedName { get; set; }
+    public DateTime? LastSyncedAtUtc { get; set; }
+    public bool IsActive { get; set; }
 }
 
 public class CamexCityMapping
 {
     public int Id { get; set; }
-    public string LocalState { get; set; } = string.Empty;
+    public string State { get; set; } = string.Empty;
+    public string? NormalizedState { get; set; }
     public int CamexCityId { get; set; }
     public CamexCity? CamexCity { get; set; }
+    public string? Notes { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 }
 
 public class CamexStoreMapping
 {
     public int Id { get; set; }
-    public int StorefrontId { get; set; }
+    public int ManufacturingCompanyId { get; set; }
     public string CamexStoreName { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 }

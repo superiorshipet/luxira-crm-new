@@ -18,27 +18,17 @@ public class ExpenseRepository
     {
         var query = _context.Expenses.AsNoTracking().AsQueryable();
 
-        if (filter.Country.HasValue && filter.Country.Value > 0)
-        {
-            query = query.Where(e => e.Country == filter.Country.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.Category))
-        {
-            query = query.Where(e => e.Category == filter.Category);
-        }
-
         if (filter.FromDate.HasValue)
         {
-            query = query.Where(e => e.Date >= filter.FromDate.Value);
+            query = query.Where(e => e.CreatedDate >= filter.FromDate.Value);
         }
 
         if (filter.ToDate.HasValue)
         {
-            query = query.Where(e => e.Date <= filter.ToDate.Value);
+            query = query.Where(e => e.CreatedDate <= filter.ToDate.Value);
         }
 
-        return await query.OrderByDescending(e => e.Date).ToListAsync(ct);
+        return await query.OrderByDescending(e => e.CreatedDate).ToListAsync(ct);
     }
 
     public async Task<Expense> AddAsync(Expense expense, CancellationToken ct = default)
@@ -55,11 +45,11 @@ public class ExpenseRepository
 
     public async Task UpdateExchangeRateAsync(ExchangeRate rate, CancellationToken ct = default)
     {
-        var existing = await _context.ExchangeRates.FirstOrDefaultAsync(r => r.FromCurrency == rate.FromCurrency && r.ToCurrency == rate.ToCurrency, ct);
+        var existing = await _context.ExchangeRates.FirstOrDefaultAsync(r => r.Country == rate.Country, ct);
         if (existing != null)
         {
-            existing.Rate = rate.Rate;
-            existing.UpdatedAt = DateTime.UtcNow;
+            existing.BuyToUSD = rate.BuyToUSD;
+            existing.SellToUSD = rate.SellToUSD;
         }
         else
         {

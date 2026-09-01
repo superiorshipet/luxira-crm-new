@@ -53,7 +53,7 @@ public class EmployeeBonusController : ControllerBase
         [FromQuery] int? countryId,
         CancellationToken ct)
     {
-        var totalBonus = await _context.EmployeeBonusPayments.SumAsync(b => (decimal?)b.Amount, ct) ?? 0m;
+        var totalBonus = await _context.EmployeeBonusPayments.SumAsync(b => (decimal?)b.AmountPaid, ct) ?? 0m;
         var count = await _context.EmployeeBonusPayments.CountAsync(ct);
         return Ok(new { totalBonus, paymentCount = count });
     }
@@ -64,7 +64,7 @@ public class EmployeeBonusController : ControllerBase
     {
         var details = await _context.EmployeeBonusPayments
             .Where(b => b.EmployeeId == employeeId)
-            .OrderByDescending(b => b.Date)
+            .OrderByDescending(b => b.DatePaid)
             .ToListAsync(ct);
 
         return Ok(details);
@@ -78,13 +78,13 @@ public class EmployeeBonusController : ControllerBase
         var payment = new EmployeeBonusPayment
         {
             EmployeeId = request.EmployeeId,
-            Amount = request.Amount,
-            Date = IstanbulTimeHelper.Now
+            AmountPaid = request.Amount,
+            DatePaid = IstanbulTimeHelper.Now
         };
 
         await _context.EmployeeBonusPayments.AddAsync(payment, ct);
         await _context.SaveChangesAsync(ct);
-        return Ok(new { success = true, paymentId = payment.Id, amount = payment.Amount });
+        return Ok(new { success = true, paymentId = payment.Id, amount = payment.AmountPaid });
     }
 
     [HttpPost("undo-pay/{paymentId:int}")]
@@ -107,7 +107,7 @@ public class EmployeeBonusController : ControllerBase
     {
         var archive = await _context.EmployeeBonusPayments
             .Include(b => b.Employee)
-            .OrderByDescending(b => b.Date)
+            .OrderByDescending(b => b.DatePaid)
             .Take(100)
             .ToListAsync(ct);
 

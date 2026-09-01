@@ -44,7 +44,7 @@ public class WebsiteDomainDbConfig : IDbConfig<WebsiteDomain>
     {
         builder.ToTable("WebsiteDomains");
         builder.HasKey(d => d.Id);
-        builder.Property(d => d.DomainName).HasMaxLength(255).IsRequired();
+        builder.Property(d => d.Domain).HasMaxLength(255).IsRequired();
     }
 }
 
@@ -54,7 +54,6 @@ public class VideoLinkDbConfig : IDbConfig<VideoLink>
     {
         builder.ToTable("VideoLinks");
         builder.HasKey(v => v.Id);
-        builder.Property(v => v.Title).HasMaxLength(255).IsRequired();
         builder.Property(v => v.Url).HasMaxLength(500).IsRequired();
     }
 }

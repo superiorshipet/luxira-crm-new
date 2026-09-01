@@ -25,10 +25,12 @@ public class VideoLinksController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/VideoLinks/Index")]
-    public async Task<IActionResult> Index([FromQuery] int? productId, CancellationToken ct = default)
+    public async Task<IActionResult> Index([FromQuery] int? manufacturingCompanyId, CancellationToken ct = default)
     {
         var query = _context.VideoLinks.AsNoTracking().AsQueryable();
-        if (productId.HasValue) query = query.Where(v => v.ProductId == productId.Value);
+        if (manufacturingCompanyId.HasValue)
+            query = query.Where(v => v.ManufacturingCompanyId == manufacturingCompanyId.Value);
+        query = query.Where(link => !link.IsDeleted);
 
         var links = await query.OrderByDescending(v => v.CreatedAt).ToListAsync(ct);
         return Ok(links);
@@ -40,11 +42,11 @@ public class VideoLinksController : ControllerBase
     {
         var link = new VideoLink
         {
-            ProductId = request.ProductId,
-            Title = request.Title,
+            ManufacturingCompanyId = request.ManufacturingCompanyId,
             Url = request.Url,
-            Platform = request.Platform ?? "YouTube",
-            CreatedAt = IstanbulTimeHelper.Now
+            CreatedAt = IstanbulTimeHelper.Now,
+            CreatedByUserId = User.GetUserId(),
+            CreatedByName = User.Identity?.Name
         };
 
         await _context.VideoLinks.AddAsync(link, ct);
@@ -59,10 +61,11 @@ public class VideoLinksController : ControllerBase
         var link = await _context.VideoLinks.FirstOrDefaultAsync(v => v.Id == request.Id, ct);
         if (link == null) return NotFound("Video link not found.");
 
-        link.ProductId = request.ProductId;
-        link.Title = request.Title;
+        link.ManufacturingCompanyId = request.ManufacturingCompanyId;
         link.Url = request.Url;
-        link.Platform = request.Platform ?? link.Platform;
+        link.UpdatedAt = IstanbulTimeHelper.Now;
+        link.UpdatedByUserId = User.GetUserId();
+        link.UpdatedByName = User.Identity?.Name;
 
         await _context.SaveChangesAsync(ct);
         return Ok(link);
@@ -76,10 +79,13 @@ public class VideoLinksController : ControllerBase
         var link = await _context.VideoLinks.FirstOrDefaultAsync(v => v.Id == id, ct);
         if (link == null) return NotFound("Video link not found.");
 
-        _context.VideoLinks.Remove(link);
+        link.IsDeleted = true;
+        link.DeletedAt = IstanbulTimeHelper.Now;
+        link.DeletedByUserId = User.GetUserId();
+        link.DeletedByName = User.Identity?.Name;
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true });
     }
 }
 
-public record VideoLinkUpsertRequest(int? Id, int? ProductId, string Title, string Url, string? Platform);
+public sealed record VideoLinkUpsertRequest(int? Id, int ManufacturingCompanyId, string Url);

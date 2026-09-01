@@ -97,7 +97,7 @@ public class ManufacturingCompanyRepository
 
         if (productId.HasValue && productId.Value > 0)
         {
-            query = query.Where(p => p.MainProductId == productId.Value);
+            query = query.Where(p => p.MainWarehouseId == productId.Value);
         }
 
         if (countryId.HasValue && countryId.Value > 0)
@@ -111,11 +111,14 @@ public class ManufacturingCompanyRepository
     public async Task SetMinimumPriceAsync(ProductMinimumSellingPrice minPrice, CancellationToken ct = default)
     {
         var existing = await _context.ProductMinimumSellingPrices
-            .FirstOrDefaultAsync(p => p.MainProductId == minPrice.MainProductId && p.Country == minPrice.Country, ct);
+            .FirstOrDefaultAsync(p => p.MainWarehouseId == minPrice.MainWarehouseId &&
+                p.ManufacturingCompanyId == minPrice.ManufacturingCompanyId &&
+                p.Country == minPrice.Country, ct);
 
         if (existing != null)
         {
-            existing.MinimumPrice = minPrice.MinimumPrice;
+            existing.MinimumSellingPrice = minPrice.MinimumSellingPrice;
+            existing.UpdatedAt = DateTime.UtcNow;
         }
         else
         {

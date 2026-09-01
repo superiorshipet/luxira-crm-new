@@ -18,7 +18,9 @@ public class Employee
     public string Address { get; set; } = string.Empty;
     public decimal Salary { get; set; }
     public string? JobTitle { get; set; }
-    public DateTime HireDate { get; set; } = DateTime.UtcNow;
+    public DateTime DateAdded { get; set; } = DateTime.UtcNow;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public DateTime HireDate { get => DateAdded; set => DateAdded = value; }
     public bool IsActive { get; set; } = true;
     public bool IsShown { get; set; } = true;
     public bool AllowMobileOrTabletLogin { get; set; }
@@ -103,11 +105,25 @@ public class EmployeeWorkShift
 public class EmployeeActivityLog
 {
     public int Id { get; set; }
-    public int EmployeeId { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public int? EmployeeId { get; set; }
     public Employee? Employee { get; set; }
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    public string ActivityType { get; set; } = string.Empty;
-    public string? Details { get; set; }
+    public string? EmployeeName { get; set; }
+    public string? EmployeeEmail { get; set; }
+    public string? EmployeeImageUrl { get; set; }
+    public DateTime ActivityDate { get; set; }
+    public DateTime FirstSeenAt { get; set; }
+    public DateTime LastSeenAt { get; set; }
+    public DateTime LastActivityAt { get; set; }
+    public string? CurrentPage { get; set; }
+    public bool IsTabActive { get; set; }
+    public int TotalOnlineSeconds { get; set; }
+    public int TotalActiveSeconds { get; set; }
+    public DateTime LastHeartbeatAt { get; set; }
+    public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class EmployeeSalaryPayment
@@ -151,8 +167,14 @@ public class EmployeeBonusRate
 {
     public int Id { get; set; }
     public int EmployeeId { get; set; }
-    public decimal Rate { get; set; }
-    public int TargetOrders { get; set; }
+    public decimal ProBonusPercentage { get; set; }
+    public int ProThreshold { get; set; }
+    public bool IsBonusPanelHidden { get; set; }
+    public bool IsBonusAmountsRevealed { get; set; }
+    public decimal BonusPercentage { get; set; }
+    public decimal BonusProcessingPercentage { get; set; }
+    public decimal ProBonusProcessingPercentage { get; set; }
+    public decimal MinimumBonusThreshold { get; set; }
 }
 
 public class EmployeeBonusPayment
@@ -160,8 +182,15 @@ public class EmployeeBonusPayment
     public int Id { get; set; }
     public int EmployeeId { get; set; }
     public Employee? Employee { get; set; }
-    public decimal Amount { get; set; }
-    public DateTime Date { get; set; } = DateTime.UtcNow;
+    public DateTime DatePaid { get; set; } = DateTime.UtcNow;
+    public decimal AmountPaid { get; set; }
+    public decimal ProExtraAmount { get; set; }
+    public int TotalOrderCount { get; set; }
+    public int ProOrderCount { get; set; }
+    public int SuccessOrderCount { get; set; }
+    public int ProcessingOrderCount { get; set; }
+    public decimal ProcessingAmount { get; set; }
+    public decimal SuccessAmount { get; set; }
 }
 
 public class EmployeeTask
@@ -207,9 +236,19 @@ public class EmployeeError
     public int Id { get; set; }
     public int EmployeeId { get; set; }
     public Employee? Employee { get; set; }
-    public string Description { get; set; } = string.Empty;
-    public decimal? DeductionAmount { get; set; }
+    public string ErrorText { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByUserName { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+    public string? PageUrl { get; set; }
+    public string? EmployeeReason { get; set; }
+    public int ErrorCount { get; set; }
+    public bool IsAcknowledged { get; set; }
+    public bool IsReasonProvided { get; set; }
+    public int SeverityLevel { get; set; }
 }
 
 public class EmployeeTransaction
@@ -219,7 +258,9 @@ public class EmployeeTransaction
     public decimal Amount { get; set; }
     public string TransactionType { get; set; } = string.Empty; // Advance, Bonus, Deduction
     public DateTime Date { get; set; } = DateTime.UtcNow;
-    public string? Note { get; set; }
+    public string? Reason { get; set; }
+    public int? EmployeePaymentSummaryId { get; set; }
+    public bool IsDeleted { get; set; }
 }
 
 public class EmployeeViolation
@@ -248,29 +289,29 @@ public class EmployeeRating
 public class PersonalNote
 {
     public int Id { get; set; }
-    public string UserId { get; set; } = string.Empty;
-    public string Title { get; set; } = string.Empty;
-    public string Content { get; set; } = string.Empty;
+    public string ApplicationUserId { get; set; } = string.Empty;
+    public string HtmlContent { get; set; } = string.Empty;
+    public string PlainText { get; set; } = string.Empty;
+    public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? ReminderAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
 }
 
 public class ManagementRequest
 {
     public int Id { get; set; }
-    public int EmployeeId { get; set; }
-    public Employee? Employee { get; set; }
+    public string ApplicationUserId { get; set; } = string.Empty;
+    public string EmployeeName { get; set; } = string.Empty;
+    public string EmployeeEmail { get; set; } = string.Empty;
     public string RequestType { get; set; } = "Leave"; // Leave, Advance, Expense, ShiftSwap, Resignation
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public decimal? RequestedAmount { get; set; }
-    public DateTime? StartDate { get; set; }
-    public DateTime? EndDate { get; set; }
+    public string Reason { get; set; } = string.Empty;
     public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected
-    public string? ManagerFeedback { get; set; }
-    public string? ReviewedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? ReviewedAt { get; set; }
+    public DateTime? DecidedAt { get; set; }
+    public string? DecidedByUserId { get; set; }
+    public string? DecidedByName { get; set; }
 }
 
 public class ScreenRecord

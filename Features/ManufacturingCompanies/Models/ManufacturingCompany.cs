@@ -73,9 +73,17 @@ public class ProductImage
 public class ProductMinimumSellingPrice
 {
     public int Id { get; set; }
-    public int MainProductId { get; set; }
     public int Country { get; set; }
-    public decimal MinimumPrice { get; set; }
+    public int ManufacturingCompanyId { get; set; }
+    public int MainWarehouseId { get; set; }
+    public decimal MinimumSellingPrice { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int MainProductId { get => MainWarehouseId; set => MainWarehouseId = value; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal MinimumPrice { get => MinimumSellingPrice; set => MinimumSellingPrice = value; }
 }
 
 /// <summary>
@@ -107,6 +115,13 @@ public class StoreCodeEditHistory
 {
     public int Id { get; set; }
     public int StoreCodeFolderId { get; set; }
-    public string UserId { get; set; } = string.Empty;
-    public DateTime EditedAt { get; set; } = DateTime.UtcNow;
+    public int ManufacturingCompanyId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public int LineNumber { get; set; }
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public bool IsRestoreAction { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
 }

@@ -97,7 +97,11 @@ public class EmployeeBonusRateDbConfig : IDbConfig<EmployeeBonusRate>
     {
         builder.ToTable("EmployeeBonusRates");
         builder.HasKey(r => r.Id);
-        builder.Property(r => r.Rate).HasPrecision(18, 2);
+        builder.Property(r => r.ProBonusPercentage).HasPrecision(18, 2);
+        builder.Property(r => r.BonusPercentage).HasPrecision(18, 2);
+        builder.Property(r => r.BonusProcessingPercentage).HasPrecision(18, 2);
+        builder.Property(r => r.ProBonusProcessingPercentage).HasPrecision(18, 2);
+        builder.Property(r => r.MinimumBonusThreshold).HasPrecision(18, 2);
     }
 }
 
@@ -107,7 +111,10 @@ public class EmployeeBonusPaymentDbConfig : IDbConfig<EmployeeBonusPayment>
     {
         builder.ToTable("EmployeeBonusPayments");
         builder.HasKey(p => p.Id);
-        builder.Property(p => p.Amount).HasPrecision(18, 2);
+        builder.Property(p => p.AmountPaid).HasPrecision(18, 2);
+        builder.Property(p => p.ProExtraAmount).HasPrecision(18, 2);
+        builder.Property(p => p.ProcessingAmount).HasPrecision(18, 2);
+        builder.Property(p => p.SuccessAmount).HasPrecision(18, 2);
     }
 }
 
@@ -151,7 +158,7 @@ public class EmployeeErrorDbConfig : IDbConfig<EmployeeError>
     {
         builder.ToTable("EmployeeErrors");
         builder.HasKey(e => e.Id);
-        builder.Property(e => e.DeductionAmount).HasPrecision(18, 2);
+        builder.Property(e => e.ErrorText).HasMaxLength(4000).IsRequired();
     }
 }
 
@@ -199,10 +206,9 @@ public class ManagementRequestDbConfig : IDbConfig<ManagementRequest>
     {
         builder.ToTable("ManagementRequests");
         builder.HasKey(m => m.Id);
-        builder.Property(m => m.Title).HasMaxLength(255).IsRequired();
         builder.Property(m => m.RequestType).HasMaxLength(100).IsRequired();
+        builder.Property(m => m.Reason).HasMaxLength(2000).IsRequired();
         builder.Property(m => m.Status).HasMaxLength(50).IsRequired();
-        builder.Property(m => m.RequestedAmount).HasPrecision(18, 2);
     }
 }
 

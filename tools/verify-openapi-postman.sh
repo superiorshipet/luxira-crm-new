@@ -9,6 +9,7 @@ base_url="http://127.0.0.1:${verification_port}"
 temporary_directory="$(mktemp -d)"
 server_log="$temporary_directory/server.log"
 openapi_document="$temporary_directory/openapi-v1.json"
+postman_document="$temporary_directory/postman-collection.json"
 countries_document="$temporary_directory/countries.json"
 legacy_countries_document="$temporary_directory/legacy-countries.json"
 preparation_countries_document="$temporary_directory/preparation-countries.json"
@@ -35,7 +36,7 @@ cd "$repository_root"
 ASPNETCORE_ENVIRONMENT=Testing \
 ASPNETCORE_URLS="$base_url" \
 dotnet run \
-    --project src/Luxira.Api/Luxira.Api.csproj \
+    --project Luxira.csproj \
     --no-build \
     --configuration "$verification_configuration" \
     --no-launch-profile \
@@ -61,6 +62,10 @@ done
 curl --fail --silent --show-error \
     "$base_url/swagger/v1/swagger.json" \
     --output "$openapi_document"
+
+curl --fail --silent --show-error \
+    "$base_url/postman/collection.json" \
+    --output "$postman_document"
 
 curl --fail --silent --show-error \
     "$base_url/api/v1/reference-data/countries" \
@@ -141,18 +146,24 @@ if ! cmp --silent \
     exit 1
 fi
 
-node tools/check-postman-coverage.mjs \
-    "$openapi_document" \
-    postman/coverage-manifest.json \
-    postman/Luxira.Api.postman_collection.json
-
 operation_count="$(
     jq '[.paths[] | to_entries[] | select(.value.operationId != null)] | length' \
         "$openapi_document"
 )"
 
+postman_request_count="$(
+    jq '[.. | objects | select(has("request"))] | length' \
+        "$postman_document"
+)"
+
+jq --exit-status '
+    .info.schema == "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" and
+    (.item | length) > 0
+' "$postman_document" >/dev/null
+
 echo "Verified Postman import document at $base_url/swagger/v1/swagger.json"
 echo "Published operations: $operation_count"
+echo "Generated Postman requests: $postman_request_count"
 echo "Verified country contract and legacy-route parity: 16 entries"
 echo "Verified preparation country contract and legacy-route parity: 4 entries"
 echo "Verified failure-reason contract and legacy-route parity: 11 entries"

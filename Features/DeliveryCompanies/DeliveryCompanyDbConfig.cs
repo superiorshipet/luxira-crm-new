@@ -48,7 +48,8 @@ public class CamexCityDbConfig : IDbConfig<CamexCity>
     public void Configure(EntityTypeBuilder<CamexCity> builder)
     {
         builder.ToTable("CamexCities");
-        builder.HasKey(c => c.Id);
+        builder.HasKey(c => c.CamexCityId);
+        builder.Property(c => c.TotalCost).HasPrecision(18, 2);
     }
 }
 

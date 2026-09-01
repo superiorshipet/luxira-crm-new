@@ -67,6 +67,7 @@ public class S3StorageService : IDisposable
         var record = new S3StoredObject
         {
             S3Key = key,
+            Prefix = prefix,
             BucketName = _bucket,
             OriginalFileName = file.FileName,
             ContentType = file.ContentType,
@@ -102,6 +103,7 @@ public class S3StorageService : IDisposable
         var record = new S3StoredObject
         {
             S3Key = key,
+            Prefix = prefix,
             BucketName = _bucket,
             OriginalFileName = sourceFileName,
             ContentType = contentType,
@@ -176,7 +178,7 @@ public class S3StorageService : IDisposable
     {
         await _s3Client.DeleteObjectAsync(_bucket, key, ct);
 
-        var existing = await _db.S3StoredObjects.FirstOrDefaultAsync(x => x.S3Key == key, ct);
+        var existing = await _db.S3StoredObjects.FirstOrDefaultAsync(x => x.Key == key, ct);
         if (existing != null)
         {
             _db.S3StoredObjects.Remove(existing);

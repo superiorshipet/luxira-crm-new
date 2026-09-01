@@ -24,15 +24,12 @@ public class HelpCenterChatController : ControllerBase
     [HttpGet("GetMessages")]
     public async Task<ActionResult<List<HelpCenterChatMessage>>> GetMessages([FromQuery] string? receiverUserId, CancellationToken ct)
     {
-        var currentUserId = User.GetUserId() ?? "system";
-        var query = _context.Set<HelpCenterChatMessage>().AsNoTracking().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(receiverUserId))
-        {
-            query = query.Where(m => (m.SenderUserId == currentUserId && m.ReceiverUserId == receiverUserId) || (m.SenderUserId == receiverUserId && m.ReceiverUserId == currentUserId));
-        }
-
-        var list = await query.OrderByDescending(m => m.SentAt).Take(100).ToListAsync(ct);
+        var list = await _context.Set<HelpCenterChatMessage>()
+            .AsNoTracking()
+            .Where(message => !message.IsDeleted)
+            .OrderByDescending(message => message.CreatedAt)
+            .Take(100)
+            .ToListAsync(ct);
         return Ok(list);
     }
 
@@ -43,11 +40,14 @@ public class HelpCenterChatController : ControllerBase
         var msg = new HelpCenterChatMessage
         {
             SenderUserId = User.GetUserId() ?? "system",
-            ReceiverUserId = request.ReceiverUserId,
             MessageText = request.MessageText,
-            AttachmentUrl = request.AttachmentUrl,
-            IsRead = false,
-            SentAt = DateTime.UtcNow
+            MessageKind = string.IsNullOrWhiteSpace(request.AttachmentStoragePath) ? "Text" : "Attachment",
+            AttachmentStoragePath = request.AttachmentStoragePath,
+            AttachmentOriginalName = request.AttachmentOriginalName,
+            AttachmentMimeType = request.AttachmentMimeType,
+            ClientMessageId = request.ClientMessageId,
+            ReplyToMessageId = request.ReplyToMessageId,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _context.Set<HelpCenterChatMessage>().AddAsync(msg, ct);
@@ -56,4 +56,10 @@ public class HelpCenterChatController : ControllerBase
     }
 }
 
-public record SendChatMessageRequest(string? ReceiverUserId, string MessageText, string? AttachmentUrl);
+public sealed record SendChatMessageRequest(
+    string MessageText,
+    string? AttachmentStoragePath,
+    string? AttachmentOriginalName,
+    string? AttachmentMimeType,
+    string? ClientMessageId,
+    int? ReplyToMessageId);

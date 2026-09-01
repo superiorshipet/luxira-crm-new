@@ -1,6 +1,8 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Communication.Models;
 using Luxira.Api.Features.Employees.Models;
+using Luxira.Api.Features.Orders.Models;
+using Luxira.Api.Features.Media.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Luxira.Tests;
@@ -58,6 +60,39 @@ public sealed class LegacySchemaMappingTests
         Assert.NotNull(payment?.FindProperty(nameof(EmployeeSalaryPayment.IsPermanentlyDeleted)));
         Assert.Null(payment?.FindProperty("Amount"));
         Assert.Null(payment?.FindProperty("PaymentDate"));
+    }
+
+    [Fact]
+    public void OrderWarehouse_UsesLegacyCompositeKeyAndPersistedColumns()
+    {
+        using var context = CreateContext();
+        var entity = context.Model.FindEntityType(typeof(OrderWarehouse));
+
+        Assert.Equal("OrderWarehouses", entity?.GetTableName());
+        Assert.Equal(
+            [nameof(OrderWarehouse.OrderId), nameof(OrderWarehouse.WarehouseId)],
+            entity?.FindPrimaryKey()?.Properties.Select(property => property.Name));
+        Assert.NotNull(entity?.FindProperty(nameof(OrderWarehouse.Amount)));
+        Assert.NotNull(entity?.FindProperty(nameof(OrderWarehouse.UnitPrice)));
+        Assert.Null(entity?.FindProperty("Id"));
+        Assert.Null(entity?.FindProperty("Quantity"));
+        Assert.Null(entity?.FindProperty("Price"));
+        Assert.Null(entity?.FindProperty("Cost"));
+    }
+
+    [Fact]
+    public void S3Object_MapsLegacyKeyAndSoftDeleteColumns()
+    {
+        using var context = CreateContext();
+        var entity = context.Model.FindEntityType(typeof(S3StoredObject));
+
+        Assert.Equal("S3StoredObjects", entity?.GetTableName());
+        Assert.NotNull(entity?.FindProperty(nameof(S3StoredObject.Key)));
+        Assert.NotNull(entity?.FindProperty(nameof(S3StoredObject.Prefix)));
+        Assert.NotNull(entity?.FindProperty(nameof(S3StoredObject.IsDeleted)));
+        Assert.Null(entity?.FindProperty(nameof(S3StoredObject.S3Key)));
+        Assert.Null(entity?.FindProperty(nameof(S3StoredObject.BucketName)));
+        Assert.Null(entity?.FindProperty(nameof(S3StoredObject.PublicUrl)));
     }
 
     private static ApplicationDbContext CreateContext() => new(

@@ -4,11 +4,21 @@ public class HelpCenterChatMessage
 {
     public int Id { get; set; }
     public string SenderUserId { get; set; } = string.Empty;
-    public string? ReceiverUserId { get; set; }
+    public string? SenderName { get; set; }
+    public string? SenderImageUrl { get; set; }
     public string MessageText { get; set; } = string.Empty;
-    public string? AttachmentUrl { get; set; }
-    public bool IsRead { get; set; }
-    public DateTime SentAt { get; set; } = DateTime.UtcNow;
+    public string MessageKind { get; set; } = "Text";
+    public string? AttachmentStoragePath { get; set; }
+    public string? AttachmentOriginalName { get; set; }
+    public string? AttachmentMimeType { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
+    public int? ReplyToMessageId { get; set; }
+    public DateTime? EditedAt { get; set; }
+    public string? ClientMessageId { get; set; }
 }
 
 public class WhatsAppMessage
