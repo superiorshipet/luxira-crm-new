@@ -35,6 +35,13 @@ public class JwtService
         if (!string.IsNullOrEmpty(user.Role))
         {
             claims.Add(new Claim(ClaimTypes.Role, user.Role));
+            if (user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                user.Role.Equals("Administrator", StringComparison.OrdinalIgnoreCase))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+                claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
+                claims.Add(new Claim(ClaimTypes.Role, "ExecutiveDirector"));
+            }
         }
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));

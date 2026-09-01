@@ -154,3 +154,26 @@ public class PersonalNoteDbConfig : IDbConfig<PersonalNote>
     }
 }
 
+public class ManagementRequestDbConfig : IDbConfig<ManagementRequest>
+{
+    public void Configure(EntityTypeBuilder<ManagementRequest> builder)
+    {
+        builder.ToTable("ManagementRequests");
+        builder.HasKey(m => m.Id);
+        builder.Property(m => m.Title).HasMaxLength(255).IsRequired();
+        builder.Property(m => m.RequestType).HasMaxLength(100).IsRequired();
+        builder.Property(m => m.Status).HasMaxLength(50).IsRequired();
+        builder.Property(m => m.RequestedAmount).HasPrecision(18, 2);
+    }
+}
+
+public class ScreenRecordDbConfig : IDbConfig<ScreenRecord>
+{
+    public void Configure(EntityTypeBuilder<ScreenRecord> builder)
+    {
+        builder.ToTable("ScreenRecords");
+        builder.HasKey(s => s.Id);
+    }
+}
+
+

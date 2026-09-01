@@ -61,6 +61,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeViolation> EmployeeViolations => Set<EmployeeViolation>();
     public DbSet<EmployeeRating> EmployeeRatings => Set<EmployeeRating>();
     public DbSet<PersonalNote> PersonalNotes => Set<PersonalNote>();
+    public DbSet<ManagementRequest> ManagementRequests => Set<ManagementRequest>();
+    public DbSet<ScreenRecord> ScreenRecords => Set<ScreenRecord>();
 
     // Finance & Expenses
     public DbSet<Expense> Expenses => Set<Expense>();

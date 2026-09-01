@@ -53,6 +53,42 @@ public class AdvertisingManagerController : ControllerBase
         await _context.SaveChangesAsync(ct);
         return Ok(c);
     }
+
+    [HttpGet("roi")]
+    [HttpGet("GetCampaignRoi/{campaignId:int}")]
+    public async Task<ActionResult<CampaignRoiDto>> GetCampaignRoi([FromRoute] int campaignId, CancellationToken ct)
+    {
+        var campaign = await _context.Set<AdvertisingCampaign>().FindAsync([campaignId], ct);
+        if (campaign == null)
+        {
+            return NotFound(new { message = $"Campaign {campaignId} not found." });
+        }
+
+        var orders = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.CampaignId == campaignId)
+            .ToListAsync(ct);
+
+        int totalOrders = orders.Count;
+        int deliveredOrders = orders.Count(o => o.OrderStatus == 5);
+        decimal totalRevenue = orders.Where(o => o.OrderStatus == 5).Sum(o => o.TotalPrice);
+        decimal spent = campaign.Spent > 0 ? campaign.Spent : campaign.Budget;
+        decimal cpa = totalOrders > 0 ? Math.Round(spent / totalOrders, 2) : 0;
+        decimal roi = spent > 0 ? Math.Round(((totalRevenue - spent) / spent) * 100, 2) : 0;
+
+        return Ok(new CampaignRoiDto(
+            campaign.Id,
+            campaign.Name,
+            campaign.Platform,
+            spent,
+            totalOrders,
+            deliveredOrders,
+            totalRevenue,
+            cpa,
+            roi
+        ));
+    }
 }
 
 public record CreateAdCampaignRequest(string Name, string? Platform, decimal Budget, int TargetCountry, int? ManufacturingCompanyId);
+public record CampaignRoiDto(int CampaignId, string CampaignName, string Platform, decimal Spent, int TotalOrders, int DeliveredOrders, decimal Revenue, decimal Cpa, decimal RoiPercentage);
