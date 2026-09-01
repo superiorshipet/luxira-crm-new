@@ -1,5 +1,6 @@
 using System.Text;
 using Luxira.Api.Data;
+using Luxira.Api.Infrastructure.Pdf;
 using Luxira.Api.Utils.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +15,21 @@ namespace Luxira.Api.Features.Expenses.Controllers;
 public class PdfController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly LuxiraPdfService _pdfService;
 
-    public PdfController(ApplicationDbContext context)
+    public PdfController(ApplicationDbContext context, LuxiraPdfService pdfService)
     {
         _context = context;
+        _pdfService = pdfService;
     }
 
     [HttpGet("orders")]
     [HttpGet("/Pdf/PrintOrder")]
-    public async Task<IActionResult> PrintOrders([FromQuery] int[]? ids, [FromQuery] string? orderIds, CancellationToken ct)
+    public async Task<IActionResult> PrintOrders(
+        [FromQuery] int[]? ids,
+        [FromQuery] string? orderIds,
+        [FromQuery] bool downloadPdf = false,
+        CancellationToken ct = default)
     {
         var targetIds = new List<int>();
         if (ids != null && ids.Length > 0) targetIds.AddRange(ids);
@@ -45,6 +52,12 @@ public class PdfController : ControllerBase
             .AsNoTracking()
             .Where(o => targetIds.Contains(o.Id))
             .ToListAsync(ct);
+
+        if (downloadPdf)
+        {
+            var pdfBytes = _pdfService.GenerateOrderReceiptPdf(orders);
+            return File(pdfBytes, "application/pdf", $"order_receipts_{DateTime.UtcNow:yyyyMMdd_HHmm}.pdf");
+        }
 
         var htmlBuilder = new StringBuilder();
         htmlBuilder.Append(@"<!DOCTYPE html>
@@ -106,14 +119,25 @@ public class PdfController : ControllerBase
 
     [HttpGet("delivery-manifest/{companyId:int}")]
     [HttpGet("/Pdf/PrintOrdersForDelivery")]
-    public async Task<IActionResult> PrintDeliveryManifest([FromRoute] int? companyId, [FromQuery] int? id, CancellationToken ct)
+    public async Task<IActionResult> PrintDeliveryManifest(
+        [FromRoute] int? companyId,
+        [FromQuery] int? id,
+        [FromQuery] bool downloadPdf = false,
+        CancellationToken ct = default)
     {
         int targetCompanyId = companyId ?? id ?? 0;
+        var company = await _context.DeliveryCompanies.FirstOrDefaultAsync(d => d.Id == targetCompanyId, ct);
         var orders = await _context.Orders
             .Include(o => o.DeliveryCompany)
             .AsNoTracking()
             .Where(o => o.DeliveryCompanyId == targetCompanyId && o.OrderStatus == 4) // جاهز للتسليم
             .ToListAsync(ct);
+
+        if (downloadPdf)
+        {
+            var pdfBytes = _pdfService.GenerateDeliveryManifestPdf(company?.Name ?? "شركة التوصيل", orders);
+            return File(pdfBytes, "application/pdf", $"manifest_{targetCompanyId}_{DateTime.UtcNow:yyyyMMdd}.pdf");
+        }
 
         var html = $@"<!DOCTYPE html>
 <html dir='rtl' lang='ar'>
@@ -121,7 +145,7 @@ public class PdfController : ControllerBase
 <style>body {{ font-family: Arial; padding: 20px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #333; padding: 6px; text-align: right; }}</style>
 </head>
 <body>
-  <h2>كشف تسليم شحنات - {DateTime.UtcNow:yyyy-MM-dd}</h2>
+  <h2>كشف تسليم شحنات - {company?.Name ?? "شركة التوصيل"} - {DateTime.UtcNow:yyyy-MM-dd}</h2>
   <p>العدد الكلي: {orders.Count} طلب</p>
   <table>
     <thead><tr><th>رقم الطلب</th><th>العميل</th><th>الهاتف</th><th>المحافظة</th><th>المبلغ المطلوب</th></tr></thead>

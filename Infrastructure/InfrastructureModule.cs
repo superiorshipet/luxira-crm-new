@@ -1,0 +1,52 @@
+using Luxira.Api.Core;
+using Luxira.Api.Features.Orders.Hubs;
+using Luxira.Api.Infrastructure.BackgroundServices;
+using Luxira.Api.Infrastructure.Email;
+using Luxira.Api.Infrastructure.Pdf;
+using Luxira.Api.Infrastructure.S3;
+using Luxira.Api.Infrastructure.Sms;
+using Luxira.Api.Infrastructure.WhatsApp;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace Luxira.Api.Infrastructure;
+
+public class InfrastructureModule : IModule
+{
+    public void Register(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    {
+        // 1. AWS S3 Storage Service
+        services.AddScoped<S3StorageService>();
+
+        // 2. WhatsApp Services (Lavva Cloud API + Infobip)
+        services.AddScoped<LavvaWhatsAppService>();
+        services.AddScoped<WhatsAppAutomationService>();
+
+        // 3. SMS Service (Infobip)
+        services.AddScoped<InfobipSmsService>();
+
+        // 4. Email / SMTP Service (Gmail Smtp)
+        services.AddScoped<LuxiraEmailService>();
+
+        // 5. PDF Generation Service (QuestPDF)
+        services.AddSingleton<LuxiraPdfService>();
+
+        // 6. SignalR Real-Time Hubs
+        services.AddSignalR();
+
+        // 7. Hosted Background Services
+        services.AddHostedService<DeliveredToBalanceAutoTransitionBackgroundService>();
+        services.AddHostedService<PendingDownloadReminderBackgroundService>();
+    }
+
+    public void Configure(IApplicationBuilder app)
+    {
+        if (app is IEndpointRouteBuilder endpoints)
+        {
+            endpoints.MapHub<OrderHub>("/hubs/orders");
+        }
+    }
+}
