@@ -11,12 +11,18 @@ public class OrderService
 {
     private readonly OrderRepository _repository;
     private readonly ApplicationDbContext _context;
+    private readonly OrderStatusTransitionPolicy _statusTransitionPolicy;
     private readonly ILogger<OrderService> _logger;
 
-    public OrderService(OrderRepository repository, ApplicationDbContext context, ILogger<OrderService> logger)
+    public OrderService(
+        OrderRepository repository,
+        ApplicationDbContext context,
+        OrderStatusTransitionPolicy statusTransitionPolicy,
+        ILogger<OrderService> logger)
     {
         _repository = repository;
         _context = context;
+        _statusTransitionPolicy = statusTransitionPolicy;
         _logger = logger;
     }
 
@@ -114,10 +120,11 @@ public class OrderService
 
         order.StatusHistories.Add(new OrderStatusHistory
         {
-            OldStatus = OrderStatusCodes.New,
-            NewStatus = OrderStatusCodes.New,
-            UserId = userId,
-            Note = "Order Created"
+            Status = OrderStatusCodes.New,
+            ApplicationUserId = userId,
+            CreatedAt = DateTime.UtcNow,
+            Reason = "Order Created",
+            Name = $"PreviousStatus:{OrderStatusCodes.New}",
         });
 
         var created = await _repository.CreateAsync(order, ct);
@@ -125,7 +132,11 @@ public class OrderService
         return MapToDto(created);
     }
 
-    public async Task<OrderDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request, string userId, CancellationToken ct = default)
+    public async Task<OrderDto> UpdateOrderStatusAsync(
+        int orderId,
+        UpdateOrderStatusRequest request,
+        OrderStatusActor actor,
+        CancellationToken ct = default)
     {
         if (!OrderStatusCodes.IsDefined(request.NewStatus))
         {
@@ -138,6 +149,12 @@ public class OrderService
             throw new NotFoundException($"Order with ID {orderId} was not found.");
         }
 
+        _statusTransitionPolicy.EnsureAllowed(
+            order,
+            request.NewStatus,
+            request.Reason,
+            actor);
+
         int oldStatus = order.OrderStatus;
         if (oldStatus == request.NewStatus)
         {
@@ -146,7 +163,7 @@ public class OrderService
 
         order.OrderStatus = request.NewStatus;
         order.LastEditedDate = DateTime.UtcNow;
-        order.Editedby = userId;
+        order.Editedby = actor.UserId;
 
         if (request.NewStatus == OrderStatusCodes.Delivered && !order.IsBonusPaidForEmployee)
         {
@@ -166,24 +183,41 @@ public class OrderService
         await _repository.UpdateWithStatusHistoryAsync(order, new OrderStatusHistory
         {
             OrderId = order.Id,
-            OldStatus = oldStatus,
-            NewStatus = request.NewStatus,
-            UserId = userId,
-            Reason = request.Reason,
-            Note = request.Note
+            Status = request.NewStatus,
+            ApplicationUserId = actor.UserId,
+            CreatedAt = DateTime.UtcNow,
+            Reason = CombineHistoryReason(request.Reason, request.Note),
+            Name = $"PreviousStatus:{oldStatus}",
         }, ct);
 
         return MapToDto(order);
     }
 
-    public async Task<int> BatchUpdateOrderStatusAsync(BatchUpdateOrderStatusRequest request, string userId, CancellationToken ct = default)
+    private static string? CombineHistoryReason(string? reason, string? note)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return note?.Trim();
+        if (string.IsNullOrWhiteSpace(note)) return reason.Trim();
+        return $"{reason.Trim()} | {note.Trim()}";
+    }
+
+    public async Task<int> BatchUpdateOrderStatusAsync(
+        BatchUpdateOrderStatusRequest request,
+        OrderStatusActor actor,
+        CancellationToken ct = default)
     {
         int updatedCount = 0;
         foreach (var orderId in request.OrderIds)
         {
             try
             {
-                await UpdateOrderStatusAsync(orderId, new UpdateOrderStatusRequest(request.NewStatus, request.Reason, request.Note), userId, ct);
+                await UpdateOrderStatusAsync(
+                    orderId,
+                    new UpdateOrderStatusRequest(
+                        request.NewStatus,
+                        request.Reason,
+                        request.Note),
+                    actor,
+                    ct);
                 updatedCount++;
             }
             catch (Exception ex)
@@ -202,6 +236,14 @@ public class OrderService
         {
             throw new NotFoundException($"Order with ID {orderId} was not found.");
         }
+
+        var nextEditNumber = (await _context.OrderEditHistories
+            .Where(history => history.OrderId == order.Id)
+            .MaxAsync(history => (int?)history.EditNumber, ct) ?? 0) + 1;
+        var editHistory = CreateEditSnapshot(
+            order,
+            nextEditNumber,
+            userId);
 
         var lowerField = fieldName.ToLowerInvariant();
         switch (lowerField)
@@ -244,17 +286,49 @@ public class OrderService
         order.Editedby = userId;
 
         // Record edit history
-        await _context.OrderEditHistories.AddAsync(new OrderEditHistory
-        {
-            OrderId = order.Id,
-            UserId = userId,
-            EditedAt = DateTime.UtcNow,
-            Details = $"Updated inline field '{fieldName}' to '{newValue}'"
-        }, ct);
+        await _context.OrderEditHistories.AddAsync(editHistory, ct);
 
         await _context.SaveChangesAsync(ct);
         return MapToDto(order);
     }
+
+    private static OrderEditHistory CreateEditSnapshot(
+        Order order,
+        int editNumber,
+        string userId) =>
+        new()
+        {
+            OrderId = order.Id,
+            EditNumber = editNumber,
+            Country = order.Country,
+            State = order.State ?? string.Empty,
+            OrderSource = order.OrderSource,
+            SourceName = order.SourceName,
+            ManufacturingCompanyId = order.ManufacturingCompanyId,
+            DeliveryCompanyId = order.DeliveryCompanyId,
+            TelephoneNumber = order.TelephoneNumber,
+            SecondTelephoneNumber = order.SecondTelephoneNumber,
+            CustomerName = order.CustomerName,
+            Notes = order.Notes,
+            Address = order.Address,
+            CreatedDate = order.CreatedDate,
+            LastEditedDate = order.LastEditedDate,
+            FixedOrderDate = order.FixedOrderDate,
+            InstantAddedDate = order.InstantAddedDate,
+            OrderStatus = order.OrderStatus,
+            TotalPrice = order.TotalPrice,
+            ExternalOrderId = order.ExternalOrderId,
+            ApplicationUserId = order.ApplicationUserId ?? userId,
+            ExternalShipmentCode = order.PostTrackNumber,
+            FromComments = order.FromComments,
+            Gender = order.Gender,
+            IsPaid = order.IsPaid,
+            Editedby = userId,
+            FromOffers = false,
+            CampaignId = order.CampaignId,
+            DeliveryPrice = order.DeliveryPrice,
+            Chaturl = order.Chaturl,
+        };
 
     public async Task<List<OrderDto>> CheckDuplicatesAsync(string phoneNumber, CancellationToken ct = default)
     {

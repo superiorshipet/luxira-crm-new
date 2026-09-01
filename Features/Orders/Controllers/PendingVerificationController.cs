@@ -52,7 +52,6 @@ public class PendingVerificationController : ControllerBase
             throw new NotFoundException($"Order {request.OrderId} not found.");
         }
 
-        var userId = User.GetUserId() ?? "system";
         // Progress to Status 3 (قيد التجهيز) or 4 (جاهز للتسليم)
         var updated = await _orderService.UpdateOrderStatusAsync(
             order.Id,
@@ -60,7 +59,7 @@ public class PendingVerificationController : ControllerBase
                 OrderStatusCodes.Processed,
                 "Verified and Dispatched to Courier Queue",
                 request.TrackingNumber),
-            userId,
+            OrderStatusActor.FromPrincipal(User),
             ct);
 
         if (!string.IsNullOrWhiteSpace(request.TrackingNumber))

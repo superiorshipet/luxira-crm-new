@@ -70,11 +70,11 @@ public sealed class DeliveredToBalanceAutoTransitionBackgroundService : Backgrou
             db.OrderStatusHistories.Add(new OrderStatusHistory
             {
                 OrderId = order.Id,
-                OldStatus = OrderStatusCodes.Delivered,
-                NewStatus = OrderStatusCodes.BalanceUpdated,
-                UserId = "AutoTransitionService",
-                ChangedAt = now,
-                Reason = "Auto Delivered to Balance Updated transition"
+                Status = OrderStatusCodes.BalanceUpdated,
+                ApplicationUserId = "AutoTransitionService",
+                CreatedAt = now,
+                Reason = "Auto Delivered to Balance Updated transition",
+                Name = $"PreviousStatus:{OrderStatusCodes.Delivered}",
             });
         }
 

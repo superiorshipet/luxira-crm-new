@@ -53,7 +53,7 @@ public class CamexWebhookController : ControllerBase
                 await _orderService.UpdateOrderStatusAsync(
                     order.Id,
                     new Orders.DTOs.UpdateOrderStatusRequest(targetStatus, $"Camex Webhook: {payload.Status}", payload.Notes),
-                    "camex-webhook",
+                    OrderStatusActor.TrustedSystem("camex-webhook"),
                     ct);
             }
         }

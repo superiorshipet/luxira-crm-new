@@ -40,9 +40,16 @@ public class InfrastructureModule : IModule
         // 6. SignalR Real-Time Hubs
         services.AddSignalR();
 
-        // 7. Hosted Background Services
-        services.AddHostedService<DeliveredToBalanceAutoTransitionBackgroundService>();
-        services.AddHostedService<PendingDownloadReminderBackgroundService>();
+        // 7. Hosted Background Services. They stay disabled by default outside
+        // Production so local/Test DB verification cannot mutate business data.
+        var backgroundJobsEnabled = configuration
+            .GetValue<bool?>("BackgroundJobs:Enabled") ??
+            environment.IsProduction();
+        if (backgroundJobsEnabled)
+        {
+            services.AddHostedService<DeliveredToBalanceAutoTransitionBackgroundService>();
+            services.AddHostedService<PendingDownloadReminderBackgroundService>();
+        }
     }
 
     public void Configure(IApplicationBuilder app)

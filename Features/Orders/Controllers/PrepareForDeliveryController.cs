@@ -34,7 +34,6 @@ public class PrepareForDeliveryController : ControllerBase
     [HttpPost("ScanBarcode")]
     public async Task<ActionResult<OrderDto>> ScanBarcode([FromBody] ScanBarcodeRequest request, CancellationToken ct)
     {
-        var userId = User.GetUserId() ?? "system";
         // Mark as Ready for Delivery (Status 4 = جاهز للتسليم)
         var result = await _orderService.UpdateOrderStatusAsync(
             request.OrderId,
@@ -42,7 +41,7 @@ public class PrepareForDeliveryController : ControllerBase
                 OrderStatusCodes.InDelivery,
                 "Scanned and Prepared for Delivery",
                 request.Barcode),
-            userId,
+            OrderStatusActor.FromPrincipal(User),
             ct);
 
         return Ok(result);

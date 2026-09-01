@@ -49,7 +49,7 @@ public class SandoogWebhookController : ControllerBase
                 await _orderService.UpdateOrderStatusAsync(
                     order.Id,
                     new Orders.DTOs.UpdateOrderStatusRequest(targetStatus, $"Sandoog Webhook: {payload.Event}", payload.Reason),
-                    "sandoog-webhook",
+                    OrderStatusActor.TrustedSystem("sandoog-webhook"),
                     ct);
             }
         }

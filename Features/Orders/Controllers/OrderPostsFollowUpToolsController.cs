@@ -24,7 +24,7 @@ public class OrderPostsFollowUpToolsController : ControllerBase
         var histories = await _context.OrderEditHistories
             .AsNoTracking()
             .Where(h => h.OrderId == orderId)
-            .OrderByDescending(h => h.EditedAt)
+            .OrderByDescending(h => h.EditNumber)
             .ToListAsync(ct);
 
         return Ok(new { success = true, items = histories });

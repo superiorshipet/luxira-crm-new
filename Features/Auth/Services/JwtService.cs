@@ -27,13 +27,18 @@ public class JwtService
             new("CountryId", (user.Country ?? 0).ToString(CultureInfo.InvariantCulture))
         };
 
-        if (!string.IsNullOrEmpty(user.Role))
+        var roles = user.Roles.Count > 0
+            ? user.Roles
+            : string.IsNullOrWhiteSpace(user.Role)
+                ? []
+                : [user.Role];
+        foreach (var role in roles.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            claims.Add(new Claim("role", user.Role));
-            claims.Add(new Claim(ClaimTypes.Role, user.Role));
+            claims.Add(new Claim("role", role));
+            claims.Add(new Claim(ClaimTypes.Role, role));
 
-            if (user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
-                user.Role.Equals("Administrator", StringComparison.OrdinalIgnoreCase))
+            if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                role.Equals("Administrator", StringComparison.OrdinalIgnoreCase))
             {
                 claims.Add(new Claim("role", "Admin"));
                 claims.Add(new Claim("role", "Administrator"));

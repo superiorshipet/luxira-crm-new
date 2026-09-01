@@ -412,11 +412,11 @@ public class FinancialController : ControllerBase
             _context.OrderStatusHistories.Add(new OrderStatusHistory
             {
                 OrderId = order.Id,
-                OldStatus = oldStatus,
-                NewStatus = OrderStatusCodes.Paid,
-                UserId = userId,
-                ChangedAt = changedAt,
+                Status = OrderStatusCodes.Paid,
+                ApplicationUserId = userId,
+                CreatedAt = changedAt,
                 Reason = reason,
+                Name = $"PreviousStatus:{oldStatus}",
             });
         }
     }

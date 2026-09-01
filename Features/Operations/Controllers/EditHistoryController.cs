@@ -28,7 +28,7 @@ public class EditHistoryController : ControllerBase
     {
         var query = _context.OrderEditHistories
             .Include(h => h.Order)
-            .OrderByDescending(h => h.EditedAt)
+            .OrderByDescending(h => h.EditNumber)
             .AsNoTracking();
 
         var total = await query.CountAsync(ct);
@@ -44,7 +44,7 @@ public class EditHistoryController : ControllerBase
         var targetId = id > 0 ? id : (orderId ?? 0);
         var changes = await _context.OrderEditHistories
             .Where(h => h.OrderId == targetId)
-            .OrderByDescending(h => h.EditedAt)
+            .OrderByDescending(h => h.EditNumber)
             .AsNoTracking()
             .ToListAsync(ct);
 

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Luxira.Api.Features.Auth.Models;
 using Luxira.Api.Features.DeliveryCompanies.Models;
 
@@ -54,9 +55,17 @@ public class Order
     public int? BonusPaymentId { get; set; }
     public string? Chaturl { get; set; }
     public int? CampaignId { get; set; }
+    public int? CreationDurationSeconds { get; set; }
+    public string? PhotoUrl { get; set; }
+    public string? PhotoS3Key { get; set; }
+    public string? PaymentReceiptUrl { get; set; }
+    public string? PaymentReceiptS3Key { get; set; }
 
+    [NotMapped]
     public string? PostTrackNumber { get; set; }
+    [NotMapped]
     public string? CamexShipmentId { get; set; }
+    [NotMapped]
     public string? SandoogShipmentId { get; set; }
 
     public List<OrderWarehouse> OrderWarehouses { get; set; } = new();
@@ -78,14 +87,16 @@ public class OrderWarehouse
 public class OrderStatusHistory
 {
     public int Id { get; set; }
-    public int OrderId { get; set; }
-    public Order? Order { get; set; }
-    public int OldStatus { get; set; }
-    public int NewStatus { get; set; }
-    public string UserId { get; set; } = string.Empty;
-    public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int? Status { get; set; }
     public string? Reason { get; set; }
-    public string? Note { get; set; }
+    public string? ApplicationUserId { get; set; }
+    public int? OrderId { get; set; }
+    public Order? Order { get; set; }
+    public string? FailureReasonImageUrl { get; set; }
+    public string? FailureReasonImageS3Key { get; set; }
+    public string? Name { get; set; }
+    public bool IsHidden { get; set; }
 }
 
 public class OrderEditHistory
@@ -93,9 +104,35 @@ public class OrderEditHistory
     public int Id { get; set; }
     public int OrderId { get; set; }
     public Order? Order { get; set; }
-    public string UserId { get; set; } = string.Empty;
-    public DateTime EditedAt { get; set; } = DateTime.UtcNow;
-    public string? Details { get; set; }
+    public int EditNumber { get; set; }
+    public int Country { get; set; }
+    public string State { get; set; } = string.Empty;
+    public int OrderSource { get; set; }
+    public string? SourceName { get; set; }
+    public int? ManufacturingCompanyId { get; set; }
+    public int DeliveryCompanyId { get; set; }
+    public string TelephoneNumber { get; set; } = string.Empty;
+    public string? SecondTelephoneNumber { get; set; }
+    public string CustomerName { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public string Address { get; set; } = string.Empty;
+    public DateTime CreatedDate { get; set; }
+    public DateTime? LastEditedDate { get; set; }
+    public DateTime? FixedOrderDate { get; set; }
+    public DateTime? InstantAddedDate { get; set; }
+    public int OrderStatus { get; set; }
+    public decimal TotalPrice { get; set; }
+    public int? ExternalOrderId { get; set; }
+    public string ApplicationUserId { get; set; } = string.Empty;
+    public string? ExternalShipmentCode { get; set; }
+    public bool FromComments { get; set; }
+    public bool Gender { get; set; }
+    public bool IsPaid { get; set; }
+    public string? Editedby { get; set; }
+    public bool FromOffers { get; set; }
+    public int? CampaignId { get; set; }
+    public decimal DeliveryPrice { get; set; }
+    public string? Chaturl { get; set; }
 }
 
 public class OrderReport

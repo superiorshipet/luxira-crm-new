@@ -21,6 +21,8 @@ public class OrderDbConfig : IDbConfig<Order>
         builder.Property(o => o.TotalPrice).HasPrecision(18, 2);
         builder.Property(o => o.DeliveryPrice).HasPrecision(18, 2);
         builder.Property(o => o.CustomerDeliveryPrice).HasPrecision(18, 2);
+        builder.Property(o => o.PhotoS3Key).HasMaxLength(450);
+        builder.Property(o => o.PaymentReceiptS3Key).HasMaxLength(450);
 
         builder.HasOne(o => o.DeliveryCompany)
             .WithMany()
@@ -68,6 +70,8 @@ public class OrderStatusHistoryDbConfig : IDbConfig<OrderStatusHistory>
     {
         builder.ToTable("OrderStatusHistories");
         builder.HasKey(h => h.Id);
+        builder.Property(h => h.Reason).HasMaxLength(255);
+        builder.Property(h => h.FailureReasonImageS3Key).HasMaxLength(450);
     }
 }
 
@@ -77,6 +81,8 @@ public class OrderEditHistoryDbConfig : IDbConfig<OrderEditHistory>
     {
         builder.ToTable("OrderEditHistories");
         builder.HasKey(e => e.Id);
+        builder.Property(e => e.TotalPrice).HasPrecision(18, 2);
+        builder.Property(e => e.DeliveryPrice).HasPrecision(18, 2);
     }
 }
 
@@ -149,4 +155,3 @@ public class UrgentReportDbConfig : IDbConfig<UrgentReport>
         builder.Property(r => r.Status).HasMaxLength(50);
     }
 }
-

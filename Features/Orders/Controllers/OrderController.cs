@@ -89,8 +89,8 @@ public class OrderController : ControllerBase
         [FromBody] UpdateOrderStatusRequest request,
         CancellationToken ct)
     {
-        var userId = User.GetUserId() ?? "system";
-        var result = await _orderService.UpdateOrderStatusAsync(id, request, userId, ct);
+        var actor = OrderStatusActor.FromPrincipal(User);
+        var result = await _orderService.UpdateOrderStatusAsync(id, request, actor, ct);
         return Ok(result);
     }
 
@@ -100,8 +100,8 @@ public class OrderController : ControllerBase
         [FromBody] BatchUpdateOrderStatusRequest request,
         CancellationToken ct)
     {
-        var userId = User.GetUserId() ?? "system";
-        int updated = await _orderService.BatchUpdateOrderStatusAsync(request, userId, ct);
+        var actor = OrderStatusActor.FromPrincipal(User);
+        int updated = await _orderService.BatchUpdateOrderStatusAsync(request, actor, ct);
         return Ok(new { updatedCount = updated, message = $"Successfully updated {updated} orders." });
     }
 
@@ -158,7 +158,8 @@ public class OrderController : ControllerBase
         var failureStatuses = OrderStatusCodes.FailureStatuses;
         var query = _context.OrderStatusHistories
             .Include(h => h.Order)
-            .Where(h => failureStatuses.Contains(h.NewStatus) &&
+            .Where(h => h.Status.HasValue &&
+                        failureStatuses.Contains(h.Status.Value) &&
                         !string.IsNullOrEmpty(h.Reason))
             .AsNoTracking()
             .AsQueryable();
@@ -373,11 +374,11 @@ public class OrderController : ControllerBase
         _context.OrderStatusHistories.Add(new OrderStatusHistory
         {
             OrderId = order.Id,
-            OldStatus = oldStatus,
-            NewStatus = OrderStatusCodes.Cancelled,
-            UserId = User.GetUserId() ?? "system",
-            ChangedAt = IstanbulTimeHelper.Now,
+            Status = OrderStatusCodes.Cancelled,
+            ApplicationUserId = User.GetUserId() ?? "system",
+            CreatedAt = IstanbulTimeHelper.Now,
             Reason = "Blocked as duplicate without deleting data",
+            Name = $"PreviousStatus:{oldStatus}",
         });
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true });
@@ -404,7 +405,7 @@ public class OrderController : ControllerBase
                 OrderStatusCodes.Delivered,
                 "Marked delivered",
                 null),
-            User.GetUserId() ?? "system",
+            OrderStatusActor.FromPrincipal(User),
             ct);
         return Ok(new { success = true, status = result.OrderStatus });
     }
@@ -425,7 +426,7 @@ public class OrderController : ControllerBase
                 OrderStatusCodes.FailedDelivery,
                 request.Reason.Trim(),
                 null),
-            User.GetUserId() ?? "system",
+            OrderStatusActor.FromPrincipal(User),
             ct);
         return Ok(new { success = true, status = result.OrderStatus });
     }
@@ -452,11 +453,11 @@ public class OrderController : ControllerBase
             _context.OrderStatusHistories.Add(new OrderStatusHistory
             {
                 OrderId = order.Id,
-                OldStatus = oldStatus,
-                NewStatus = request.NewStatus,
-                UserId = userId,
-                ChangedAt = now,
-                Reason = request.Reason ?? "Bulk Status Update"
+                Status = request.NewStatus,
+                ApplicationUserId = userId,
+                CreatedAt = now,
+                Reason = request.Reason ?? "Bulk Status Update",
+                Name = $"PreviousStatus:{oldStatus}",
             });
         }
 

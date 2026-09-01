@@ -22,6 +22,8 @@ public class ApplicationDbContext : DbContext
 
     // Auth & Users
     public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
+    public DbSet<ApplicationRole> Roles => Set<ApplicationRole>();
+    public DbSet<ApplicationUserRole> UserRoles => Set<ApplicationUserRole>();
     public DbSet<UserSwitchGroup> UserSwitchGroups => Set<UserSwitchGroup>();
     public DbSet<UserSwitchGroupMember> UserSwitchGroupMembers => Set<UserSwitchGroupMember>();
 
