@@ -125,3 +125,28 @@ public class OrderFollowUpRequestDbConfig : IDbConfig<OrderFollowUpRequest>
         builder.HasKey(f => f.Id);
     }
 }
+
+public class PotentialOrderDbConfig : IDbConfig<PotentialOrder>
+{
+    public void Configure(EntityTypeBuilder<PotentialOrder> builder)
+    {
+        builder.ToTable("PotentialOrders");
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.CustomerName).HasMaxLength(255);
+        builder.Property(p => p.TelephoneNumber).HasMaxLength(255);
+        builder.Property(p => p.TotalPrice).HasPrecision(18, 2);
+    }
+}
+
+public class UrgentReportDbConfig : IDbConfig<UrgentReport>
+{
+    public void Configure(EntityTypeBuilder<UrgentReport> builder)
+    {
+        builder.ToTable("UrgentReports");
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Title).HasMaxLength(255);
+        builder.Property(r => r.Priority).HasMaxLength(50);
+        builder.Property(r => r.Status).HasMaxLength(50);
+    }
+}
+

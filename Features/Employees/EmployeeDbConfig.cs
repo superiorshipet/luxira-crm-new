@@ -116,3 +116,41 @@ public class EmployeeTransactionDbConfig : IDbConfig<EmployeeTransaction>
         builder.Property(t => t.Amount).HasPrecision(18, 2);
     }
 }
+
+public class EmployeeBreakDbConfig : IDbConfig<EmployeeBreak>
+{
+    public void Configure(EntityTypeBuilder<EmployeeBreak> builder)
+    {
+        builder.ToTable("EmployeeBreaks");
+        builder.HasKey(b => b.Id);
+    }
+}
+
+public class EmployeeViolationDbConfig : IDbConfig<EmployeeViolation>
+{
+    public void Configure(EntityTypeBuilder<EmployeeViolation> builder)
+    {
+        builder.ToTable("EmployeeViolations");
+        builder.HasKey(v => v.Id);
+        builder.Property(v => v.PenaltyAmount).HasPrecision(18, 2);
+    }
+}
+
+public class EmployeeRatingDbConfig : IDbConfig<EmployeeRating>
+{
+    public void Configure(EntityTypeBuilder<EmployeeRating> builder)
+    {
+        builder.ToTable("EmployeeRatings");
+        builder.HasKey(r => r.Id);
+    }
+}
+
+public class PersonalNoteDbConfig : IDbConfig<PersonalNote>
+{
+    public void Configure(EntityTypeBuilder<PersonalNote> builder)
+    {
+        builder.ToTable("PersonalNotes");
+        builder.HasKey(n => n.Id);
+    }
+}
+

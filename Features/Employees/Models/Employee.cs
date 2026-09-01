@@ -119,3 +119,47 @@ public class EmployeeTransaction
     public DateTime Date { get; set; } = DateTime.UtcNow;
     public string? Note { get; set; }
 }
+
+public class EmployeeBreak
+{
+    public int Id { get; set; }
+    public int EmployeeId { get; set; }
+    public Employee? Employee { get; set; }
+    public DateTime StartTime { get; set; } = DateTime.UtcNow;
+    public DateTime? EndTime { get; set; }
+    public string? Reason { get; set; }
+}
+
+public class EmployeeViolation
+{
+    public int Id { get; set; }
+    public int EmployeeId { get; set; }
+    public Employee? Employee { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public decimal PenaltyAmount { get; set; }
+    public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
+    public string IssuedByUserId { get; set; } = string.Empty;
+}
+
+public class EmployeeRating
+{
+    public int Id { get; set; }
+    public int EmployeeId { get; set; }
+    public Employee? Employee { get; set; }
+    public int Score { get; set; } // 1 to 5 or 1 to 100
+    public string? Feedback { get; set; }
+    public string RatedByUserId { get; set; } = string.Empty;
+    public DateTime RatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class PersonalNote
+{
+    public int Id { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ReminderAt { get; set; }
+}
+

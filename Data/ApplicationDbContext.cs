@@ -8,6 +8,8 @@ using Luxira.Api.Features.Warehouses.Models;
 using Luxira.Api.Features.ManufacturingCompanies.Models;
 using Luxira.Api.Features.SearchKeywords.Models;
 using Luxira.Api.Features.Media.Models;
+using Luxira.Api.Features.Marketing.Models;
+using Luxira.Api.Features.Communication.Models;
 
 namespace Luxira.Api.Data;
 
@@ -41,6 +43,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<OrderBonusConfiguration> OrderBonusConfigurations => Set<OrderBonusConfiguration>();
     public DbSet<OrderPost> OrderPosts => Set<OrderPost>();
     public DbSet<OrderFollowUpRequest> OrderFollowUpRequests => Set<OrderFollowUpRequest>();
+    public DbSet<PotentialOrder> PotentialOrders => Set<PotentialOrder>();
+    public DbSet<UrgentReport> UrgentReports => Set<UrgentReport>();
 
     // Employees & HR
     public DbSet<Employee> Employees => Set<Employee>();
@@ -53,11 +57,17 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeTask> EmployeeTasks => Set<EmployeeTask>();
     public DbSet<EmployeeError> EmployeeErrors => Set<EmployeeError>();
     public DbSet<EmployeeTransaction> EmployeeTransactions => Set<EmployeeTransaction>();
+    public DbSet<EmployeeBreak> EmployeeBreaks => Set<EmployeeBreak>();
+    public DbSet<EmployeeViolation> EmployeeViolations => Set<EmployeeViolation>();
+    public DbSet<EmployeeRating> EmployeeRatings => Set<EmployeeRating>();
+    public DbSet<PersonalNote> PersonalNotes => Set<PersonalNote>();
 
     // Finance & Expenses
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<SalesIndicator> SalesIndicators => Set<SalesIndicator>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<FinancialTransfer> FinancialTransfers => Set<FinancialTransfer>();
 
     // Warehouses & Inventory
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
@@ -79,6 +89,19 @@ public class ApplicationDbContext : DbContext
 
     // Media & Storage
     public DbSet<S3StoredObject> S3StoredObjects => Set<S3StoredObject>();
+
+    // Marketing & Advertising
+    public DbSet<AdvertisingCampaign> AdvertisingCampaigns => Set<AdvertisingCampaign>();
+    public DbSet<MarketingLead> MarketingLeads => Set<MarketingLead>();
+    public DbSet<StoreScript> StoreScripts => Set<StoreScript>();
+    public DbSet<WebsiteDomain> WebsiteDomains => Set<WebsiteDomain>();
+    public DbSet<VideoLink> VideoLinks => Set<VideoLink>();
+
+    // Communication & Messages
+    public DbSet<HelpCenterChatMessage> HelpCenterChatMessages => Set<HelpCenterChatMessage>();
+    public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
+    public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
+    public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

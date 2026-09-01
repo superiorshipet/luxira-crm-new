@@ -36,3 +36,28 @@ public class SalesIndicatorDbConfig : IDbConfig<SalesIndicator>
         builder.Property(s => s.TargetAmount).HasPrecision(18, 2);
     }
 }
+
+public class InvoiceDbConfig : IDbConfig<Invoice>
+{
+    public void Configure(EntityTypeBuilder<Invoice> builder)
+    {
+        builder.ToTable("Invoices");
+        builder.HasKey(i => i.Id);
+        builder.Property(i => i.InvoiceNumber).HasMaxLength(100).IsRequired();
+        builder.Property(i => i.TotalAmount).HasPrecision(18, 2);
+        builder.Property(i => i.DiscountAmount).HasPrecision(18, 2);
+        builder.Property(i => i.FinalAmount).HasPrecision(18, 2);
+    }
+}
+
+public class FinancialTransferDbConfig : IDbConfig<FinancialTransfer>
+{
+    public void Configure(EntityTypeBuilder<FinancialTransfer> builder)
+    {
+        builder.ToTable("FinancialTransfers");
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Amount).HasPrecision(18, 2);
+        builder.Property(t => t.ExchangeRate).HasPrecision(18, 4);
+    }
+}
+
