@@ -43,8 +43,10 @@ public class OrderBonusConfigurationController : ControllerBase
         var config = new OrderBonusConfiguration
         {
             Country = request.Country,
-            BonusAmount = request.BonusAmount,
-            IsActive = true
+            OrderThreshold = request.OrderThreshold,
+            FlatBonusAmount = request.FlatBonusAmount,
+            PercentageBonus = request.PercentageBonus,
+            EmployeeId = request.EmployeeId
         };
 
         await _context.OrderBonusConfigurations.AddAsync(config, ct);
@@ -61,11 +63,19 @@ public class OrderBonusConfigurationController : ControllerBase
         if (config == null) return NotFound("Bonus configuration not found.");
 
         config.Country = request.Country;
-        config.BonusAmount = request.BonusAmount;
+        config.OrderThreshold = request.OrderThreshold;
+        config.FlatBonusAmount = request.FlatBonusAmount;
+        config.PercentageBonus = request.PercentageBonus;
+        config.EmployeeId = request.EmployeeId;
 
         await _context.SaveChangesAsync(ct);
         return Ok(config);
     }
 }
 
-public record CreateOrderBonusConfigRequest(int Country, decimal BonusAmount);
+public sealed record CreateOrderBonusConfigRequest(
+    int Country,
+    decimal OrderThreshold,
+    decimal FlatBonusAmount,
+    decimal? PercentageBonus,
+    int? EmployeeId);

@@ -159,9 +159,8 @@ public partial class OrderService
                 order.OrderWarehouses.Add(new OrderWarehouse
                 {
                     WarehouseId = item.WarehouseId,
-                    Quantity = item.Quantity,
-                    Price = item.Price,
-                    Cost = item.Cost
+                    Amount = item.Quantity,
+                    UnitPrice = item.Price
                 });
             }
         }
@@ -254,9 +253,14 @@ public partial class OrderService
         {
             var bonusConfig = await _context.OrderBonusConfigurations
                 .FirstOrDefaultAsync(
-                    config => config.Country == order.Country && config.IsActive,
+                    config => config.Country == order.Country &&
+                        (config.EmployeeId == null || _context.Employees.Any(employee =>
+                            employee.Id == config.EmployeeId &&
+                            employee.ApplicationUserId == order.ApplicationUserId)),
                     ct);
-            if (bonusConfig is not null && bonusConfig.BonusAmount > 0)
+            if (bonusConfig is not null &&
+                ((bonusConfig.FlatBonusAmount > 0 && order.TotalPrice >= bonusConfig.OrderThreshold) ||
+                 bonusConfig.PercentageBonus > 0))
             {
                 order.IsBonus = true;
             }
@@ -337,7 +341,8 @@ public partial class OrderService
         {
             var countries = orders.Select(order => order.Country).Distinct().ToList();
             bonusCountries = (await _context.OrderBonusConfigurations.AsNoTracking()
-                .Where(config => countries.Contains(config.Country) && config.IsActive && config.BonusAmount > 0)
+                .Where(config => countries.Contains(config.Country) &&
+                    (config.FlatBonusAmount > 0 || config.PercentageBonus > 0))
                 .Select(config => config.Country)
                 .ToListAsync(ct)).ToHashSet();
         }
@@ -592,7 +597,7 @@ public partial class OrderService
         o.IsPinned,
         o.IsPaid,
         o.IsDelayed,
-        o.OrderWarehouses.Select(w => new OrderItemDto(w.Id, w.WarehouseId, w.Quantity, w.Price, w.Cost)).ToList()
+        o.OrderWarehouses.Select(w => new OrderItemDto(w.OrderId, w.WarehouseId, w.Amount, w.UnitPrice)).ToList()
     );
 
     [GeneratedRegex(@"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")]

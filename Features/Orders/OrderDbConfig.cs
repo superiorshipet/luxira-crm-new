@@ -59,9 +59,8 @@ public class OrderWarehouseDbConfig : IDbConfig<OrderWarehouse>
     public void Configure(EntityTypeBuilder<OrderWarehouse> builder)
     {
         builder.ToTable("OrderWarehouses");
-        builder.HasKey(w => w.Id);
-        builder.Property(w => w.Price).HasPrecision(18, 2);
-        builder.Property(w => w.Cost).HasPrecision(18, 2);
+        builder.HasKey(w => new { w.OrderId, w.WarehouseId });
+        builder.Property(w => w.UnitPrice).HasPrecision(18, 2);
     }
 }
 
@@ -93,6 +92,7 @@ public class OrderReportDbConfig : IDbConfig<OrderReport>
     {
         builder.ToTable("OrderReports");
         builder.HasKey(r => r.Id);
+        builder.Property(r => r.TotalAmount).HasPrecision(18, 2);
     }
 }
 
@@ -101,7 +101,13 @@ public class OrderReportOrderDbConfig : IDbConfig<OrderReportOrder>
     public void Configure(EntityTypeBuilder<OrderReportOrder> builder)
     {
         builder.ToTable("OrderReportOrders");
-        builder.HasKey(ro => ro.Id);
+        builder.HasKey(ro => new { ro.OrderReportId, ro.OrderId });
+        builder.HasOne(ro => ro.OrderReport)
+            .WithMany(r => r.ReportOrders)
+            .HasForeignKey(ro => ro.OrderReportId);
+        builder.HasOne(ro => ro.Order)
+            .WithMany()
+            .HasForeignKey(ro => ro.OrderId);
     }
 }
 
@@ -111,7 +117,9 @@ public class OrderBonusConfigurationDbConfig : IDbConfig<OrderBonusConfiguration
     {
         builder.ToTable("OrderBonusConfigurations");
         builder.HasKey(b => b.Id);
-        builder.Property(b => b.BonusAmount).HasPrecision(18, 2);
+        builder.Property(b => b.OrderThreshold).HasPrecision(18, 2);
+        builder.Property(b => b.FlatBonusAmount).HasPrecision(18, 2);
+        builder.Property(b => b.PercentageBonus).HasPrecision(18, 2);
     }
 }
 
@@ -121,6 +129,10 @@ public class OrderPostDbConfig : IDbConfig<OrderPost>
     {
         builder.ToTable("OrderPosts");
         builder.HasKey(p => p.Id);
+        builder.Property(p => p.AuthorUserId).HasMaxLength(450).IsRequired();
+        builder.HasOne(p => p.Order)
+            .WithMany()
+            .HasForeignKey(p => p.OrderId);
     }
 }
 
@@ -130,6 +142,16 @@ public class OrderFollowUpRequestDbConfig : IDbConfig<OrderFollowUpRequest>
     {
         builder.ToTable("OrderFollowUpRequests");
         builder.HasKey(f => f.Id);
+        builder.Property(f => f.RequestType).HasMaxLength(30).IsRequired();
+        builder.Property(f => f.Note).HasMaxLength(2000);
+        builder.Property(f => f.ImagePath).HasMaxLength(1000);
+        builder.Property(f => f.ImageS3Key).HasMaxLength(450);
+        builder.Property(f => f.CreatedByUserId).HasMaxLength(450);
+        builder.Property(f => f.CreatedByName).HasMaxLength(250);
+        builder.Property(f => f.ClosedByUserId).HasMaxLength(450);
+        builder.Property(f => f.ClosedByName).HasMaxLength(250);
+        builder.Property(f => f.ProcessingStartedByUserId).HasMaxLength(450);
+        builder.Property(f => f.ProcessingStartedByName).HasMaxLength(250);
     }
 }
 

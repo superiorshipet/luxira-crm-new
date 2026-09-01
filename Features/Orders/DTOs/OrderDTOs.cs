@@ -30,11 +30,10 @@ public record OrderDto(
 );
 
 public record OrderItemDto(
-    int Id,
+    int OrderId,
     int WarehouseId,
-    int Quantity,
-    decimal Price,
-    decimal? Cost
+    int Amount,
+    decimal UnitPrice
 );
 
 public record CreateOrderRequest(

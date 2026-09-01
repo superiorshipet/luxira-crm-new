@@ -70,13 +70,11 @@ public class Order
 
 public class OrderWarehouse
 {
-    public int Id { get; set; }
     public int OrderId { get; set; }
     public Order? Order { get; set; }
     public int WarehouseId { get; set; }
-    public int Quantity { get; set; }
-    public decimal Price { get; set; }
-    public decimal? Cost { get; set; }
+    public int Amount { get; set; }
+    public decimal UnitPrice { get; set; }
 }
 
 public class OrderStatusHistory
@@ -133,15 +131,16 @@ public class OrderEditHistory
 public class OrderReport
 {
     public int Id { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public string CreatedByUserId { get; set; } = string.Empty;
+    public DateTime GeneratedTime { get; set; }
+    public decimal TotalAmount { get; set; }
+    public int? Country { get; set; }
+    public int? DeliveryCompanyId { get; set; }
+    public int OrderStatus { get; set; }
     public List<OrderReportOrder> ReportOrders { get; set; } = new();
 }
 
 public class OrderReportOrder
 {
-    public int Id { get; set; }
     public int OrderReportId { get; set; }
     public OrderReport? OrderReport { get; set; }
     public int OrderId { get; set; }
@@ -151,21 +150,29 @@ public class OrderReportOrder
 public class OrderBonusConfiguration
 {
     public int Id { get; set; }
+    public decimal OrderThreshold { get; set; }
+    public decimal FlatBonusAmount { get; set; }
+    public decimal? PercentageBonus { get; set; }
     public int Country { get; set; }
-    public decimal BonusAmount { get; set; }
-    public bool IsActive { get; set; } = true;
+    public int? EmployeeId { get; set; }
+}
+
+public enum OrderPostType
+{
+    Problem = 0,
+    EditNote = 1,
+    OrderNote = 2
 }
 
 public class OrderPost
 {
     public int Id { get; set; }
-    public int Country { get; set; }
-    public string PostId { get; set; } = string.Empty;
-    public string? PostUrl { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public string? StoreName { get; set; }
-    public bool IsActive { get; set; } = true;
-    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public int OrderId { get; set; }
+    public Order? Order { get; set; }
+    public OrderPostType Type { get; set; }
+    public string AuthorUserId { get; set; } = string.Empty;
+    public string? Body { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class OrderFollowUpRequest
@@ -173,8 +180,19 @@ public class OrderFollowUpRequest
     public int Id { get; set; }
     public int OrderId { get; set; }
     public Order? Order { get; set; }
-    public string RequestedByUserId { get; set; } = string.Empty;
-    public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
+    public string RequestType { get; set; } = "Complaint";
     public string? Note { get; set; }
-    public bool IsResolved { get; set; }
+    public string? ImagePath { get; set; }
+    public string? ImageS3Key { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public bool IsClosed { get; set; }
+    public string? ClosedByUserId { get; set; }
+    public string? ClosedByName { get; set; }
+    public DateTime? ClosedAt { get; set; }
+    public string? ComplaintStatus { get; set; }
+    public DateTime? ProcessingStartedAt { get; set; }
+    public string? ProcessingStartedByUserId { get; set; }
+    public string? ProcessingStartedByName { get; set; }
 }

@@ -439,7 +439,7 @@ public class FinancialController : ControllerBase
 
         var total = await query.CountAsync(ct);
         var reports = await query
-            .OrderByDescending(r => r.CreatedAt)
+            .OrderByDescending(r => r.GeneratedTime)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -461,7 +461,7 @@ public class FinancialController : ControllerBase
             .AsQueryable();
 
         var reports = await query
-            .OrderByDescending(r => r.CreatedAt)
+            .OrderByDescending(r => r.GeneratedTime)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -485,8 +485,11 @@ public class FinancialController : ControllerBase
         return Ok(new
         {
             report.Id,
-            report.Title,
-            report.CreatedAt,
+            report.GeneratedTime,
+            report.TotalAmount,
+            report.Country,
+            report.DeliveryCompanyId,
+            report.OrderStatus,
             Orders = report.ReportOrders.Select(ro => ro.Order)
         });
     }
