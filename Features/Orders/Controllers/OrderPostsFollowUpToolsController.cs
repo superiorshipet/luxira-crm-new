@@ -1,7 +1,4 @@
 using Luxira.Api.Data;
-using Luxira.Api.Features.Orders.Models;
-using Luxira.Api.Utils.Exceptions;
-using Luxira.Api.Utils.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +19,6 @@ public class OrderPostsFollowUpToolsController : ControllerBase
     }
 
     [HttpGet("ListFollowUpEditNotes")]
-    [HttpGet("/OrderPosts/ListFollowUpEditNotes")]
     public async Task<IActionResult> ListFollowUpEditNotes([FromQuery] int orderId, [FromQuery] int type, CancellationToken ct)
     {
         var histories = await _context.OrderEditHistories
@@ -35,7 +31,6 @@ public class OrderPostsFollowUpToolsController : ControllerBase
     }
 
     [HttpGet("ProblemDeductionHistory")]
-    [HttpGet("/OrderPosts/ProblemDeductionHistory")]
     public async Task<IActionResult> ProblemDeductionHistory([FromQuery] int orderId, CancellationToken ct)
     {
         var deductions = await _context.EmployeeViolations

@@ -65,6 +65,7 @@ public class AuthService
             Name = request.Name,
             Country = request.Country,
             AcessId = request.AccessId,
+            Role = request.Role ?? "Admin",
             PasswordHash = HashPassword(request.Password),
             IsActive = true
         };

@@ -34,10 +34,15 @@ public class JwtService
 
         if (!string.IsNullOrEmpty(user.Role))
         {
+            claims.Add(new Claim("role", user.Role));
             claims.Add(new Claim(ClaimTypes.Role, user.Role));
+
             if (user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
                 user.Role.Equals("Administrator", StringComparison.OrdinalIgnoreCase))
             {
+                claims.Add(new Claim("role", "Admin"));
+                claims.Add(new Claim("role", "Administrator"));
+                claims.Add(new Claim("role", "ExecutiveDirector"));
                 claims.Add(new Claim(ClaimTypes.Role, "Admin"));
                 claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
                 claims.Add(new Claim(ClaimTypes.Role, "ExecutiveDirector"));

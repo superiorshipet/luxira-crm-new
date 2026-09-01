@@ -2,7 +2,7 @@ namespace Luxira.Api.Features.Auth.DTOs;
 
 public record LoginRequest(string Username, string Password);
 
-public record RegisterRequest(string Username, string Email, string Password, string? Name, int? Country, int AccessId = 0);
+public record RegisterRequest(string Username, string Email, string Password, string? Name = null, int? Country = null, int AccessId = 0, string? Role = null);
 
 public record AuthResponse(
     string Token,

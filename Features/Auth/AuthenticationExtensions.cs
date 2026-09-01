@@ -39,7 +39,7 @@ public static class AuthenticationExtensions
                     IssuerSigningKey = new SymmetricSecurityKey(jwtSettings.Key),
                     ClockSkew = TimeSpan.FromMinutes(1),
                     NameClaimType = JwtRegisteredClaimNames.Sub,
-                    RoleClaimType = ClaimTypes.Role,
+                    RoleClaimType = "role",
                 };
                 options.Events = new JwtBearerEvents
                 {
@@ -142,15 +142,18 @@ public static class AuthenticationExtensions
     {
         public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
         {
-            if (!principal.IsInRole("Team Leader") ||
-                principal.IsInRole("TeamLeader"))
-            {
-                return Task.FromResult(principal);
-            }
-
             if (principal.Identity is ClaimsIdentity identity)
             {
-                identity.AddClaim(new Claim(identity.RoleClaimType, "TeamLeader"));
+                if (principal.IsInRole("Admin") || principal.IsInRole("Administrator"))
+                {
+                    if (!principal.IsInRole("Admin")) identity.AddClaim(new Claim(identity.RoleClaimType, "Admin"));
+                    if (!principal.IsInRole("Administrator")) identity.AddClaim(new Claim(identity.RoleClaimType, "Administrator"));
+                    if (!principal.IsInRole("ExecutiveDirector")) identity.AddClaim(new Claim(identity.RoleClaimType, "ExecutiveDirector"));
+                }
+                if (principal.IsInRole("Team Leader") && !principal.IsInRole("TeamLeader"))
+                {
+                    identity.AddClaim(new Claim(identity.RoleClaimType, "TeamLeader"));
+                }
             }
 
             return Task.FromResult(principal);

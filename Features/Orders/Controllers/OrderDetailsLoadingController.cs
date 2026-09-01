@@ -19,7 +19,6 @@ public class OrderDetailsLoadingController : ControllerBase
     }
 
     [HttpGet("BatchMeta")]
-    [HttpGet("/OrderDetailsLoading/BatchMeta")]
     public async Task<IActionResult> BatchMeta([FromQuery] string? ids, CancellationToken ct)
     {
         var orderIds = (ids ?? string.Empty)
