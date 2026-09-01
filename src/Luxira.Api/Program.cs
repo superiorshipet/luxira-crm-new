@@ -52,8 +52,8 @@ app.UseOutputCache();
 
 app.MapLuxiraOpenApi();
 app.MapPlatformEndpoints();
-app.MapCountryEndpoints();
-app.MapFailureReasonEndpoints();
+app.MapCountryController();
+app.MapFailureReasonController();
 app.MapOrderSourceEndpoints();
 app.MapOrderStatusEndpoints();
 app.MapDeliveryCompanyController();

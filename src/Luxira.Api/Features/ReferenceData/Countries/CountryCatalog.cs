@@ -30,8 +30,3 @@ internal static class CountryCatalog
         All[1],
     ];
 }
-
-internal sealed record CountryResponse(
-    int Id,
-    string Name,
-    string ImageUrl);

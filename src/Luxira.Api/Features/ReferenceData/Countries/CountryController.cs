@@ -3,27 +3,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Luxira.Api.Features.ReferenceData.Countries;
 
-internal static class CountryEndpoints
+internal static class CountryController
 {
-    internal static IEndpointRouteBuilder MapCountryEndpoints(
+    internal static IEndpointRouteBuilder MapCountryController(
         this IEndpointRouteBuilder endpoints)
     {
-        var publicEndpoints = endpoints
-            .MapGroup(string.Empty)
-            .AllowAnonymous();
+        var publicEndpoints = endpoints.MapGroup(string.Empty).AllowAnonymous();
 
-        publicEndpoints.MapGet(
-                "/api/v1/reference-data/countries",
-                GetCountries)
+        publicEndpoints.MapGet("/api/v1/reference-data/countries", GetCountries)
             .WithName("ReferenceData_GetCountries")
             .WithTags("Reference Data")
             .WithSummary("List the countries supported by Luxira")
             .CacheOutput("ReferenceData")
             .Produces<CountryResponse[]>();
 
-        publicEndpoints.MapGet(
-                "/DataList/GetAllCountries",
-                GetCountries)
+        publicEndpoints.MapGet("/DataList/GetAllCountries", GetCountries)
             .WithName("LegacyDataList_GetAllCountries")
             .WithTags("Legacy Compatibility")
             .WithSummary("List countries using the legacy DataList route")
@@ -52,17 +46,13 @@ internal static class CountryEndpoints
             .CacheOutput("ReferenceData")
             .Produces<CountryResponse[]>();
 
-        publicEndpoints.MapGet(
-                "/api/v1/reference-data/cities",
-                GetCities)
+        publicEndpoints.MapGet("/api/v1/reference-data/cities", GetCities)
             .WithName("ReferenceData_GetCitiesByCountry")
             .WithTags("Reference Data")
             .WithSummary("List distinct cities for the selected countries")
             .Produces<string[]>();
 
-        publicEndpoints.MapGet(
-                "/DataList/GetCitiesByCountry",
-                GetCities)
+        publicEndpoints.MapGet("/DataList/GetCitiesByCountry", GetCities)
             .WithName("LegacyDataList_GetCitiesByCountry")
             .WithTags("Legacy Compatibility")
             .WithSummary("List cities using the legacy DataList route")
