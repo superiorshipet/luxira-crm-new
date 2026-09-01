@@ -36,6 +36,10 @@ public class EmployeeAccessController : ControllerBase
             throw new NotFoundException("Employee record not found for the authenticated user.");
         }
 
+        employee.FaceDescriptor = request.FaceDescriptor.Trim();
+        employee.HasFacePrint = true;
+        await _context.SaveChangesAsync(ct);
+
         return Ok(new { success = true, message = "تم حفظ بصمة الوجه بنجاح!" });
     }
 }

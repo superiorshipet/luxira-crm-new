@@ -47,3 +47,34 @@ public class ConferenceMeetingDbConfig : IDbConfig<ConferenceMeeting>
         builder.HasKey(c => c.Id);
     }
 }
+
+public class PasswordEmailDbConfig : IDbConfig<PasswordEmail>
+{
+    public void Configure(EntityTypeBuilder<PasswordEmail> builder)
+    {
+        builder.ToTable("PasswordEmails");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Email).HasMaxLength(256).IsRequired();
+        builder.Property(item => item.Password).HasMaxLength(500).IsRequired();
+        builder.Property(item => item.PhoneNumber).HasMaxLength(80);
+        builder.Property(item => item.PageStatusName).HasMaxLength(200);
+        builder.HasOne(item => item.ManufacturingCompany)
+            .WithMany()
+            .HasForeignKey(item => item.ManufacturingCompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(item => item.Histories)
+            .WithOne(history => history.PasswordEmail)
+            .HasForeignKey(history => history.PasswordEmailId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class PasswordEmailHistoryDbConfig : IDbConfig<PasswordEmailHistory>
+{
+    public void Configure(EntityTypeBuilder<PasswordEmailHistory> builder)
+    {
+        builder.ToTable("PasswordEmailHistories");
+        builder.HasKey(history => history.Id);
+        builder.Property(history => history.ActionType).HasMaxLength(30).IsRequired();
+    }
+}

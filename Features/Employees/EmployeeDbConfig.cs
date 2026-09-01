@@ -99,6 +99,31 @@ public class EmployeeTaskDbConfig : IDbConfig<EmployeeTask>
     {
         builder.ToTable("EmployeeTasks");
         builder.HasKey(t => t.Id);
+        builder.Property(t => t.Title).HasMaxLength(200).IsRequired();
+        builder.Property(t => t.Description).HasMaxLength(2000);
+        builder.Property(t => t.Priority).HasMaxLength(30).IsRequired();
+        builder.Property(t => t.AttachmentS3Key).HasMaxLength(450);
+        builder.Property(t => t.AttachmentType).HasMaxLength(30);
+        builder.Property(t => t.CreatedByUserId).HasMaxLength(450).IsRequired();
+        builder.Property(t => t.CreatedByName).HasMaxLength(250);
+        builder.HasMany(t => t.Assignments)
+            .WithOne(a => a.EmployeeTask)
+            .HasForeignKey(a => a.EmployeeTaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class EmployeeTaskAssignmentDbConfig : IDbConfig<EmployeeTaskAssignment>
+{
+    public void Configure(EntityTypeBuilder<EmployeeTaskAssignment> builder)
+    {
+        builder.ToTable("EmployeeTaskAssignments");
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.EmployeeUserId).HasMaxLength(450).IsRequired();
+        builder.Property(a => a.EmployeeName).HasMaxLength(250);
+        builder.Property(a => a.EmployeeImageUrl).HasMaxLength(500);
+        builder.Property(a => a.CompletionNote).HasMaxLength(2000);
+        builder.Property(a => a.Status).HasMaxLength(30).IsRequired();
     }
 }
 

@@ -57,6 +57,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeBonusRate> EmployeeBonusRates => Set<EmployeeBonusRate>();
     public DbSet<EmployeeBonusPayment> EmployeeBonusPayments => Set<EmployeeBonusPayment>();
     public DbSet<EmployeeTask> EmployeeTasks => Set<EmployeeTask>();
+    public DbSet<EmployeeTaskAssignment> EmployeeTaskAssignments => Set<EmployeeTaskAssignment>();
     public DbSet<EmployeeError> EmployeeErrors => Set<EmployeeError>();
     public DbSet<EmployeeTransaction> EmployeeTransactions => Set<EmployeeTransaction>();
     public DbSet<EmployeeViolation> EmployeeViolations => Set<EmployeeViolation>();
@@ -103,6 +104,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
     public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
     public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();
+    public DbSet<PasswordEmail> PasswordEmails => Set<PasswordEmail>();
+    public DbSet<PasswordEmailHistory> PasswordEmailHistories => Set<PasswordEmailHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

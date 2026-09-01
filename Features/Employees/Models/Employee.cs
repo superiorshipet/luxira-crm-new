@@ -20,6 +20,8 @@ public class Employee
     public string? JobTitle { get; set; }
     public DateTime HireDate { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+    public string? FaceDescriptor { get; set; }
+    public bool HasFacePrint { get; set; }
 
     public string? ApplicationUserId { get; set; }
     public ApplicationUser? ApplicationUser { get; set; }
@@ -122,13 +124,39 @@ public class EmployeeBonusPayment
 public class EmployeeTask
 {
     public int Id { get; set; }
-    public int EmployeeId { get; set; }
-    public Employee? Employee { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public bool IsCompleted { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? DueDate { get; set; }
+    public int DurationMinutes { get; set; }
+    public string Priority { get; set; } = "Important";
+    public string? AttachmentUrl { get; set; }
+    public string? AttachmentS3Key { get; set; }
+    public string? AttachmentType { get; set; }
+    public string? AttachmentImagesJson { get; set; }
+    public string CreatedByUserId { get; set; } = string.Empty;
+    public string? CreatedByName { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
+    public ICollection<EmployeeTaskAssignment> Assignments { get; set; } = new List<EmployeeTaskAssignment>();
+}
+
+public class EmployeeTaskAssignment
+{
+    public int Id { get; set; }
+    public int EmployeeTaskId { get; set; }
+    public EmployeeTask? EmployeeTask { get; set; }
+    public string EmployeeUserId { get; set; } = string.Empty;
+    public string? EmployeeName { get; set; }
+    public string? EmployeeImageUrl { get; set; }
+    public DateTime AssignedAt { get; set; }
+    public DateTime? SeenAt { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? DueAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public string? CompletionNote { get; set; }
+    public DateTime? DueSoonNotifiedAt { get; set; }
+    public string Status { get; set; } = "New";
 }
 
 public class EmployeeError
@@ -213,4 +241,3 @@ public class ScreenRecord
     public string? VideoS3Key { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
-
