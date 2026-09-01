@@ -319,7 +319,8 @@ public class OrderService
             TotalPrice = order.TotalPrice,
             ExternalOrderId = order.ExternalOrderId,
             ApplicationUserId = order.ApplicationUserId ?? userId,
-            ExternalShipmentCode = order.PostTrackNumber,
+            ExternalShipmentCode = order.CamexTrackingNumber?.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
             FromComments = order.FromComments,
             Gender = order.Gender,
             IsPaid = order.IsPaid,

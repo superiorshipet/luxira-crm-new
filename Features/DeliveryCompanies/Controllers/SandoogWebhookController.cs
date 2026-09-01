@@ -31,11 +31,25 @@ public class SandoogWebhookController : ControllerBase
             return BadRequest(new { message = "Invalid payload" });
         }
 
+        if (!payload.OrderId.HasValue || payload.OrderId.Value <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "orderId is required because the legacy database has no persisted Sandoog shipment-id mapping."
+            });
+        }
+
         var order = await _context.Orders
-            .FirstOrDefaultAsync(o => o.SandoogShipmentId == payload.ShipmentId || o.PostTrackNumber == payload.ShipmentId, ct);
+            .Include(o => o.DeliveryCompany)
+            .FirstOrDefaultAsync(o => o.Id == payload.OrderId.Value, ct);
 
         if (order != null)
         {
+            if (!string.IsNullOrWhiteSpace(payload.ReasonCode))
+            {
+                order.SandoogReasonCode = payload.ReasonCode.Trim();
+            }
+
             int targetStatus = payload.Event?.ToLowerInvariant() switch
             {
                 "delivered" => OrderStatusCodes.Delivered,
@@ -52,10 +66,20 @@ public class SandoogWebhookController : ControllerBase
                     OrderStatusActor.TrustedSystem("sandoog-webhook"),
                     ct);
             }
+            else if (_context.Entry(order).Property(o => o.SandoogReasonCode).IsModified)
+            {
+                await _context.SaveChangesAsync(ct);
+            }
         }
 
         return Ok(new { success = true, shipmentId = payload.ShipmentId });
     }
 }
 
-public record SandoogWebhookPayload(string ShipmentId, string? Event, string? Reason, DateTime? Date);
+public record SandoogWebhookPayload(
+    string ShipmentId,
+    string? Event,
+    string? Reason,
+    DateTime? Date,
+    int? OrderId = null,
+    string? ReasonCode = null);

@@ -171,9 +171,11 @@ public class ScreenRecordDbConfig : IDbConfig<ScreenRecord>
 {
     public void Configure(EntityTypeBuilder<ScreenRecord> builder)
     {
-        builder.ToTable("ScreenRecords");
+        builder.ToTable("EmployeeScreenRecords");
         builder.HasKey(s => s.Id);
+        builder.Property(s => s.EmployeeId).HasMaxLength(450).IsRequired();
+        builder.Property(s => s.VideoPath).HasMaxLength(2000).IsRequired();
+        builder.Property(s => s.VideoS3Key).HasMaxLength(450);
     }
 }
-
 

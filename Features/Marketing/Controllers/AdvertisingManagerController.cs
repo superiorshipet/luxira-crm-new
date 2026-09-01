@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Marketing.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,ExecutiveDirector")]
 [Route("api/v1/marketing/advertising")]
 [Route("AdvertisingManager")]
 public class AdvertisingManagerController : ControllerBase
@@ -27,10 +27,10 @@ public class AdvertisingManagerController : ControllerBase
         var query = _context.Set<AdvertisingCampaign>().AsNoTracking().AsQueryable();
         if (country.HasValue && country.Value > 0)
         {
-            query = query.Where(c => c.TargetCountry == country.Value);
+            query = query.Where(campaign => campaign.Country == country.Value);
         }
 
-        var list = await query.OrderByDescending(c => c.StartDate).ToListAsync(ct);
+        var list = await query.OrderByDescending(campaign => campaign.CreatedAt).ToListAsync(ct);
         return Ok(list);
     }
 
@@ -41,13 +41,11 @@ public class AdvertisingManagerController : ControllerBase
         var c = new AdvertisingCampaign
         {
             Name = request.Name,
-            Platform = request.Platform ?? "Facebook",
-            Budget = request.Budget,
-            Spent = 0,
-            TargetCountry = request.TargetCountry,
+            Country = request.Country,
+            MainWarehouseId = request.MainWarehouseId,
             ManufacturingCompanyId = request.ManufacturingCompanyId,
-            Status = "Active",
-            StartDate = DateTime.UtcNow
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _context.Set<AdvertisingCampaign>().AddAsync(c, ct);
@@ -75,23 +73,26 @@ public class AdvertisingManagerController : ControllerBase
         decimal totalRevenue = orders
             .Where(o => o.OrderStatus == OrderStatusCodes.Delivered)
             .Sum(o => o.TotalPrice);
-        decimal spent = campaign.Spent > 0 ? campaign.Spent : campaign.Budget;
-        decimal cpa = totalOrders > 0 ? Math.Round(spent / totalOrders, 2) : 0;
-        decimal roi = spent > 0 ? Math.Round(((totalRevenue - spent) / spent) * 100, 2) : 0;
 
         return Ok(new CampaignRoiDto(
             campaign.Id,
-            campaign.Name,
-            campaign.Platform,
-            spent,
+            campaign.Name ?? string.Empty,
             totalOrders,
             deliveredOrders,
-            totalRevenue,
-            cpa,
-            roi
+            totalRevenue
         ));
     }
 }
 
-public record CreateAdCampaignRequest(string Name, string? Platform, decimal Budget, int TargetCountry, int? ManufacturingCompanyId);
-public record CampaignRoiDto(int CampaignId, string CampaignName, string Platform, decimal Spent, int TotalOrders, int DeliveredOrders, decimal Revenue, decimal Cpa, decimal RoiPercentage);
+public record CreateAdCampaignRequest(
+    string Name,
+    int Country,
+    int? MainWarehouseId,
+    int? ManufacturingCompanyId);
+
+public record CampaignRoiDto(
+    int CampaignId,
+    string CampaignName,
+    int TotalOrders,
+    int DeliveredOrders,
+    decimal Revenue);

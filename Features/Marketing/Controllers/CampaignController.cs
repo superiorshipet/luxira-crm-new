@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Marketing.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,ExecutiveDirector")]
 [Route("api/v1/marketing/campaigns")]
 [Route("Campaign")]
 public class CampaignController : ControllerBase
@@ -23,7 +23,10 @@ public class CampaignController : ControllerBase
     [HttpGet("GetCampaigns")]
     public async Task<ActionResult<List<AdvertisingCampaign>>> GetCampaigns(CancellationToken ct)
     {
-        var list = await _context.Set<AdvertisingCampaign>().AsNoTracking().ToListAsync(ct);
+        var list = await _context.Set<AdvertisingCampaign>()
+            .AsNoTracking()
+            .OrderByDescending(campaign => campaign.CreatedAt)
+            .ToListAsync(ct);
         return Ok(list);
     }
 }

@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
 using Luxira.Api.Features.Auth.Models;
 using Luxira.Api.Features.DeliveryCompanies.Models;
 
@@ -61,12 +60,8 @@ public class Order
     public string? PaymentReceiptUrl { get; set; }
     public string? PaymentReceiptS3Key { get; set; }
 
-    [NotMapped]
-    public string? PostTrackNumber { get; set; }
-    [NotMapped]
-    public string? CamexShipmentId { get; set; }
-    [NotMapped]
-    public string? SandoogShipmentId { get; set; }
+    public long? CamexTrackingNumber { get; set; }
+    public string? SandoogReasonCode { get; set; }
 
     public List<OrderWarehouse> OrderWarehouses { get; set; } = new();
     public List<OrderStatusHistory> StatusHistories { get; set; } = new();

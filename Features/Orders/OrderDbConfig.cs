@@ -23,6 +23,7 @@ public class OrderDbConfig : IDbConfig<Order>
         builder.Property(o => o.CustomerDeliveryPrice).HasPrecision(18, 2);
         builder.Property(o => o.PhotoS3Key).HasMaxLength(450);
         builder.Property(o => o.PaymentReceiptS3Key).HasMaxLength(450);
+        builder.Property(o => o.SandoogReasonCode).HasMaxLength(64);
 
         builder.HasOne(o => o.DeliveryCompany)
             .WithMany()

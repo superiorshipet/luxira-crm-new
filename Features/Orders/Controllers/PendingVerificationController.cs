@@ -29,10 +29,10 @@ public class PendingVerificationController : ControllerBase
     [HttpGet("/PendingVerification/GetQueue")]
     public async Task<ActionResult<List<OrderDto>>> GetPendingVerificationOrders([FromQuery] int? deliveryCompanyId, CancellationToken ct)
     {
-        // Status 1 (طلب جديد) with external/integrated courier
+        // Legacy status 0 is the persisted "new / waiting preparation" state.
         var filter = new OrderFilterRequest(
             Country: null,
-            Status: 1,
+            Status: OrderStatusCodes.New,
             DeliveryCompanyId: deliveryCompanyId,
             Page: 1,
             PageSize: 100
@@ -64,7 +64,16 @@ public class PendingVerificationController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.TrackingNumber))
         {
-            order.PostTrackNumber = request.TrackingNumber;
+            if (!long.TryParse(
+                    request.TrackingNumber,
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var trackingNumber))
+            {
+                throw new BadRequestException("CAMEX tracking number must be numeric.");
+            }
+
+            order.CamexTrackingNumber = trackingNumber;
             await _context.SaveChangesAsync(ct);
         }
 

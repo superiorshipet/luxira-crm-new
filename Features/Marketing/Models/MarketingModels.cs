@@ -3,28 +3,25 @@ namespace Luxira.Api.Features.Marketing.Models;
 public class AdvertisingCampaign
 {
     public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Platform { get; set; } = "Facebook"; // Facebook, TikTok, Snapchat, Google
-    public decimal Budget { get; set; }
-    public decimal Spent { get; set; }
-    public int TargetCountry { get; set; }
+    public string? ImageUrl { get; set; }
+    public string? ImageS3Key { get; set; }
+    public string? Name { get; set; }
+    public int Country { get; set; }
+    public int? MainWarehouseId { get; set; }
     public int? ManufacturingCompanyId { get; set; }
-    public string Status { get; set; } = "Active";
-    public DateTime StartDate { get; set; } = DateTime.UtcNow;
-    public DateTime? EndDate { get; set; }
+    public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsActive { get; set; } = true;
 }
 
 public class MarketingLead
 {
     public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Phone { get; set; } = string.Empty;
-    public string? Source { get; set; }
-    public int Country { get; set; }
-    public string Status { get; set; } = "New"; // New, Contacted, Qualified, Converted, Lost
-    public string? AssignedUserId { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public string? Notes { get; set; }
+    public string SourceName { get; set; } = string.Empty;
+    public int OrderSource { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string? ChatUrl { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public string ApplicationUserId { get; set; } = string.Empty;
 }
 
 public class StoreScript

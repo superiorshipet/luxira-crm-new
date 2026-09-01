@@ -9,11 +9,10 @@ public class AdvertisingCampaignDbConfig : IDbConfig<AdvertisingCampaign>
 {
     public void Configure(EntityTypeBuilder<AdvertisingCampaign> builder)
     {
-        builder.ToTable("AdvertisingCampaigns");
+        builder.ToTable("Campaigns");
         builder.HasKey(c => c.Id);
-        builder.Property(c => c.Name).HasMaxLength(255).IsRequired();
-        builder.Property(c => c.Budget).HasPrecision(18, 2);
-        builder.Property(c => c.Spent).HasPrecision(18, 2);
+        builder.Property(c => c.ImageUrl).HasMaxLength(500);
+        builder.Property(c => c.ImageS3Key).HasMaxLength(450);
     }
 }
 
@@ -21,10 +20,10 @@ public class MarketingLeadDbConfig : IDbConfig<MarketingLead>
 {
     public void Configure(EntityTypeBuilder<MarketingLead> builder)
     {
-        builder.ToTable("MarketingLeads");
+        builder.ToTable("Leads");
         builder.HasKey(l => l.Id);
-        builder.Property(l => l.Name).HasMaxLength(255).IsRequired();
-        builder.Property(l => l.Phone).HasMaxLength(50).IsRequired();
+        builder.Property(l => l.SourceName).HasMaxLength(255).IsRequired();
+        builder.Property(l => l.PhoneNumber).HasMaxLength(50);
     }
 }
 

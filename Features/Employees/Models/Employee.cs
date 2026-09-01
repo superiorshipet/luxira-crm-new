@@ -184,13 +184,12 @@ public class ManagementRequest
 public class ScreenRecord
 {
     public int Id { get; set; }
-    public int EmployeeId { get; set; }
-    public Employee? Employee { get; set; }
-    public string ScreenshotUrl { get; set; } = string.Empty;
-    public string? S3Key { get; set; }
-    public string? ActiveApplication { get; set; }
-    public int IdleSeconds { get; set; }
-    public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
+    public string EmployeeId { get; set; } = string.Empty;
+    public DateTime Date { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public string VideoPath { get; set; } = string.Empty;
+    public string? VideoS3Key { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
-
 

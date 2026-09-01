@@ -23,22 +23,22 @@ public class ScreenRecordsController : ControllerBase
 
     [HttpGet]
     [HttpGet("GetRecords")]
-    public async Task<ActionResult<List<ScreenRecord>>> GetRecords([FromQuery] int? employeeId, [FromQuery] DateTime? date, CancellationToken ct)
+    public async Task<ActionResult<List<ScreenRecord>>> GetRecords([FromQuery] string? employeeId, [FromQuery] DateTime? date, CancellationToken ct)
     {
         var query = _context.ScreenRecords.AsNoTracking().AsQueryable();
-        if (employeeId.HasValue && employeeId.Value > 0)
+        if (!string.IsNullOrWhiteSpace(employeeId))
         {
-            query = query.Where(s => s.EmployeeId == employeeId.Value);
+            query = query.Where(record => record.EmployeeId == employeeId);
         }
 
         if (date.HasValue)
         {
             var dayStart = date.Value.Date;
             var dayEnd = dayStart.AddDays(1);
-            query = query.Where(s => s.CapturedAt >= dayStart && s.CapturedAt < dayEnd);
+            query = query.Where(record => record.Date >= dayStart && record.Date < dayEnd);
         }
 
-        var list = await query.OrderByDescending(s => s.CapturedAt).Take(100).ToListAsync(ct);
+        var list = await query.OrderByDescending(record => record.Date).ThenByDescending(record => record.StartTime).Take(100).ToListAsync(ct);
         return Ok(list);
     }
 
@@ -49,11 +49,12 @@ public class ScreenRecordsController : ControllerBase
         var rec = new ScreenRecord
         {
             EmployeeId = request.EmployeeId,
-            ScreenshotUrl = request.ScreenshotUrl,
-            S3Key = request.S3Key,
-            ActiveApplication = request.ActiveApplication,
-            IdleSeconds = request.IdleSeconds,
-            CapturedAt = DateTime.UtcNow
+            Date = request.Date.Date,
+            StartTime = request.StartTime,
+            EndTime = request.EndTime,
+            VideoPath = request.VideoPath,
+            VideoS3Key = request.VideoS3Key,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _context.ScreenRecords.AddAsync(rec, ct);
@@ -62,4 +63,10 @@ public class ScreenRecordsController : ControllerBase
     }
 }
 
-public record UploadScreenRecordRequest(int EmployeeId, string ScreenshotUrl, string? S3Key, string? ActiveApplication, int IdleSeconds);
+public record UploadScreenRecordRequest(
+    string EmployeeId,
+    DateTime Date,
+    DateTime StartTime,
+    DateTime? EndTime,
+    string VideoPath,
+    string? VideoS3Key);

@@ -5,6 +5,7 @@ using Luxira.Api.Utils.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 
@@ -34,8 +35,18 @@ public class CamexWebhookController : ControllerBase
             return BadRequest(new { message = "Invalid payload" });
         }
 
+        if (!long.TryParse(
+                payload.TrackingNumber,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var trackingNumber))
+        {
+            return BadRequest(new { message = "Tracking number must be numeric." });
+        }
+
         var order = await _context.Orders
-            .FirstOrDefaultAsync(o => o.CamexShipmentId == payload.TrackingNumber || o.PostTrackNumber == payload.TrackingNumber, ct);
+            .Include(o => o.DeliveryCompany)
+            .FirstOrDefaultAsync(o => o.CamexTrackingNumber == trackingNumber, ct);
 
         if (order != null)
         {

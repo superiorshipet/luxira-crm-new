@@ -77,8 +77,7 @@ public sealed class OrderStatusTransitionPolicy
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(order.CamexShipmentId) ||
-            !string.IsNullOrWhiteSpace(order.SandoogShipmentId))
+        if (order.CamexTrackingNumber.HasValue)
         {
             throw new ForbidException(
                 "Orders owned by an automated courier can only be updated by its authenticated webhook workflow.");
