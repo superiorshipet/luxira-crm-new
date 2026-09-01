@@ -76,4 +76,24 @@ public class OrderController : ControllerBase
         var stats = await _orderService.GetStatsAsync(country, ct);
         return Ok(stats);
     }
+
+    [HttpPost("inline-edit")]
+    [HttpPost("/Order/UpdateOrderInlineField")]
+    public async Task<ActionResult<OrderDto>> UpdateOrderInlineField([FromBody] UpdateInlineFieldRequest request, CancellationToken ct)
+    {
+        var userId = User.GetUserId() ?? "system";
+        var result = await _orderService.UpdateInlineFieldAsync(request.OrderId, request.FieldName, request.NewValue, userId, ct);
+        return Ok(result);
+    }
+
+    [HttpGet("check-duplicates")]
+    [HttpGet("/Order/CheckDuplicates")]
+    public async Task<ActionResult<List<OrderDto>>> CheckDuplicates([FromQuery] string phoneNumber, CancellationToken ct)
+    {
+        var duplicates = await _orderService.CheckDuplicatesAsync(phoneNumber, ct);
+        return Ok(duplicates);
+    }
 }
+
+public record UpdateInlineFieldRequest(int OrderId, string FieldName, string? NewValue);
+

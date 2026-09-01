@@ -1,17 +1,21 @@
+using Luxira.Api.Data;
 using Luxira.Api.Features.Employees.DTOs;
 using Luxira.Api.Features.Employees.Models;
 using Luxira.Api.Features.Employees.Repositories;
 using Luxira.Api.Utils.Exceptions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Luxira.Api.Features.Employees.Services;
 
 public class EmployeeService
 {
     private readonly EmployeeRepository _repository;
+    private readonly ApplicationDbContext _context;
 
-    public EmployeeService(EmployeeRepository repository)
+    public EmployeeService(EmployeeRepository repository, ApplicationDbContext context)
     {
         _repository = repository;
+        _context = context;
     }
 
     public async Task<List<EmployeeDto>> GetEmployeesAsync(bool? isActive = null, CancellationToken ct = default)
@@ -163,6 +167,74 @@ public class EmployeeService
         )).ToList();
     }
 
+    public async Task<List<PayrollSummaryDto>> CalculatePayrollAsync(int? employeeId, int year, int month, CancellationToken ct = default)
+    {
+        var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var endDate = startDate.AddMonths(1);
+        int totalDays = DateTime.DaysInMonth(year, month);
+
+        var empQuery = _context.Employees.AsNoTracking().Where(e => e.IsActive);
+        if (employeeId.HasValue && employeeId.Value > 0)
+        {
+            empQuery = empQuery.Where(e => e.Id == employeeId.Value);
+        }
+
+        var employees = await empQuery.ToListAsync(ct);
+        var summaries = new List<PayrollSummaryDto>();
+
+        foreach (var emp in employees)
+        {
+            var attendedDays = await _context.EmployeeAttendanceLogs
+                .Where(a => a.EmployeeId == emp.Id && a.CheckIn >= startDate && a.CheckIn < endDate)
+                .Select(a => a.CheckIn.Date)
+                .Distinct()
+                .CountAsync(ct);
+
+            // If no biometric logs recorded yet, treat active employees as fully attended for preview
+            int effectiveDays = attendedDays > 0 ? attendedDays : totalDays;
+            decimal dailyRate = totalDays > 0 ? emp.Salary / totalDays : 0;
+            decimal earnedSalary = Math.Round(dailyRate * effectiveDays, 2);
+
+            decimal bonuses = await _context.EmployeeBonusPayments
+                .Where(b => b.EmployeeId == emp.Id && b.Date >= startDate && b.Date < endDate)
+                .SumAsync(b => (decimal?)b.Amount, ct) ?? 0;
+
+            decimal deductions = await _context.EmployeeViolations
+                .Where(v => v.EmployeeId == emp.Id && v.OccurredAt >= startDate && v.OccurredAt < endDate)
+                .SumAsync(v => (decimal?)v.PenaltyAmount, ct) ?? 0;
+
+            decimal advances = await _context.EmployeeTransactions
+                .Where(t => t.EmployeeId == emp.Id && t.Date >= startDate && t.Date < endDate && t.TransactionType == "Advance")
+                .SumAsync(t => (decimal?)t.Amount, ct) ?? 0;
+
+            decimal paidAmount = await _context.EmployeeSalaryPayments
+                .Where(p => p.EmployeeId == emp.Id && p.PaymentDate >= startDate && p.PaymentDate < endDate)
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0;
+
+            decimal netDue = Math.Max(0, earnedSalary + bonuses - deductions - advances);
+            decimal remaining = Math.Max(0, netDue - paidAmount);
+
+            summaries.Add(new PayrollSummaryDto(
+                emp.Id,
+                emp.Name,
+                emp.Salary,
+                effectiveDays,
+                totalDays,
+                earnedSalary,
+                bonuses,
+                deductions,
+                advances,
+                paidAmount,
+                netDue,
+                remaining,
+                year,
+                month
+            ));
+        }
+
+        return summaries;
+    }
+
     private static EmployeeDto MapToDto(Employee e) => new(
         e.Id,
         e.Name,
@@ -180,3 +252,20 @@ public class EmployeeService
         e.ApplicationUserId
     );
 }
+
+public record PayrollSummaryDto(
+    int EmployeeId,
+    string EmployeeName,
+    decimal BaseSalary,
+    int AttendedDays,
+    int TotalDaysInMonth,
+    decimal EarnedSalary,
+    decimal TotalBonuses,
+    decimal TotalDeductions,
+    decimal TotalAdvances,
+    decimal PaidAmount,
+    decimal NetSalaryDue,
+    decimal RemainingDue,
+    int Year,
+    int Month
+);

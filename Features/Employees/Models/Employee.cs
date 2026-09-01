@@ -163,3 +163,34 @@ public class PersonalNote
     public DateTime? ReminderAt { get; set; }
 }
 
+public class ManagementRequest
+{
+    public int Id { get; set; }
+    public int EmployeeId { get; set; }
+    public Employee? Employee { get; set; }
+    public string RequestType { get; set; } = "Leave"; // Leave, Advance, Expense, ShiftSwap, Resignation
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public decimal? RequestedAmount { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected
+    public string? ManagerFeedback { get; set; }
+    public string? ReviewedByUserId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ReviewedAt { get; set; }
+}
+
+public class ScreenRecord
+{
+    public int Id { get; set; }
+    public int EmployeeId { get; set; }
+    public Employee? Employee { get; set; }
+    public string ScreenshotUrl { get; set; } = string.Empty;
+    public string? S3Key { get; set; }
+    public string? ActiveApplication { get; set; }
+    public int IdleSeconds { get; set; }
+    public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
+}
+
+

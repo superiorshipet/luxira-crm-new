@@ -8,7 +8,9 @@ namespace Luxira.Api.Features.ManufacturingCompanies.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/v1/product-prices")]
-[Route("api/[controller]")]
+[Route("ProductsPrices")]
+[Route("ProductMinimumSellingPrices")]
+[Route("CountryMinimumPrices")]
 public class ProductPriceController : ControllerBase
 {
     private readonly ManufacturingCompanyService _service;

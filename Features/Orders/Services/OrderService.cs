@@ -1,18 +1,22 @@
+using Luxira.Api.Data;
 using Luxira.Api.Features.Orders.DTOs;
 using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Features.Orders.Repositories;
 using Luxira.Api.Utils.Exceptions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Luxira.Api.Features.Orders.Services;
 
 public class OrderService
 {
     private readonly OrderRepository _repository;
+    private readonly ApplicationDbContext _context;
     private readonly ILogger<OrderService> _logger;
 
-    public OrderService(OrderRepository repository, ILogger<OrderService> logger)
+    public OrderService(OrderRepository repository, ApplicationDbContext context, ILogger<OrderService> logger)
     {
         _repository = repository;
+        _context = context;
         _logger = logger;
     }
 
@@ -53,6 +57,23 @@ public class OrderService
         if (request.DeliveryCompanyId <= 0)
         {
             throw new BadRequestException("A valid delivery company must be selected.");
+        }
+
+        // Validate Minimum Selling Price if items provided
+        if (request.Items != null && request.Items.Count > 0)
+        {
+            foreach (var item in request.Items)
+            {
+                var minPrice = await _context.ProductMinimumSellingPrices
+                    .Where(p => p.Country == request.Country)
+                    .Select(p => p.MinimumPrice)
+                    .FirstOrDefaultAsync(ct);
+
+                if (minPrice > 0 && item.Price < minPrice)
+                {
+                    _logger.LogWarning("Order created below minimum price: {Price} < {MinPrice}", item.Price, minPrice);
+                }
+            }
         }
 
         var order = new Order
@@ -124,6 +145,22 @@ public class OrderService
         order.LastEditedDate = DateTime.UtcNow;
         order.Editedby = userId;
 
+        // Auto-bonus trigger if order is Delivered (Status 5 = تم التوصيل)
+        if (request.NewStatus == 5 && !order.IsBonusPaidForEmployee)
+        {
+            var bonusConfig = await _context.OrderBonusConfigurations
+                .FirstOrDefaultAsync(b => b.Country == order.Country && b.IsActive, ct);
+
+            if (bonusConfig != null && bonusConfig.BonusAmount > 0)
+            {
+                order.IsBonus = true;
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation("Order {OrderId} qualified for bonus {BonusAmount}", order.Id, bonusConfig.BonusAmount);
+                }
+            }
+        }
+
         await _repository.UpdateAsync(order, ct);
 
         await _repository.AddStatusHistoryAsync(new OrderStatusHistory
@@ -156,6 +193,82 @@ public class OrderService
         }
 
         return updatedCount;
+    }
+
+    public async Task<OrderDto> UpdateInlineFieldAsync(int orderId, string fieldName, string? newValue, string userId, CancellationToken ct = default)
+    {
+        var order = await _context.Orders.Include(o => o.OrderWarehouses).FirstOrDefaultAsync(o => o.Id == orderId, ct);
+        if (order == null)
+        {
+            throw new NotFoundException($"Order with ID {orderId} was not found.");
+        }
+
+        var lowerField = fieldName.ToLowerInvariant();
+        switch (lowerField)
+        {
+            case "customername":
+                order.CustomerName = newValue ?? string.Empty;
+                break;
+            case "telephonenumber":
+            case "phone":
+                order.TelephoneNumber = newValue ?? string.Empty;
+                break;
+            case "secondtelephonenumber":
+                order.SecondTelephoneNumber = newValue;
+                break;
+            case "address":
+                order.Address = newValue ?? string.Empty;
+                break;
+            case "notes":
+            case "note":
+                order.Notes = newValue;
+                break;
+            case "state":
+            case "city":
+                order.State = newValue;
+                break;
+            case "deliverycompanyid":
+                if (int.TryParse(newValue, out var dcId)) order.DeliveryCompanyId = dcId;
+                break;
+            case "totalprice":
+                if (decimal.TryParse(newValue, out var tp)) order.TotalPrice = tp;
+                break;
+            case "delegateemployeeid":
+                order.DelegateEmployeeId = newValue;
+                break;
+            default:
+                throw new BadRequestException($"Unknown inline field '{fieldName}'.");
+        }
+
+        order.LastEditedDate = DateTime.UtcNow;
+        order.Editedby = userId;
+
+        // Record edit history
+        await _context.OrderEditHistories.AddAsync(new OrderEditHistory
+        {
+            OrderId = order.Id,
+            UserId = userId,
+            EditedAt = DateTime.UtcNow,
+            Details = $"Updated inline field '{fieldName}' to '{newValue}'"
+        }, ct);
+
+        await _context.SaveChangesAsync(ct);
+        return MapToDto(order);
+    }
+
+    public async Task<List<OrderDto>> CheckDuplicatesAsync(string phoneNumber, CancellationToken ct = default)
+    {
+        var cleanPhone = phoneNumber.Trim();
+        var duplicates = await _context.Orders
+            .Include(o => o.OrderWarehouses)
+            .Include(o => o.DeliveryCompany)
+            .AsNoTracking()
+            .Where(o => o.TelephoneNumber == cleanPhone || o.SecondTelephoneNumber == cleanPhone)
+            .OrderByDescending(o => o.CreatedDate)
+            .Take(10)
+            .ToListAsync(ct);
+
+        return duplicates.Select(MapToDto).ToList();
     }
 
     public async Task<OrderStatsDto> GetStatsAsync(int? country = null, CancellationToken ct = default)
