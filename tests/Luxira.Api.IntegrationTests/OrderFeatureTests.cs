@@ -49,7 +49,8 @@ public sealed class OrderFeatureTests(LuxiraApiFactory factory) : IClassFixture<
         // Update status to 2 (مؤكد)
         var statusReq = new UpdateOrderStatusRequest(2, "Confirmed by phone", "Call center agent note");
         var updateResponse = await _client.PutAsJsonAsync($"/api/v1/orders/{createdOrder.Id}/status", statusReq);
-        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updateContent = await updateResponse.Content.ReadAsStringAsync();
+        Assert.True(updateResponse.IsSuccessStatusCode, $"Update status failed: {updateResponse.StatusCode} - {updateContent}");
 
         var updatedOrder = await updateResponse.Content.ReadFromJsonAsync<OrderDto>();
         Assert.NotNull(updatedOrder);

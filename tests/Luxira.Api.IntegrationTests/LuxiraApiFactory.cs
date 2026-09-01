@@ -34,58 +34,64 @@ public sealed class LuxiraApiFactory : WebApplicationFactory<Program>
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            db.Database.EnsureCreated();
 
-            if (!db.Users.Any(u => u.Id == "test-user-1"))
+            try
             {
-                db.Users.Add(new ApplicationUser
+                if (db.Users.Find("test-user-1") == null)
                 {
-                    Id = "test-user-1",
-                    UserName = "testadmin",
-                    NormalizedUserName = "TESTADMIN",
-                    Email = "admin@luxiracrm.com",
-                    Name = "Test Admin",
-                    Role = "Admin",
-                    Country = 1,
-                    AcessId = 1,
-                    IsActive = true
-                });
-            }
+                    db.Users.Add(new ApplicationUser
+                    {
+                        Id = "test-user-1",
+                        UserName = "testadmin",
+                        NormalizedUserName = "TESTADMIN",
+                        Email = "admin@luxiracrm.com",
+                        Name = "Test Admin",
+                        Role = "Admin",
+                        Country = 1,
+                        AcessId = 1,
+                        IsActive = true
+                    });
+                }
 
-            if (!db.DeliveryCompanies.Any(d => d.Id == 1))
+                if (db.DeliveryCompanies.Find(1) == null)
+                {
+                    var dc = new DeliveryCompany
+                    {
+                        Id = 1,
+                        Name = "شركة النصر للشحن",
+                        DisplayName = "النصر",
+                        Country = 1,
+                        Address = "بغداد - الكرادة",
+                        PhoneNumber = "07700000000",
+                        IdNumber = "123456",
+                        UserId = "test-user-1",
+                        IsActive = true,
+                        IsShown = true,
+                        IsRepresentative = false
+                    };
+                    dc.Prices.Add(new DeliveryCompanyPrice { Id = 1, Country = 1, Price = 5000m, DeliveryCompanyId = 1 });
+                    db.DeliveryCompanies.Add(dc);
+                }
+
+                if (db.SearchKeywordOptions.Find(1) == null)
+                {
+                    db.SearchKeywordOptions.Add(new SearchKeywordOption
+                    {
+                        Id = 1,
+                        Keyword = "عطور",
+                        TargetType = "Product",
+                        Category = "General",
+                        IsActive = true,
+                        SortOrder = 1
+                    });
+                }
+
+                db.SaveChanges();
+            }
+            catch
             {
-                var dc = new DeliveryCompany
-                {
-                    Id = 1,
-                    Name = "شركة النصر للشحن",
-                    DisplayName = "النصر",
-                    Country = 1,
-                    Address = "بغداد - الكرادة",
-                    PhoneNumber = "07700000000",
-                    IdNumber = "123456",
-                    UserId = "test-user-1",
-                    IsActive = true,
-                    IsShown = true,
-                    IsRepresentative = false
-                };
-                dc.Prices.Add(new DeliveryCompanyPrice { Id = 1, Country = 1, Price = 5000m, DeliveryCompanyId = 1 });
-                db.DeliveryCompanies.Add(dc);
+                // In-memory store already seeded
             }
-
-            if (!db.SearchKeywordOptions.Any(k => k.Id == 1))
-            {
-                db.SearchKeywordOptions.Add(new SearchKeywordOption
-                {
-                    Id = 1,
-                    Keyword = "عطور",
-                    TargetType = "Product",
-                    Category = "General",
-                    IsActive = true,
-                    SortOrder = 1
-                });
-            }
-
-            db.SaveChanges();
         });
     }
 }
