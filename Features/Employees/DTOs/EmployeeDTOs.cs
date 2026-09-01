@@ -71,7 +71,10 @@ public record SalaryPaymentDto(
 public record RecordSalaryPaymentRequest(
     int EmployeeId,
     decimal Amount,
-    string? Notes
+    string? Notes,
+    string Currency = "USD",
+    DateTime? PeriodFrom = null,
+    DateTime? PeriodTo = null
 );
 
 public record EmployeeBonusPaymentDto(

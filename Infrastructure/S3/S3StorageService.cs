@@ -46,6 +46,7 @@ public class S3StorageService : IDisposable
     }
 
     public string BucketName => _bucket;
+    public string Region => _region;
 
     public async Task<S3StoredObject> UploadAsync(
         IFormFile file,

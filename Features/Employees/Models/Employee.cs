@@ -98,10 +98,36 @@ public class EmployeeSalaryPayment
     public int Id { get; set; }
     public int EmployeeId { get; set; }
     public Employee? Employee { get; set; }
-    public decimal Amount { get; set; }
-    public DateTime PaymentDate { get; set; } = DateTime.UtcNow;
-    public string? Notes { get; set; }
-    public string PaidByUserId { get; set; } = string.Empty;
+    public DateTime SalaryMonth { get; set; }
+    public DateTime PeriodFrom { get; set; }
+    public DateTime PeriodTo { get; set; }
+    public decimal MonthlySalary { get; set; }
+    public int DaysWorked { get; set; }
+    public int DaysInMonth { get; set; }
+    public decimal EarnedSalary { get; set; }
+    public decimal TotalDeductions { get; set; }
+    public decimal TotalAdvances { get; set; }
+    public decimal TotalBonuses { get; set; }
+    public decimal RemainingAmount { get; set; }
+    public decimal ManualAdjustmentAmount { get; set; }
+    public string? ManualAdjustmentReason { get; set; }
+    public DateTime? ManualAdjustmentAt { get; set; }
+    public string? ManualAdjustmentByUserId { get; set; }
+    public string? ManualAdjustmentByUserName { get; set; }
+    public string Currency { get; set; } = string.Empty;
+    public bool IsPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public string? PaidByUserId { get; set; }
+    public string? PaidByUserName { get; set; }
+    public string ReceiptNumber { get; set; } = string.Empty;
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByUserName { get; set; }
+    public bool IsPermanentlyDeleted { get; set; }
+    public DateTime? PermanentlyDeletedAt { get; set; }
+    public string? PermanentlyDeletedByUserId { get; set; }
+    public string? PermanentlyDeletedByUserName { get; set; }
 }
 
 public class EmployeeBonusRate

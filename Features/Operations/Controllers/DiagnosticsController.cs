@@ -54,50 +54,25 @@ public class DiagnosticsController : ControllerBase
             return Unauthorized("Invalid diagnostics API key.");
         }
 
-        var sampleLogs = new[]
-        {
-            new { Id = 1, Level = "Information", Message = "Application started on .NET 10", Timestamp = IstanbulTimeHelper.Now },
-            new { Id = 2, Level = "Information", Message = "SignalR Hub /hubs/orders active", Timestamp = IstanbulTimeHelper.Now.AddMinutes(-5) }
-        };
-
-        return Ok(new { total = sampleLogs.Length, logs = sampleLogs });
+        return NotImplemented("A durable application-log query source is not configured.");
     }
 
     [HttpGet("logs/facets")]
     public IActionResult GetLogFacets([FromQuery] string? key)
     {
-        return Ok(new
-        {
-            levels = new[] { "Information", "Warning", "Error" },
-            categories = new[] { "General", "OrderService", "FinancialService", "S3StorageService" }
-        });
+        return NotImplemented("Log facets require a durable application-log query source.");
     }
 
     [HttpGet("metrics/p95")]
     public IActionResult GetP95Metrics([FromQuery] string? key)
     {
-        return Ok(new
-        {
-            p50Ms = 12.4,
-            p95Ms = 45.8,
-            p99Ms = 112.0,
-            sampledRequests = 5420
-        });
+        return NotImplemented("Request percentile storage is not configured.");
     }
 
     [HttpGet("metrics/timeseries")]
     public IActionResult GetTimeseriesMetrics([FromQuery] string? key)
     {
-        return Ok(new
-        {
-            metric = "RequestDurationMs",
-            points = new[]
-            {
-                new { Time = IstanbulTimeHelper.Now.AddMinutes(-30), Value = 14.2 },
-                new { Time = IstanbulTimeHelper.Now.AddMinutes(-15), Value = 18.5 },
-                new { Time = IstanbulTimeHelper.Now, Value = 15.1 }
-            }
-        });
+        return NotImplemented("Request time-series storage is not configured.");
     }
 
     [HttpGet("profiling")]
@@ -105,15 +80,24 @@ public class DiagnosticsController : ControllerBase
     {
         return Ok(new
         {
-            profilingEnabled = false,
-            slowQueryThresholdMs = 250,
-            detailedErrors = true
+            profilingEnabled = _configuration.GetValue<bool>("Diagnostics:ProfilingEnabled"),
+            slowQueryThresholdMs = _configuration.GetValue<int?>("Diagnostics:SlowQueryThresholdMs") ?? 250,
+            detailedErrors = _configuration.GetValue<bool>("Diagnostics:DetailedErrors")
         });
     }
 
     [HttpPost("profiling")]
     public IActionResult UpdateProfiling([FromQuery] string? key, [FromBody] object payload)
     {
-        return Ok(new { success = true });
+        return NotImplemented("Runtime profiling configuration changes are disabled; use deployment configuration.");
     }
+
+    private ObjectResult NotImplemented(string detail) => StatusCode(
+        StatusCodes.Status501NotImplemented,
+        new ProblemDetails
+        {
+            Status = StatusCodes.Status501NotImplemented,
+            Title = "Operation not implemented",
+            Detail = detail
+        });
 }

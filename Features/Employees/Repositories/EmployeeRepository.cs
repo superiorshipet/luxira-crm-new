@@ -102,6 +102,9 @@ public class EmployeeRepository
             query = query.Where(s => s.EmployeeId == employeeId.Value);
         }
 
-        return await query.OrderByDescending(s => s.PaymentDate).ToListAsync(ct);
+        return await query
+            .Where(s => !s.IsPermanentlyDeleted)
+            .OrderByDescending(s => s.PaidAt ?? s.SalaryMonth)
+            .ToListAsync(ct);
     }
 }

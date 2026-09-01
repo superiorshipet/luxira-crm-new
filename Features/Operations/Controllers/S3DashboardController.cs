@@ -37,9 +37,9 @@ public class S3DashboardController : ControllerBase
             storageBytes = totalBytes,
             storageFormatted = $"{gb} GB",
             objectCount = count,
-            monthlyEgressGb = 42.5,
-            region = "eu-central-1",
-            status = "Healthy"
+            monthlyEgressGb = (double?)null,
+            region = _s3.Region,
+            source = "S3StoredObjects index"
         });
     }
 
@@ -55,66 +55,54 @@ public class S3DashboardController : ControllerBase
     [HttpPost("/S3Dashboard/MigrationStatus")]
     public IActionResult MigrationStatus()
     {
-        return Ok(new
-        {
-            inProgress = false,
-            migratedFiles = 100,
-            pendingFiles = 0,
-            failedFiles = 0,
-            percentage = 100.0
-        });
+        return NotImplemented("Migration progress persistence has not been ported yet.");
     }
 
     [HttpPost("run-migration")]
     [HttpPost("/S3Dashboard/RunMigration")]
     public IActionResult RunMigration([FromQuery] int batchSize = 100, [FromQuery] int afterId = 0)
     {
-        return Ok(new { success = true, processedBatch = batchSize, nextCursor = afterId + batchSize });
+        return NotImplemented("S3 migration execution is disabled until its idempotent cursor and audit log are ported.");
     }
 
     [HttpPost("disk-usage")]
     [HttpPost("/S3Dashboard/DiskUsage")]
     public IActionResult DiskUsage()
     {
-        return Ok(new
-        {
-            wwwrootBytes = 2147483648L, // 2 GB
-            s3TotalBytes = 10737418240L, // 10 GB
-            freeDiskBytes = 53687091200L // 50 GB
-        });
+        return NotImplemented("Filesystem usage collection is not configured for this deployment.");
     }
 
     [HttpPost("reconcile")]
     [HttpPost("/S3Dashboard/Reconcile")]
     public IActionResult Reconcile()
     {
-        return Ok(new { success = true, mismatchedCount = 0 });
+        return NotImplemented("S3 reconciliation is not available until a durable reconciliation run model is ported.");
     }
 
     [HttpPost("repair-index")]
     [HttpPost("/S3Dashboard/RepairIndex")]
     public IActionResult RepairIndex()
     {
-        return Ok(new { success = true, repairedCount = 0 });
+        return NotImplemented("S3 index repair is not available yet.");
     }
 
     [HttpPost("delete-orphans")]
     [HttpPost("/S3Dashboard/DeleteOrphans")]
     public IActionResult DeleteOrphans([FromQuery] bool confirm = false)
     {
-        return Ok(new { success = true, confirmed = confirm, deletedOrphans = 0 });
+        return NotImplemented("Orphan deletion is disabled until reconciliation and recovery guarantees are implemented.");
     }
 
     [HttpPost("module-statuses")]
     [HttpPost("/S3Dashboard/ModuleStatuses")]
-    public IActionResult ModuleStatuses()
+    public async Task<IActionResult> ModuleStatuses(CancellationToken ct)
     {
         var modules = new[]
         {
-            new { Module = "OrderPosts", Migrated = true, S3Count = 4200 },
-            new { Module = "ProductImages", Migrated = true, S3Count = 1850 },
-            new { Module = "Employees", Migrated = true, S3Count = 310 },
-            new { Module = "Warehouses", Migrated = true, S3Count = 95 }
+            new { Module = "OrderPosts", IndexedCount = await CountIndexedPrefixAsync("OrderPosts/", ct) },
+            new { Module = "ProductImages", IndexedCount = await CountIndexedPrefixAsync("ProductImages/", ct) },
+            new { Module = "Employees", IndexedCount = await CountIndexedPrefixAsync("Employees/", ct) },
+            new { Module = "Warehouses", IndexedCount = await CountIndexedPrefixAsync("Warehouses/", ct) }
         };
         return Ok(modules);
     }
@@ -123,13 +111,25 @@ public class S3DashboardController : ControllerBase
     [HttpPost("/S3Dashboard/ModuleMigrate")]
     public IActionResult ModuleMigrate([FromBody] object request)
     {
-        return Ok(new { success = true });
+        return NotImplemented("Module migration is not available yet.");
     }
 
     [HttpPost("module-delete-local")]
     [HttpPost("/S3Dashboard/ModuleDeleteLocal")]
     public IActionResult ModuleDeleteLocal([FromBody] object request)
     {
-        return Ok(new { success = true });
+        return NotImplemented("Local-file deletion is disabled until migration verification is implemented.");
     }
+
+    private ObjectResult NotImplemented(string detail) => StatusCode(
+        StatusCodes.Status501NotImplemented,
+        new ProblemDetails
+        {
+            Status = StatusCodes.Status501NotImplemented,
+            Title = "Operation not implemented",
+            Detail = detail
+        });
+
+    private Task<int> CountIndexedPrefixAsync(string prefix, CancellationToken ct) =>
+        _context.S3StoredObjects.AsNoTracking().CountAsync(item => item.S3Key.StartsWith(prefix), ct);
 }

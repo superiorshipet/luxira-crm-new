@@ -1,5 +1,7 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Employees.Models;
+using Luxira.Api.Features.Employees.DTOs;
+using Luxira.Api.Features.Employees.Services;
 using Luxira.Api.Features.Expenses.Models;
 using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Utils.Exceptions;
@@ -18,10 +20,12 @@ namespace Luxira.Api.Features.Expenses.Controllers;
 public class FinancialController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly EmployeeService _employeeService;
 
-    public FinancialController(ApplicationDbContext context)
+    public FinancialController(ApplicationDbContext context, EmployeeService employeeService)
     {
         _context = context;
+        _employeeService = employeeService;
     }
 
     [HttpGet("Countries")]
@@ -260,18 +264,13 @@ public class FinancialController : ControllerBase
         if (employee == null)
             return NotFound("Employee not found.");
 
-        var now = IstanbulTimeHelper.Now;
-        var payment = new EmployeeSalaryPayment
-        {
-            EmployeeId = employee.Id,
-            Amount = request.Amount > 0 ? request.Amount : employee.Salary,
-            PaymentDate = now,
-            Notes = request.Notes ?? "Monthly salary payout",
-            PaidByUserId = User.GetUserId() ?? "Admin"
-        };
-
-        await _context.EmployeeSalaryPayments.AddAsync(payment, ct);
-        await _context.SaveChangesAsync(ct);
+        var payment = await _employeeService.RecordSalaryPaymentAsync(
+            new RecordSalaryPaymentRequest(
+                employee.Id,
+                request.Amount > 0 ? request.Amount : employee.Salary,
+                request.Notes ?? "Monthly salary payout"),
+            User.GetUserId() ?? "Admin",
+            ct);
 
         return Ok(new { success = true, paymentId = payment.Id, amount = payment.Amount });
     }

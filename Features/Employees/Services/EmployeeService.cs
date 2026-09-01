@@ -148,17 +148,53 @@ public class EmployeeService
             throw new NotFoundException($"Employee with ID {request.EmployeeId} not found.");
         }
 
+        if (request.Amount < 0)
+            throw new BadRequestException("Salary payment amount cannot be negative.");
+
+        var now = Luxira.Api.Utils.Time.IstanbulTimeHelper.Now;
+        var periodFrom = (request.PeriodFrom ?? new DateTime(now.Year, now.Month, 1)).Date;
+        var periodTo = (request.PeriodTo ?? now.Date).Date;
+        if (periodTo < periodFrom)
+            throw new BadRequestException("Salary period end cannot be before its start.");
+
+        var salaryMonth = new DateTime(periodFrom.Year, periodFrom.Month, 1);
+        var duplicateExists = await _context.EmployeeSalaryPayments.AsNoTracking().AnyAsync(
+            payment => payment.EmployeeId == request.EmployeeId
+                && payment.SalaryMonth == salaryMonth
+                && payment.IsPaid
+                && !payment.IsDeleted
+                && !payment.IsPermanentlyDeleted,
+            ct);
+        if (duplicateExists)
+            throw new BadRequestException("This employee salary period has already been paid.");
+
+        var daysInMonth = DateTime.DaysInMonth(salaryMonth.Year, salaryMonth.Month);
+        var daysWorked = Math.Clamp((periodTo - periodFrom).Days + 1, 0, daysInMonth);
+        var currency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim();
+        if (currency.Length > 20) throw new BadRequestException("Currency is too long.");
+        var receiptNumber = $"SAL-{request.EmployeeId}-{salaryMonth:yyyyMM}-{Guid.NewGuid():N}";
+
         var payment = new EmployeeSalaryPayment
         {
             EmployeeId = request.EmployeeId,
-            Amount = request.Amount,
-            Notes = request.Notes,
+            SalaryMonth = salaryMonth,
+            PeriodFrom = periodFrom,
+            PeriodTo = periodTo,
+            MonthlySalary = employee.Salary,
+            DaysWorked = daysWorked,
+            DaysInMonth = daysInMonth,
+            EarnedSalary = request.Amount,
+            RemainingAmount = request.Amount,
+            ManualAdjustmentReason = request.Notes?.Trim(),
+            Currency = currency,
+            IsPaid = true,
+            PaidAt = now,
             PaidByUserId = userId,
-            PaymentDate = DateTime.UtcNow
+            ReceiptNumber = receiptNumber[..Math.Min(80, receiptNumber.Length)]
         };
 
         var created = await _repository.AddSalaryPaymentAsync(payment, ct);
-        return new SalaryPaymentDto(created.Id, created.EmployeeId, employee.Name, created.Amount, created.PaymentDate, created.Notes);
+        return MapSalaryPayment(created, employee.Name);
     }
 
     public async Task<List<SalaryPaymentDto>> GetSalaryPaymentsAsync(int? employeeId = null, CancellationToken ct = default)
@@ -168,9 +204,9 @@ public class EmployeeService
             p.Id,
             p.EmployeeId,
             p.Employee?.Name ?? string.Empty,
-            p.Amount,
-            p.PaymentDate,
-            p.Notes
+            p.RemainingAmount,
+            p.PaidAt ?? p.SalaryMonth,
+            p.ManualAdjustmentReason
         )).ToList();
     }
 
@@ -215,8 +251,10 @@ public class EmployeeService
                 .SumAsync(t => (decimal?)t.Amount, ct) ?? 0;
 
             decimal paidAmount = await _context.EmployeeSalaryPayments
-                .Where(p => p.EmployeeId == emp.Id && p.PaymentDate >= startDate && p.PaymentDate < endDate)
-                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0;
+                .Where(p => p.EmployeeId == emp.Id
+                    && p.SalaryMonth >= startDate && p.SalaryMonth < endDate
+                    && p.IsPaid && !p.IsDeleted && !p.IsPermanentlyDeleted)
+                .SumAsync(p => (decimal?)p.RemainingAmount, ct) ?? 0;
 
             decimal netDue = Math.Max(0, earnedSalary + bonuses - deductions - advances);
             decimal remaining = Math.Max(0, netDue - paidAmount);
@@ -241,6 +279,14 @@ public class EmployeeService
 
         return summaries;
     }
+
+    private static SalaryPaymentDto MapSalaryPayment(EmployeeSalaryPayment payment, string employeeName) => new(
+        payment.Id,
+        payment.EmployeeId,
+        employeeName,
+        payment.RemainingAmount,
+        payment.PaidAt ?? payment.SalaryMonth,
+        payment.ManualAdjustmentReason);
 
     public async Task<List<EmployeeBonusPaymentDto>> GetBonusPaymentsAsync(int? employeeId = null, CancellationToken ct = default)
     {
