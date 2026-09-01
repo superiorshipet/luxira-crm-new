@@ -11,14 +11,11 @@ public class ManufacturingCompanyDbConfig : IDbConfig<ManufacturingCompany>
     {
         builder.ToTable("ManufacturingCompanies");
         builder.HasKey(m => m.Id);
-        builder.Property(m => m.Name).HasMaxLength(100).IsRequired();
-        builder.Property(m => m.DisplayName).HasMaxLength(100);
-        builder.Property(m => m.Code).HasMaxLength(50);
-
-        builder.HasMany(m => m.Products)
-            .WithOne(p => p.ManufacturingCompany)
-            .HasForeignKey(p => p.ManufacturingCompanyId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.Property(m => m.Name).IsRequired();
+        builder.Property(m => m.ImageUrl).HasMaxLength(200);
+        builder.Property(m => m.ImageS3Key).HasMaxLength(450);
+        builder.Property(m => m.ImageUrl2S3Key).HasMaxLength(450);
+        builder.Property(m => m.InvoiceImageS3Key).HasMaxLength(450);
     }
 }
 
@@ -28,15 +25,12 @@ public class MainProductDbConfig : IDbConfig<MainProduct>
     {
         builder.ToTable("MainProducts");
         builder.HasKey(p => p.Id);
-        builder.Property(p => p.Name).HasMaxLength(150).IsRequired();
-        builder.Property(p => p.SKU).HasMaxLength(100);
-        builder.Property(p => p.DefaultPrice).HasPrecision(18, 2);
-        builder.Property(p => p.DefaultCost).HasPrecision(18, 2);
-
-        builder.HasMany(p => p.Images)
-            .WithOne(i => i.MainProduct)
-            .HasForeignKey(i => i.MainProductId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.Property(p => p.Name).IsRequired();
+        builder.Property(p => p.Price).HasPrecision(18, 2);
+        builder.Property(p => p.MaximumSellingPrice).HasPrecision(18, 2);
+        builder.Property(p => p.MinimumSellingPrice).HasPrecision(18, 2);
+        builder.Property(p => p.DeliveryPrice).HasPrecision(18, 2);
+        builder.Property(p => p.ImageS3Key).HasMaxLength(450);
     }
 }
 
@@ -67,7 +61,11 @@ public class StoreCodeFolderDbConfig : IDbConfig<StoreCodeFolder>
     {
         builder.ToTable("StoreCodeFolders");
         builder.HasKey(s => s.Id);
-        builder.Property(s => s.FolderName).HasMaxLength(100).IsRequired();
+        builder.Property(s => s.FolderName).HasMaxLength(150).IsRequired();
+        builder.Property(s => s.PageType).HasMaxLength(100).IsRequired();
+        builder.Property(s => s.CreatedByUserId).HasMaxLength(450);
+        builder.Property(s => s.UpdatedByUserId).HasMaxLength(450);
+        builder.Property(s => s.DeletedByUserId).HasMaxLength(450);
     }
 }
 

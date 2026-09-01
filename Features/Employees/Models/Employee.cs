@@ -205,7 +205,7 @@ public class ManagementRequest
 public class ScreenRecord
 {
     public int Id { get; set; }
-    public string EmployeeId { get; set; } = string.Empty;
+    public string? EmployeeId { get; set; }  // nullable in live DB
     public DateTime Date { get; set; }
     public DateTime StartTime { get; set; }
     public DateTime? EndTime { get; set; }
@@ -213,3 +213,4 @@ public class ScreenRecord
     public string? VideoS3Key { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+

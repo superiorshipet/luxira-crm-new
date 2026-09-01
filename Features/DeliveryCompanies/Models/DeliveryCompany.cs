@@ -28,6 +28,13 @@ public class DeliveryCompany
     public bool IsRepresentative { get; set; }
     public bool IsAllOrdersHidden { get; set; }
     public bool AutoConvertDeliveredToBalanceUpdated { get; set; }
+    public bool SupportsCashPayment { get; set; }
+    public bool SupportsBankTransferPayment { get; set; }
+    public bool ShowInPrepareForDelivery { get; set; }
+    public string? PrepareForDeliveryCountries { get; set; }
+    public bool AutoPullDeliveryInvoice { get; set; }
+    public bool AutoPullAccountingInvoice { get; set; }
+    public bool AutoPullCustomerInvoice { get; set; }
 
     public List<DeliveryCompanyPrice> Prices { get; set; } = new();
 }

@@ -23,6 +23,10 @@ public class InfrastructureModule : IModule
         // 1. AWS S3 Storage Service
         services.AddScoped<S3StorageService>();
 
+        // Cache
+        services.AddMemoryCache(opts => { opts.SizeLimit = 10_000; });
+        services.AddSingleton<Luxira.Api.Infrastructure.Caching.LuxiraCacheService>();
+
         // 2. WhatsApp Services (Lavva Cloud API + Infobip)
         services.AddHttpClient<LavvaWhatsAppService>(client =>
             client.Timeout = TimeSpan.FromSeconds(20));

@@ -2,13 +2,15 @@ using Luxira.Api.Core;
 using Luxira.Api.Data;
 using Luxira.Api.OpenApi;
 using Luxira.Api.Utils.Middlewares;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Database Context (SQL Server with InMemory support for Testing)
+// ─── Database Context ────────────────────────────────────────────────────────
+// Uses the existing DB schema — NO migrations are applied at startup.
+// The connection string points to a live SQL Server DB with all tables already created.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
@@ -16,8 +18,8 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
     if (builder.Environment.IsEnvironment("Testing") ||
         connectionString?.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase) == true)
     {
-        var dbName = connectionString?.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase) == true 
-            ? connectionString["InMemory:".Length..] 
+        var dbName = connectionString?.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase) == true
+            ? connectionString["InMemory:".Length..]
             : "LuxiraTestDb";
         options.UseInMemoryDatabase(dbName);
     }
@@ -29,11 +31,34 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
                 "ConnectionStrings:DefaultConnection is required outside Testing or an explicit InMemory configuration.");
         }
 
-        options.UseSqlServer(connectionString);
+        options
+            .UseSqlServer(connectionString, sqlOptions =>
+            {
+                // 30-second command timeout
+                sqlOptions.CommandTimeout(30);
+                // Auto-retry transient failures up to 3 times with 5s wait
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorNumbersToAdd: null);
+                // Use query splitting for large collection navigations (avoids cartesian explosion)
+                sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+            })
+            .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
+            .EnableDetailedErrors(builder.Environment.IsDevelopment())
+            // Global NoTracking — services that need tracking call .AsTracking() explicitly
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution);
     }
+}, poolSize: 128);  // Pool of 128 DB context instances for high concurrency
+
+// ─── In-Process Cache (lookup tables: delivery companies, stores, etc.) ──────
+builder.Services.AddMemoryCache(opts =>
+{
+    opts.SizeLimit = 10_000;          // Max 10 000 cache "size units"
+    opts.CompactionPercentage = 0.1;  // Remove 10% of entries when limit is hit
 });
 
-// Dynamic Discovery and Registration of all Feature Modules
+// ─── Dynamic Discovery: all IModule implementations ──────────────────────────
 var modules = typeof(Program).Assembly.GetTypes()
     .Where(t => typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
     .Select(t => (IModule)Activator.CreateInstance(t)!)
@@ -44,7 +69,7 @@ foreach (var module in modules)
     module.Register(builder.Services, builder.Configuration, builder.Environment);
 }
 
-// Controller & API Explorer Configuration
+// ─── Controllers & API Explorer ───────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -53,11 +78,17 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddLuxiraOpenApi();
+
+// ─── Response Compression ─────────────────────────────────────────────────────
 builder.Services.AddResponseCompression(options =>
 {
     options.EnableForHttps = true;
 });
 
+// ─── Response Caching (for public GET endpoints with [ResponseCache]) ─────────
+builder.Services.AddResponseCaching();
+
+// ─── Rate Limiting ────────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -76,6 +107,7 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
+// ─── CORS ─────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -104,13 +136,24 @@ builder.Services.AddCors(options =>
     });
 });
 
-var app = builder.Build();
+// ─── Health Checks ────────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>("database");
 
-// Global Exception Handling Middleware
+// ════════════════════════════════════════════════════════════════════════════════
+var app = builder.Build();
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Global Exception Handling
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Compression must come before response caching
 app.UseResponseCompression();
 
-// OpenAPI / Swagger Documentation
+// Response caching (respects [ResponseCache] attributes on controllers)
+app.UseResponseCaching();
+
+// OpenAPI / Swagger
 app.MapLuxiraOpenApi();
 
 app.UseRouting();
@@ -119,7 +162,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Configure Feature Modules
+// Configure Feature Modules (SignalR hubs, etc.)
 foreach (var module in modules)
 {
     module.Configure(app);
@@ -128,7 +171,9 @@ foreach (var module in modules)
 // Map all Feature Controllers
 app.MapControllers();
 
-app.Run();
+// Health endpoint
+app.MapHealthChecks("/health");
 
+app.Run();
 
 public partial class Program;
