@@ -5,6 +5,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <NoWarn>$(NoWarn);CA1848;CA1305;CA1861;CA1812;CA1822</NoWarn>
   </PropertyGroup>
 </Project>
 

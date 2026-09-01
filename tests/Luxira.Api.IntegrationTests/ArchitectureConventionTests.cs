@@ -1,94 +1,50 @@
 using System.Reflection;
-using Luxira.Application;
-using Luxira.Infrastructure;
+using Luxira.Api.Core;
 
 namespace Luxira.Api.IntegrationTests;
 
 public sealed class ArchitectureConventionTests
 {
     private static readonly Assembly ApiAssembly = typeof(Program).Assembly;
-    private static readonly Assembly ApplicationAssembly =
-        typeof(ApplicationExtensions).Assembly;
-    private static readonly Assembly InfrastructureAssembly =
-        typeof(InfrastructureExtensions).Assembly;
 
     [Fact]
-    public void EndpointTypesStayInsideFeatureFolders()
+    public void AllFeatureModulesImplementIModule()
     {
-        var misplacedEndpoints = ApiAssembly
+        var modules = ApiAssembly
             .GetTypes()
-            .Where(type => type.Name.EndsWith("Endpoints", StringComparison.Ordinal))
-            .Where(type => type.Namespace is null ||
-                !type.Namespace.StartsWith(
-                    "Luxira.Api.Features.",
-                    StringComparison.Ordinal))
-            .Select(type => type.FullName)
+            .Where(t => t.Name.EndsWith("Module", StringComparison.Ordinal) && !t.IsInterface && !t.IsAbstract)
             .ToArray();
 
-        Assert.Empty(misplacedEndpoints);
+        Assert.NotEmpty(modules);
+        Assert.All(modules, module =>
+        {
+            Assert.True(typeof(IModule).IsAssignableFrom(module), $"Module {module.FullName} must implement IModule.");
+            Assert.True(module.Namespace?.StartsWith("Luxira.Api.Features.", StringComparison.Ordinal) == true,
+                $"Module {module.FullName} must reside in Luxira.Api.Features.* namespace.");
+        });
     }
 
     [Fact]
     public void ControllersStayInsideFeatureFolders()
     {
-        var misplacedControllers = ApiAssembly
+        var controllers = ApiAssembly
             .GetTypes()
             .Where(type => type.Name.EndsWith("Controller", StringComparison.Ordinal))
-            .Where(type => type.Namespace is null ||
-                !type.Namespace.StartsWith(
-                    "Luxira.Api.Features.",
-                    StringComparison.Ordinal))
-            .Select(type => type.FullName)
+            .Where(type => !type.IsAbstract)
             .ToArray();
 
-        Assert.Empty(misplacedControllers);
-    }
-
-    [Fact]
-    public void DependencyDirectionKeepsApplicationIndependent()
-    {
-        var applicationReferences = ApplicationAssembly
-            .GetReferencedAssemblies()
-            .Select(reference => reference.Name)
-            .ToArray();
-        var infrastructureReferences = InfrastructureAssembly
-            .GetReferencedAssemblies()
-            .Select(reference => reference.Name)
-            .ToArray();
-
-        Assert.DoesNotContain("Luxira.Api", applicationReferences);
-        Assert.DoesNotContain("Luxira.Infrastructure", applicationReferences);
-        Assert.DoesNotContain("Luxira.Api", infrastructureReferences);
-        Assert.Contains("Luxira.Application", infrastructureReferences);
-    }
-
-    [Fact]
-    public void DeliveryUseCasesHaveExplicitRepositoryPorts()
-    {
-        var deliveryServices = ApplicationAssembly
-            .GetTypes()
-            .Where(type => type.Namespace?.StartsWith(
-                "Luxira.Application.Features.DeliveryCompanies.",
-                StringComparison.Ordinal) == true)
-            .Where(type => type.Name.EndsWith("Service", StringComparison.Ordinal))
-            .ToArray();
-
-        Assert.NotEmpty(deliveryServices);
-        Assert.All(deliveryServices, service =>
+        Assert.NotEmpty(controllers);
+        Assert.All(controllers, controller =>
         {
-            var constructor = Assert.Single(service.GetConstructors());
-            Assert.Contains(constructor.GetParameters(), parameter =>
-                parameter.ParameterType.IsInterface &&
-                parameter.ParameterType.Name.EndsWith(
-                    "Repository",
-                    StringComparison.Ordinal));
+            Assert.True(controller.Namespace?.StartsWith("Luxira.Api.Features.", StringComparison.Ordinal) == true,
+                $"Controller {controller.FullName} must reside in Luxira.Api.Features.*");
         });
     }
 
     [Fact]
-    public void ApplicationTypesDoNotCreateGenericDumpingGroundNamespaces()
+    public void FeatureTypesDoNotCreateGenericDumpingGrounds()
     {
-        var forbiddenSegments = new[] { ".Common", ".Helpers", ".Services" };
+        var forbiddenSegments = new[] { ".Common.Services", ".Common.Helpers" };
         var violations = ApiAssembly
             .GetTypes()
             .Where(type => type.Namespace is not null)

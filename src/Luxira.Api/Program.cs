@@ -1,68 +1,91 @@
-using Luxira.Api.Features.Platform;
+using Luxira.Api.Core;
+using Luxira.Api.Data;
+using Luxira.Api.OpenApi;
 using Luxira.Api.Features.ReferenceData.Countries;
 using Luxira.Api.Features.ReferenceData.FailureReasons;
 using Luxira.Api.Features.ReferenceData.OrderSources;
 using Luxira.Api.Features.ReferenceData.OrderStatuses;
-using Luxira.Api.Features.DeliveryCompanies.GetDeliveryPrice;
-using Luxira.Api.Features.DeliveryCompanies.ListDeliveryCompanies;
-using Luxira.Api.Features.DeliveryCompanies.ListDeliveryRepresentatives;
-using Luxira.Api.Features.DeliveryCompanies.ListDeliveryOptions;
-using Luxira.Api.Features.SearchKeywords.ListSearchKeywords;
-using Luxira.Api.Features.SearchKeywords.GetSearchKeywordOptions;
-using Luxira.Api.Features.Identity.GetUserProfile;
-using Luxira.Infrastructure;
-using Luxira.Api.Authentication;
-using Luxira.Api.OpenApi;
-using Luxira.ServiceDefaults;
-using Luxira.Application;
+using Luxira.Api.Utils.Middlewares;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddProblemDetails();
-builder.Services.AddHealthChecks();
-builder.Services.AddLuxiraOpenApi();
-builder.Services.AddLuxiraAuthentication();
-builder.Services.AddLuxiraApplication();
-builder.Services.AddLuxiraObservability(
-    builder.Configuration,
-    builder.Environment,
-    "Luxira.Api");
-builder.Services.AddLuxiraReadInfrastructure(
-    builder.Configuration,
-    builder.Environment);
-builder.Services.AddResponseCompression(options =>
-    options.EnableForHttps = true);
-builder.Services.AddOutputCache(options =>
+// Database Context (SQL Server with InMemory support for Testing)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.AddPolicy(
-        "ReferenceData",
-        policy => policy
-            .Expire(TimeSpan.FromHours(24))
-            .Tag("ReferenceData"));
+    if (builder.Environment.IsEnvironment("Testing") || string.IsNullOrEmpty(connectionString))
+    {
+        var dbName = connectionString?.StartsWith("InMemory:", StringComparison.Ordinal) == true 
+            ? connectionString["InMemory:".Length..] 
+            : "LuxiraTestDb";
+        options.UseInMemoryDatabase(dbName);
+    }
+    else
+    {
+        options.UseSqlServer(connectionString);
+    }
+});
+
+// Dynamic Discovery and Registration of all Feature Modules
+var modules = typeof(Program).Assembly.GetTypes()
+    .Where(t => typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
+    .Select(t => (IModule)Activator.CreateInstance(t)!)
+    .ToList();
+
+foreach (var module in modules)
+{
+    module.Register(builder.Services, builder.Configuration, builder.Environment);
+}
+
+// Controller & API Explorer Configuration
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddLuxiraOpenApi();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
 });
 
 var app = builder.Build();
 
-app.UseExceptionHandler();
-app.UseResponseCompression();
-app.UseHttpsRedirection();
+// Global Exception Handling Middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// OpenAPI / Swagger Documentation
+app.MapLuxiraOpenApi();
+
+app.UseRouting();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseOutputCache();
 
-app.MapLuxiraOpenApi();
-app.MapPlatformEndpoints();
+// Configure Feature Modules
+foreach (var module in modules)
+{
+    module.Configure(app);
+}
+
+// Reference Data Endpoints
 app.MapCountryController();
 app.MapFailureReasonController();
-app.MapOrderSourceEndpoints();
 app.MapOrderStatusEndpoints();
-app.MapDeliveryCompanyController();
-app.MapDeliveryRepresentativeController();
-app.MapDeliveryPriceController();
-app.MapDeliveryOptionController();
-app.MapSearchKeywordController();
-app.MapSearchKeywordOptionController();
-app.MapUserProfileController();
+app.MapOrderSourceEndpoints();
+
+// Map all Feature Controllers
+app.MapControllers();
 
 app.Run();
 
