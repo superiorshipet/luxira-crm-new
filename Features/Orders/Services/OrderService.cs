@@ -74,6 +74,11 @@ public partial class OrderService
         if (request.DeliveryCompanyId <= 0)
             throw new BadRequestException("يجب اختيار شركة توصيل صالحة.");
 
+        if (string.IsNullOrWhiteSpace(request.Address))
+            throw new BadRequestException("عنوان العميل مطلوب.");
+
+        var normalizedAddress = request.Address.Trim();
+
         if (request.OrderSource != 2 && string.IsNullOrWhiteSpace(request.ChatUrl))
             throw new BadRequestException("حقل رابط المحادثة مطلوب.");
 
@@ -91,8 +96,6 @@ public partial class OrderService
         {
             throw new BadRequestException("تم إرسال طلب لهذا الرقم قبل قليل، يرجى الانتظار 30 ثانية قبل إعادة المحاولة.");
         }
-        CreationThrottle[throttleKey] = now;
-
         var hasActiveOrder = await _context.Orders
             .AsNoTracking()
             .AnyAsync(o => o.TelephoneNumber == normalizedPhone
@@ -112,13 +115,13 @@ public partial class OrderService
 
         if (request.Items != null && request.Items.Count > 0)
         {
+            var minPrice = await _context.ProductMinimumSellingPrices
+                .Where(p => p.Country == request.Country)
+                .Select(p => p.MinimumPrice)
+                .FirstOrDefaultAsync(ct);
+
             foreach (var item in request.Items)
             {
-                var minPrice = await _context.ProductMinimumSellingPrices
-                    .Where(p => p.Country == request.Country)
-                    .Select(p => p.MinimumPrice)
-                    .FirstOrDefaultAsync(ct);
-
                 if (minPrice > 0 && item.Price < minPrice)
                 {
                     _logger.LogWarning("Order created below minimum price: {Price} < {MinPrice}", item.Price, minPrice);
@@ -126,114 +129,98 @@ public partial class OrderService
             }
         }
 
-        using var tx = await _context.Database.BeginTransactionAsync(ct);
+        var order = new Order
+        {
+            Country = request.Country,
+            State = request.State,
+            OrderSource = request.OrderSource,
+            SourceName = request.SourceName,
+            ManufacturingCompanyId = request.ManufacturingCompanyId,
+            DeliveryCompanyId = request.DeliveryCompanyId,
+            TelephoneNumber = normalizedPhone,
+            SecondTelephoneNumber = normalizedSecondPhone,
+            CustomerName = request.CustomerName.Trim(),
+            Notes = request.Notes,
+            Address = normalizedAddress,
+            TotalPrice = request.TotalPrice,
+            DeliveryPrice = request.DeliveryPrice,
+            CustomerDeliveryPrice = request.CustomerDeliveryPrice,
+            Chaturl = request.ChatUrl,
+            ApplicationUserId = userId,
+            OrderStatus = initialStatus,
+            CreatedDate = now,
+            LastEditedDate = now
+        };
+
+        if (request.Items != null)
+        {
+            foreach (var item in request.Items)
+            {
+                order.OrderWarehouses.Add(new OrderWarehouse
+                {
+                    WarehouseId = item.WarehouseId,
+                    Quantity = item.Quantity,
+                    Price = item.Price,
+                    Cost = item.Cost
+                });
+            }
+        }
+
+        order.StatusHistories.Add(new OrderStatusHistory
+        {
+            Status = initialStatus,
+            CreatedAt = now,
+            ApplicationUserId = userId,
+            Reason = "إنشاء الطلب في النظام",
+            Name = $"PreviousStatus:{initialStatus}",
+            IsHidden = false
+        });
+        order.EditHistories.Add(new OrderEditHistory
+        {
+            EditNumber = 1,
+            Country = order.Country,
+            State = order.State ?? string.Empty,
+            OrderSource = order.OrderSource,
+            SourceName = order.SourceName,
+            ManufacturingCompanyId = order.ManufacturingCompanyId,
+            DeliveryCompanyId = order.DeliveryCompanyId,
+            TelephoneNumber = order.TelephoneNumber,
+            SecondTelephoneNumber = order.SecondTelephoneNumber,
+            CustomerName = order.CustomerName,
+            Notes = order.Notes,
+            Address = order.Address,
+            CreatedDate = order.CreatedDate,
+            LastEditedDate = now,
+            OrderStatus = order.OrderStatus,
+            TotalPrice = order.TotalPrice,
+            ApplicationUserId = userId,
+            DeliveryPrice = order.DeliveryPrice,
+            Chaturl = order.Chaturl
+        });
+
+        await _context.Orders.AddAsync(order, ct);
+        await _context.SaveChangesAsync(ct);
+        CreationThrottle[throttleKey] = now;
+
         try
         {
-            var order = new Order
-            {
-                Country = request.Country,
-                State = request.State,
-                OrderSource = request.OrderSource,
-                SourceName = request.SourceName,
-                ManufacturingCompanyId = request.ManufacturingCompanyId,
-                DeliveryCompanyId = request.DeliveryCompanyId,
-                TelephoneNumber = normalizedPhone,
-                SecondTelephoneNumber = normalizedSecondPhone,
-                CustomerName = request.CustomerName.Trim(),
-                Notes = request.Notes,
-                Address = request.Address.Trim(),
-                TotalPrice = request.TotalPrice,
-                DeliveryPrice = request.DeliveryPrice,
-                CustomerDeliveryPrice = request.CustomerDeliveryPrice,
-                Chaturl = request.ChatUrl,
-                ApplicationUserId = userId,
-                OrderStatus = initialStatus,
-                CreatedDate = now,
-                LastEditedDate = now
-            };
-
-            if (request.Items != null && request.Items.Count > 0)
-            {
-                foreach (var item in request.Items)
-                {
-                    order.OrderWarehouses.Add(new OrderWarehouse
-                    {
-                        WarehouseId = item.WarehouseId,
-                        Quantity = item.Quantity,
-                        Price = item.Price,
-                        Cost = item.Cost
-                    });
-                }
-            }
-
-            await _context.Orders.AddAsync(order, ct);
-            await _context.SaveChangesAsync(ct);
-
-            var statusLog = new OrderStatusHistory
+            await _orderHub.Clients.Group("UsersExpectDelivery").SendAsync("OrderCreated", new
             {
                 OrderId = order.Id,
-                Status = initialStatus,
-                CreatedAt = now,
-                ApplicationUserId = userId,
-                Reason = "إنشاء الطلب في النظام",
-                Name = "إنشاء الطلب",
-                IsHidden = false
-            };
-            await _context.OrderStatusHistories.AddAsync(statusLog, ct);
-
-            var editLog = new OrderEditHistory
-            {
-                OrderId = order.Id,
-                EditNumber = 1,
-                Country = order.Country,
-                State = order.State ?? string.Empty,
-                OrderSource = order.OrderSource,
-                SourceName = order.SourceName,
-                ManufacturingCompanyId = order.ManufacturingCompanyId,
-                DeliveryCompanyId = order.DeliveryCompanyId,
-                TelephoneNumber = order.TelephoneNumber,
-                SecondTelephoneNumber = order.SecondTelephoneNumber,
-                CustomerName = order.CustomerName,
-                Notes = order.Notes,
-                Address = order.Address,
-                CreatedDate = order.CreatedDate,
-                LastEditedDate = now,
-                OrderStatus = order.OrderStatus,
-                TotalPrice = order.TotalPrice,
-                ApplicationUserId = userId,
-                DeliveryPrice = order.DeliveryPrice,
-                Chaturl = order.Chaturl
-            };
-            await _context.OrderEditHistories.AddAsync(editLog, ct);
-
-            await _context.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-
-            try
-            {
-                await _orderHub.Clients.Group("UsersExpectDelivery").SendAsync("OrderCreated", new
-                {
-                    OrderId = order.Id,
-                    order.CustomerName,
-                    order.TelephoneNumber,
-                    order.TotalPrice,
-                    order.OrderStatus,
-                    StatusName = OrderStatusCodes.GetDisplayName(order.OrderStatus),
-                    CreatedAt = now
-                }, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to broadcast OrderCreated event for Order {OrderId}", order.Id);
-            }
-
-            return MapToDto(order);
+                order.CustomerName,
+                order.TelephoneNumber,
+                order.TotalPrice,
+                order.OrderStatus,
+                StatusName = OrderStatusCodes.GetDisplayName(order.OrderStatus),
+                CreatedAt = now
+            }, ct);
         }
-        catch
+        catch (Exception ex)
         {
-            await tx.RollbackAsync(ct);
-            throw;
+            _logger.LogError(ex, "Failed to broadcast OrderCreated event for Order {OrderId}", order.Id);
         }
+
+        return MapToDto(order);
     }
 
     public async Task<OrderDto> UpdateOrderStatusAsync(
@@ -253,9 +240,27 @@ public partial class OrderService
         var previousStatus = order.OrderStatus;
         _statusTransitionPolicy.EnsureAllowed(order, request.NewStatus, request.Reason, actor);
 
+        if (previousStatus == request.NewStatus)
+        {
+            return MapToDto(order);
+        }
+
         var now = IstanbulTimeHelper.Now;
         order.OrderStatus = request.NewStatus;
         order.LastEditedDate = now;
+        order.Editedby = actor.UserId;
+
+        if (request.NewStatus == OrderStatusCodes.Delivered && !order.IsBonusPaidForEmployee)
+        {
+            var bonusConfig = await _context.OrderBonusConfigurations
+                .FirstOrDefaultAsync(
+                    config => config.Country == order.Country && config.IsActive,
+                    ct);
+            if (bonusConfig is not null && bonusConfig.BonusAmount > 0)
+            {
+                order.IsBonus = true;
+            }
+        }
 
         var history = new OrderStatusHistory
         {
@@ -263,8 +268,10 @@ public partial class OrderService
             Status = request.NewStatus,
             CreatedAt = now,
             ApplicationUserId = actor.UserId,
-            Reason = request.Reason ?? $"تغيير الحالة من {OrderStatusCodes.GetDisplayName(previousStatus)} إلى {OrderStatusCodes.GetDisplayName(request.NewStatus)}",
-            Name = actor.UserId,
+            Reason = CombineHistoryReason(
+                request.Reason ?? $"تغيير الحالة من {OrderStatusCodes.GetDisplayName(previousStatus)} إلى {OrderStatusCodes.GetDisplayName(request.NewStatus)}",
+                request.Note),
+            Name = $"PreviousStatus:{previousStatus}",
             IsHidden = false
         };
 
@@ -289,6 +296,13 @@ public partial class OrderService
         }
 
         return MapToDto(order);
+    }
+
+    private static string? CombineHistoryReason(string? reason, string? note)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return note?.Trim();
+        if (string.IsNullOrWhiteSpace(note)) return reason.Trim();
+        return $"{reason.Trim()} | {note.Trim()}";
     }
 
     public async Task<int> BatchUpdateOrderStatusAsync(
@@ -325,6 +339,11 @@ public partial class OrderService
         if (order == null)
             throw new NotFoundException($"Order with ID {orderId} was not found.");
 
+        var nextEditNumber = (await _context.OrderEditHistories
+            .Where(history => history.OrderId == order.Id)
+            .MaxAsync(history => (int?)history.EditNumber, ct) ?? 0) + 1;
+        var editHistory = CreateEditSnapshot(order, nextEditNumber, userId);
+
         var now = IstanbulTimeHelper.Now;
         switch (fieldName.ToLowerInvariant())
         {
@@ -334,6 +353,17 @@ public partial class OrderService
             case "telephonenumber": order.TelephoneNumber = newValue ?? string.Empty; break;
             case "secondtelephonenumber": order.SecondTelephoneNumber = newValue; break;
             case "state": order.State = newValue; break;
+            case "deliverycompanyid":
+                if (!int.TryParse(newValue, out var deliveryCompanyId) || deliveryCompanyId <= 0)
+                    throw new BadRequestException("Delivery company ID must be a positive integer.");
+                order.DeliveryCompanyId = deliveryCompanyId;
+                break;
+            case "totalprice":
+                if (!decimal.TryParse(newValue, out var totalPrice) || totalPrice < 0)
+                    throw new BadRequestException("Total price must be a non-negative number.");
+                order.TotalPrice = totalPrice;
+                break;
+            case "delegateemployeeid": order.DelegateEmployeeId = newValue; break;
             default:
                 throw new BadRequestException($"Unsupported field name '{fieldName}' for inline update.");
         }
@@ -341,6 +371,7 @@ public partial class OrderService
         order.LastEditedDate = now;
         order.Editedby = userId;
 
+        await _context.OrderEditHistories.AddAsync(editHistory, ct);
         await _context.SaveChangesAsync(ct);
         return MapToDto(order);
     }
@@ -358,6 +389,16 @@ public partial class OrderService
         if (order == null)
             throw new NotFoundException($"Order with ID {orderId} was not found.");
 
+        if (order.IsPaid)
+            return MapToDto(order);
+
+        var nextEditNumber = (await _context.OrderEditHistories
+            .Where(history => history.OrderId == order.Id)
+            .MaxAsync(history => (int?)history.EditNumber, ct) ?? 0) + 1;
+        await _context.OrderEditHistories.AddAsync(
+            CreateEditSnapshot(order, nextEditNumber, userId),
+            ct);
+
         order.IsPaid = true;
         order.LastEditedDate = IstanbulTimeHelper.Now;
         order.Editedby = userId;
@@ -365,6 +406,45 @@ public partial class OrderService
         await _context.SaveChangesAsync(ct);
         return MapToDto(order);
     }
+
+    private static OrderEditHistory CreateEditSnapshot(
+        Order order,
+        int editNumber,
+        string userId) =>
+        new()
+        {
+            OrderId = order.Id,
+            EditNumber = editNumber,
+            Country = order.Country,
+            State = order.State ?? string.Empty,
+            OrderSource = order.OrderSource,
+            SourceName = order.SourceName,
+            ManufacturingCompanyId = order.ManufacturingCompanyId,
+            DeliveryCompanyId = order.DeliveryCompanyId,
+            TelephoneNumber = order.TelephoneNumber,
+            SecondTelephoneNumber = order.SecondTelephoneNumber,
+            CustomerName = order.CustomerName,
+            Notes = order.Notes,
+            Address = order.Address,
+            CreatedDate = order.CreatedDate,
+            LastEditedDate = order.LastEditedDate,
+            FixedOrderDate = order.FixedOrderDate,
+            InstantAddedDate = order.InstantAddedDate,
+            OrderStatus = order.OrderStatus,
+            TotalPrice = order.TotalPrice,
+            ExternalOrderId = order.ExternalOrderId,
+            ApplicationUserId = order.ApplicationUserId ?? userId,
+            ExternalShipmentCode = order.CamexTrackingNumber?.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            FromComments = order.FromComments,
+            Gender = order.Gender,
+            IsPaid = order.IsPaid,
+            Editedby = userId,
+            FromOffers = false,
+            CampaignId = order.CampaignId,
+            DeliveryPrice = order.DeliveryPrice,
+            Chaturl = order.Chaturl,
+        };
 
     public async Task<List<OrderDto>> CheckDuplicatesAsync(string phoneNumber, CancellationToken ct = default)
     {
@@ -404,14 +484,14 @@ public partial class OrderService
         {
             if (digits.StartsWith("00964", StringComparison.Ordinal)) digits = digits[5..];
             else if (digits.StartsWith("964", StringComparison.Ordinal)) digits = digits[3..];
-            else if (digits.StartsWith("0", StringComparison.Ordinal)) digits = digits[1..];
+            else if (digits.StartsWith('0')) digits = digits[1..];
             return $"964{digits}";
         }
         else if (country == 2) // تركيا
         {
             if (digits.StartsWith("0090", StringComparison.Ordinal)) digits = digits[4..];
             else if (digits.StartsWith("90", StringComparison.Ordinal)) digits = digits[2..];
-            else if (digits.StartsWith("0", StringComparison.Ordinal)) digits = digits[1..];
+            else if (digits.StartsWith('0')) digits = digits[1..];
             return $"90{digits}";
         }
 

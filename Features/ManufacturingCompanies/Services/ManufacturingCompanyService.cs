@@ -29,13 +29,13 @@ public class ManufacturingCompanyService
 
         var entity = new ManufacturingCompany
         {
-            Name = request.Name,
-            DisplayName = request.DisplayName,
-            Code = request.Code,
-            Country = request.Country,
-            Notes = request.Notes,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            Name = request.Name.Trim(),
+            PhoneNumber = request.PhoneNumber?.Trim(),
+            MainWarehouseId = request.MainWarehouseId,
+            IsShown = request.IsShown,
+            ImageUrl = request.ImageUrl,
+            ImageUrl2 = request.ImageUrl2,
+            InvoiceImage = request.InvoiceImage
         };
 
         var created = await _repository.AddCompanyAsync(entity, ct);
@@ -48,13 +48,17 @@ public class ManufacturingCompanyService
         return list.Select(p => new ProductDto(
             p.Id,
             p.Name,
-            p.SKU,
-            p.DefaultPrice,
-            p.DefaultCost,
+            p.Country,
+            p.Price,
+            p.MinimumSellingPrice,
+            p.MaximumSellingPrice,
+            p.DeliveryPrice,
+            p.Quantity,
+            p.SaleType,
+            p.ImageUrl,
             p.ManufacturingCompanyId,
             p.ManufacturingCompany?.Name,
-            p.IsActive,
-            p.Images.Select(i => i.ImageUrl).ToList()
+            p.IsDeleted
         )).ToList();
     }
 
@@ -65,27 +69,62 @@ public class ManufacturingCompanyService
             throw new BadRequestException("Product name is required.");
         }
 
+        if (request.Country <= 0)
+            throw new BadRequestException("Country is required.");
+
+        if (request.ManufacturingCompanyId <= 0 ||
+            !await _repository.CompanyExistsAsync(request.ManufacturingCompanyId, ct))
+            throw new BadRequestException("Manufacturing company was not found.");
+
+        var minimumPrice = request.MinimumSellingPrice;
+        var maximumPrice = request.MaximumSellingPrice > 0
+            ? request.MaximumSellingPrice
+            : minimumPrice;
+        if (minimumPrice < 0 || maximumPrice < minimumPrice)
+            throw new BadRequestException("Maximum selling price must be greater than or equal to minimum selling price.");
+
+        var saleType = string.IsNullOrWhiteSpace(request.SaleType)
+            ? "بيع فردي"
+            : request.SaleType.Trim();
+        var normalizedName = request.Name.Trim();
+        if (await _repository.ActiveProductExistsAsync(
+                normalizedName,
+                request.Country,
+                request.ManufacturingCompanyId,
+                saleType,
+                ct))
+            throw new BadRequestException("The same product already exists for this country, store, and sale type.");
+
         var product = new MainProduct
         {
-            Name = request.Name,
-            SKU = request.SKU,
-            DefaultPrice = request.DefaultPrice,
-            DefaultCost = request.DefaultCost,
+            Name = normalizedName,
+            Country = request.Country,
+            Price = minimumPrice,
+            MinimumSellingPrice = minimumPrice,
+            MaximumSellingPrice = maximumPrice,
+            DeliveryPrice = Math.Max(0, request.DeliveryPrice),
+            Quantity = request.Quantity <= 0 ? 1 : request.Quantity,
+            SaleType = saleType,
             ManufacturingCompanyId = request.ManufacturingCompanyId,
-            IsActive = true
+            ImageUrl = request.ImageUrl,
+            IsDeleted = false
         };
 
         var created = await _repository.AddProductAsync(product, ct);
         return new ProductDto(
             created.Id,
             created.Name,
-            created.SKU,
-            created.DefaultPrice,
-            created.DefaultCost,
+            created.Country,
+            created.Price,
+            created.MinimumSellingPrice,
+            created.MaximumSellingPrice,
+            created.DeliveryPrice,
+            created.Quantity,
+            created.SaleType,
+            created.ImageUrl,
             created.ManufacturingCompanyId,
             null,
-            created.IsActive,
-            new List<string>()
+            created.IsDeleted
         );
     }
 
@@ -119,10 +158,12 @@ public class ManufacturingCompanyService
     private static ManufacturingCompanyDto MapToDto(ManufacturingCompany m) => new(
         m.Id,
         m.Name,
-        m.DisplayName,
-        m.Code,
-        m.Country,
-        m.Notes,
-        m.IsActive
+        m.ImageUrl,
+        m.IsShown,
+        m.InvoiceImage,
+        m.ImageUrl2,
+        m.PhoneNumber,
+        m.MainWarehouseId,
+        m.IsPasswordEmailStore
     );
 }

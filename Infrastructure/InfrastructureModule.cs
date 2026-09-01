@@ -47,14 +47,30 @@ public class InfrastructureModule : IModule
         services.AddSignalR();
 
         // 7. Hosted Background Services
-        var backgroundJobsEnabled = configuration
-            .GetValue<bool?>("BackgroundJobs:Enabled") ??
-            environment.IsProduction();
-        if (backgroundJobsEnabled)
+        // Jobs can mutate data or contact external recipients. They are opt-in per job
+        // so deploying the API never starts unrelated work by environment alone.
+        var backgroundJobsEnabled = configuration.GetValue<bool>("BackgroundJobs:Enabled");
+        if (backgroundJobsEnabled &&
+            configuration.GetValue<bool>("BackgroundJobs:DeliveredToBalanceEnabled"))
         {
             services.AddHostedService<DeliveredToBalanceAutoTransitionBackgroundService>();
+        }
+
+        if (backgroundJobsEnabled &&
+            configuration.GetValue<bool>("BackgroundJobs:PendingDownloadReminderEnabled"))
+        {
             services.AddHostedService<PendingDownloadReminderBackgroundService>();
+        }
+
+        if (backgroundJobsEnabled &&
+            configuration.GetValue<bool>("BackgroundJobs:StoreInvoiceDailyEmailEnabled"))
+        {
             services.AddHostedService<StoreInvoiceDailyEmailService>();
+        }
+
+        if (backgroundJobsEnabled &&
+            configuration.GetValue<bool>("BackgroundJobs:ScreenRecordCleanupEnabled"))
+        {
             services.AddHostedService<ScreenRecordCleanupService>();
         }
     }

@@ -24,15 +24,15 @@ public class ImageSearchController : ControllerBase
     {
         // Image search returns matching products
         var products = await _context.MainProducts
-            .Include(p => p.Images)
             .AsNoTracking()
+            .Where(product => !product.IsDeleted)
             .Take(10)
             .Select(p => new
             {
                 p.Id,
                 p.Name,
-                p.DefaultPrice,
-                imageUrl = p.Images.Select(i => i.ImageUrl).FirstOrDefault()
+                p.Price,
+                p.ImageUrl
             })
             .ToListAsync(ct);
 

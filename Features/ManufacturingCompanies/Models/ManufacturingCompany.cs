@@ -1,10 +1,8 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 namespace Luxira.Api.Features.ManufacturingCompanies.Models;
 
 /// <summary>
 /// Maps to the ManufacturingCompanies table in the live DB.
-/// Note: The live DB does NOT have DisplayName, Code, Notes, IsActive, or CreatedAt columns.
+/// Uses only columns and relationships that exist in the legacy schema.
 /// </summary>
 public class ManufacturingCompany
 {
@@ -21,18 +19,12 @@ public class ManufacturingCompany
     public string? ImageUrl2S3Key { get; set; }
     public string? InvoiceImageS3Key { get; set; }
 
-    [NotMapped] public string? DisplayName { get; set; }
-    [NotMapped] public string? Code { get; set; }
-    [NotMapped] public string? Notes { get; set; }
-    [NotMapped] public bool IsActive { get; set; } = true;
-    [NotMapped] public int Country { get; set; }
-    [NotMapped] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    [NotMapped] public List<MainProduct> Products { get; set; } = new();
+    public ICollection<MainProduct> Products { get; set; } = new List<MainProduct>();
 }
 
 /// <summary>
 /// Maps to the MainProducts table in the live DB.
-/// Note: The live DB does NOT have SKU, DefaultPrice, DefaultCost columns.
+/// Uses the legacy product pricing and soft-delete columns.
 /// </summary>
 public class MainProduct
 {
@@ -53,21 +45,29 @@ public class MainProduct
     public string? DeletedByName { get; set; }
     public string? DeletedByUserId { get; set; }
 
-    [NotMapped] public string? SKU { get; set; }
-    [NotMapped] public decimal DefaultPrice { get => Price; set => Price = value; }
-    [NotMapped] public decimal? DefaultCost { get; set; }
-    [NotMapped] public ManufacturingCompany? ManufacturingCompany { get; set; }
-    [NotMapped] public bool IsActive { get; set; } = true;
-    [NotMapped] public List<ProductImage> Images { get; set; } = new();
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
 }
 
+/// <summary>
+/// Legacy product-media catalogue. It is related to a store and product name,
+/// not to a MainProduct row.
+/// </summary>
 public class ProductImage
 {
     public int Id { get; set; }
-    public int MainProductId { get; set; }
     public string ImageUrl { get; set; } = string.Empty;
-    public string? S3Key { get; set; }
-    public bool IsPrimary { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public int ManufacturingCompanyId { get; set; }
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public string? CreatedByUserId { get; set; }
+    public bool IsPinned { get; set; }
+    public DateTime? PinnedAt { get; set; }
+    public string? PinnedByUserId { get; set; }
+    public string? PinnedByName { get; set; }
+    public int CopyCount { get; set; }
+    public DateTime? LastCopiedAt { get; set; }
+    public string? CreatedByName { get; set; }
 }
 
 public class ProductMinimumSellingPrice

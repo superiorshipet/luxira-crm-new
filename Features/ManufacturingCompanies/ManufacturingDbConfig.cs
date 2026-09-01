@@ -16,6 +16,10 @@ public class ManufacturingCompanyDbConfig : IDbConfig<ManufacturingCompany>
         builder.Property(m => m.ImageS3Key).HasMaxLength(450);
         builder.Property(m => m.ImageUrl2S3Key).HasMaxLength(450);
         builder.Property(m => m.InvoiceImageS3Key).HasMaxLength(450);
+        builder.HasMany(m => m.Products)
+            .WithOne(p => p.ManufacturingCompany)
+            .HasForeignKey(p => p.ManufacturingCompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -41,7 +45,11 @@ public class ProductImageDbConfig : IDbConfig<ProductImage>
         builder.ToTable("ProductImages");
         builder.HasKey(i => i.Id);
         builder.Property(i => i.ImageUrl).HasMaxLength(500).IsRequired();
-        builder.Property(i => i.S3Key).HasMaxLength(450);
+        builder.Property(i => i.ProductName).HasMaxLength(255).IsRequired();
+        builder.HasOne(i => i.ManufacturingCompany)
+            .WithMany()
+            .HasForeignKey(i => i.ManufacturingCompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

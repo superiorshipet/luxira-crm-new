@@ -45,9 +45,7 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
                 sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
             })
             .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
-            .EnableDetailedErrors(builder.Environment.IsDevelopment())
-            // Global NoTracking — services that need tracking call .AsTracking() explicitly
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution);
+            .EnableDetailedErrors(builder.Environment.IsDevelopment());
     }
 }, poolSize: 128);  // Pool of 128 DB context instances for high concurrency
 

@@ -69,7 +69,7 @@ public class EmployeeController : ControllerBase
     [HttpGet("/Employee/EmployeeStores")]
     public async Task<IActionResult> EmployeeStores(CancellationToken ct)
     {
-        var stores = await _context.ManufacturingCompanies.Where(m => m.IsActive).Select(m => new { m.Id, m.Name }).ToListAsync(ct);
+        var stores = await _context.ManufacturingCompanies.Where(m => m.IsShown).Select(m => new { m.Id, m.Name }).ToListAsync(ct);
         return Ok(stores);
     }
 

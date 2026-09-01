@@ -1,5 +1,4 @@
 using Luxira.Api.Data;
-using Luxira.Api.Infrastructure.S3;
 using Luxira.Api.Utils.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,7 +60,10 @@ public class ScreenRecordCleanupService : BackgroundService
         {
             db.ScreenRecords.RemoveRange(oldRecords);
             await db.SaveChangesAsync(ct);
-            _logger.LogInformation("Cleaned up {Count} expired screen records.", oldRecords.Count);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Cleaned up {Count} expired screen records.", oldRecords.Count);
+            }
         }
     }
 }

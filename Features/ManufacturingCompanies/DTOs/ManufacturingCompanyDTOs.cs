@@ -3,39 +3,51 @@ namespace Luxira.Api.Features.ManufacturingCompanies.DTOs;
 public record ManufacturingCompanyDto(
     int Id,
     string Name,
-    string? DisplayName,
-    string? Code,
-    int Country,
-    string? Notes,
-    bool IsActive
+    string? ImageUrl,
+    bool IsShown,
+    string? InvoiceImage,
+    string? ImageUrl2,
+    string? PhoneNumber,
+    int? MainWarehouseId,
+    bool IsPasswordEmailStore
 );
 
 public record CreateManufacturingCompanyRequest(
     string Name,
-    string? DisplayName,
-    string? Code,
-    int Country,
-    string? Notes
+    string? PhoneNumber = null,
+    int? MainWarehouseId = null,
+    bool IsShown = true,
+    string? ImageUrl = null,
+    string? ImageUrl2 = null,
+    string? InvoiceImage = null
 );
 
 public record ProductDto(
     int Id,
     string Name,
-    string? SKU,
-    decimal DefaultPrice,
-    decimal? DefaultCost,
+    int Country,
+    decimal Price,
+    decimal MinimumSellingPrice,
+    decimal MaximumSellingPrice,
+    decimal DeliveryPrice,
+    int Quantity,
+    string SaleType,
+    string? ImageUrl,
     int ManufacturingCompanyId,
     string? ManufacturingCompanyName,
-    bool IsActive,
-    IReadOnlyList<string> ImageUrls
+    bool IsDeleted
 );
 
 public record CreateProductRequest(
     string Name,
-    string? SKU,
-    decimal DefaultPrice,
-    decimal? DefaultCost,
-    int ManufacturingCompanyId
+    int Country,
+    decimal MinimumSellingPrice,
+    decimal MaximumSellingPrice,
+    decimal DeliveryPrice,
+    int Quantity,
+    string? SaleType,
+    int ManufacturingCompanyId,
+    string? ImageUrl = null
 );
 
 public record ProductMinimumPriceDto(

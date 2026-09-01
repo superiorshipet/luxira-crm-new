@@ -19,12 +19,12 @@ public class ManufacturingCompanyRepository
 
         if (countryId.HasValue && countryId.Value > 0)
         {
-            query = query.Where(m => m.Country == countryId.Value);
+            query = query.Where(m => m.Products.Any(p => !p.IsDeleted && p.Country == countryId.Value));
         }
 
         if (isActive.HasValue)
         {
-            query = query.Where(m => m.IsActive == isActive.Value);
+            query = query.Where(m => m.IsShown == isActive.Value);
         }
 
         return await query.OrderBy(m => m.Name).ToListAsync(ct);
@@ -34,7 +34,6 @@ public class ManufacturingCompanyRepository
     {
         return await _context.ManufacturingCompanies
             .Include(m => m.Products)
-            .ThenInclude(p => p.Images)
             .FirstOrDefaultAsync(m => m.Id == id, ct);
     }
 
@@ -49,8 +48,8 @@ public class ManufacturingCompanyRepository
     {
         var query = _context.MainProducts
             .Include(p => p.ManufacturingCompany)
-            .Include(p => p.Images)
             .AsNoTracking()
+            .Where(p => !p.IsDeleted)
             .AsQueryable();
 
         if (companyId.HasValue && companyId.Value > 0)
@@ -65,7 +64,6 @@ public class ManufacturingCompanyRepository
     {
         return await _context.MainProducts
             .Include(p => p.ManufacturingCompany)
-            .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
     }
 
@@ -75,6 +73,23 @@ public class ManufacturingCompanyRepository
         await _context.SaveChangesAsync(ct);
         return result.Entity;
     }
+
+    public Task<bool> CompanyExistsAsync(int companyId, CancellationToken ct = default) =>
+        _context.ManufacturingCompanies.AsNoTracking().AnyAsync(company => company.Id == companyId, ct);
+
+    public Task<bool> ActiveProductExistsAsync(
+        string name,
+        int country,
+        int companyId,
+        string saleType,
+        CancellationToken ct = default) =>
+        _context.MainProducts.AsNoTracking().AnyAsync(
+            product => !product.IsDeleted
+                && product.Name == name
+                && product.Country == country
+                && product.ManufacturingCompanyId == companyId
+                && product.SaleType == saleType,
+            ct);
 
     public async Task<List<ProductMinimumSellingPrice>> GetMinimumPricesAsync(int? productId = null, int? countryId = null, CancellationToken ct = default)
     {

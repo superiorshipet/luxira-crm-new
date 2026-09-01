@@ -476,7 +476,7 @@ public class OrderController : ControllerBase
         }
         if (field.Equals("store", StringComparison.OrdinalIgnoreCase))
         {
-            var stores = await _context.ManufacturingCompanies.Where(m => m.IsActive).Select(m => new { m.Id, m.Name }).ToListAsync(ct);
+            var stores = await _context.ManufacturingCompanies.Where(m => m.IsShown).Select(m => new { m.Id, m.Name }).ToListAsync(ct);
             return Ok(stores);
         }
         return Ok(new List<string>());

@@ -4,12 +4,14 @@ using Luxira.Api.Utils.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Luxira.Api.Utils.Extensions;
+using Luxira.Api.Utils.Time;
 
 namespace Luxira.Api.Features.ManufacturingCompanies.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("api/v1/manufacturing-companies/products/{productId:int}/images")]
+[Route("api/v1/product-images")]
 [Route("ProductImages")]
 public class ProductImagesController : ControllerBase
 {
@@ -20,13 +22,23 @@ public class ProductImagesController : ControllerBase
         _context = context;
     }
 
-    [HttpGet]
+    [HttpGet("by-product/{productId:int}")]
     [HttpGet("/ProductImages/GetImages/{productId:int}")]
-    public async Task<ActionResult<List<ProductImage>>> GetProductImages([FromRoute] int productId, CancellationToken ct)
+    public async Task<ActionResult<List<ProductImage>>> GetProductImages(
+        [FromRoute] int productId,
+        CancellationToken ct)
     {
+        var product = await _context.MainProducts.AsNoTracking()
+            .Where(item => item.Id == productId)
+            .Select(item => new { item.Name, item.ManufacturingCompanyId })
+            .FirstOrDefaultAsync(ct);
+        if (product is null) throw new NotFoundException("Product not found.");
+
         var images = await _context.ProductImages
             .AsNoTracking()
-            .Where(img => img.MainProductId == productId)
+            .Where(image => image.ManufacturingCompanyId == product.ManufacturingCompanyId
+                && image.ProductName == product.Name)
+            .OrderByDescending(image => image.CreatedAt)
             .ToListAsync(ct);
 
         return Ok(images);
@@ -36,12 +48,22 @@ public class ProductImagesController : ControllerBase
     [HttpPost("/ProductImages/AddImage")]
     public async Task<ActionResult<ProductImage>> AddImage([FromBody] AddProductImageRequest request, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(request.ImageUrl))
+            throw new BadRequestException("Image URL is required.");
+        if (string.IsNullOrWhiteSpace(request.ProductName))
+            throw new BadRequestException("Product name is required.");
+        if (!await _context.ManufacturingCompanies.AsNoTracking()
+                .AnyAsync(company => company.Id == request.ManufacturingCompanyId, ct))
+            throw new NotFoundException("Manufacturing company not found.");
+
         var img = new ProductImage
         {
-            MainProductId = request.ProductId,
-            ImageUrl = request.ImageUrl,
-            S3Key = request.S3Key,
-            IsPrimary = request.IsPrimary
+            ImageUrl = request.ImageUrl.Trim(),
+            ProductName = request.ProductName.Trim(),
+            ManufacturingCompanyId = request.ManufacturingCompanyId,
+            CreatedAt = IstanbulTimeHelper.Now,
+            CreatedByUserId = User.GetUserId(),
+            CreatedByName = User.Identity?.Name
         };
 
         await _context.ProductImages.AddAsync(img, ct);
@@ -51,4 +73,4 @@ public class ProductImagesController : ControllerBase
     }
 }
 
-public record AddProductImageRequest(int ProductId, string ImageUrl, string? S3Key, bool IsPrimary);
+public record AddProductImageRequest(string ProductName, int ManufacturingCompanyId, string ImageUrl);
