@@ -38,10 +38,10 @@ public class WhatsAppDashboardController : ControllerBase
         var query = _context.Set<WhatsAppMessage>().AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(phone))
         {
-            query = query.Where(m => m.PhoneNumber.Contains(phone));
+            query = query.Where(message => message.RecipientPhoneNumber.Contains(phone));
         }
 
-        var list = await query.OrderByDescending(m => m.Timestamp).Take(100).ToListAsync(ct);
+        var list = await query.OrderByDescending(message => message.CreatedAt).Take(100).ToListAsync(ct);
         return Ok(list);
     }
 
@@ -54,12 +54,13 @@ public class WhatsAppDashboardController : ControllerBase
 
         var msg = new WhatsAppMessage
         {
-            PhoneNumber = request.PhoneNumber,
-            Message = request.Message,
-            Direction = "Outbound",
-            Status = sendResult ? "Delivered" : "Sent",
             OrderId = request.OrderId,
-            Timestamp = IstanbulTimeHelper.Now
+            RecipientPhoneNumber = request.PhoneNumber,
+            EventType = request.OrderId.HasValue ? 2 : 1,
+            Success = sendResult,
+            Skipped = false,
+            ErrorMessage = sendResult ? null : "Provider did not confirm the send operation.",
+            CreatedAt = IstanbulTimeHelper.Now
         };
 
         await _context.Set<WhatsAppMessage>().AddAsync(msg, ct);

@@ -27,8 +27,8 @@ public class AdminNotificationsController : ControllerBase
         var currentUserId = User.GetUserId();
         var list = await _context.Set<AdminNotification>()
             .AsNoTracking()
-            .Where(n => n.TargetUserId == null || n.TargetUserId == currentUserId)
-            .OrderByDescending(n => n.CreatedAt)
+            .Where(notification => notification.RecipientUserId == currentUserId)
+            .OrderByDescending(notification => notification.CreatedAt)
             .Take(50)
             .ToListAsync(ct);
 

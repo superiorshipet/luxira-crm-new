@@ -13,24 +13,33 @@ public class HelpCenterChatMessage
 
 public class WhatsAppMessage
 {
-    public int Id { get; set; }
-    public string PhoneNumber { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public string Direction { get; set; } = "Outbound"; // Inbound, Outbound
-    public string Status { get; set; } = "Sent"; // Sent, Delivered, Read, Failed
+    public long Id { get; set; }
+    public int? AccountId { get; set; }
+    public int? TemplateId { get; set; }
     public int? OrderId { get; set; }
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public string RecipientPhoneNumber { get; set; } = string.Empty;
+    public int EventType { get; set; }
+    public int? OrderStatus { get; set; }
+    public bool Success { get; set; }
+    public bool Skipped { get; set; }
+    public string? ProviderMessageId { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class AdminNotification
 {
     public int Id { get; set; }
-    public string Title { get; set; } = string.Empty;
+    public string RecipientUserId { get; set; } = string.Empty;
+    public int? RecipientEmployeeId { get; set; }
+    public string RecipientName { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
-    public string? Type { get; set; } = "Info"; // Info, Warning, Alert, Order
-    public string? TargetUserId { get; set; }
+    public string CreatedByAdminUserId { get; set; } = string.Empty;
+    public string CreatedByAdminName { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public bool IsRead { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTimeOffset? ReadAt { get; set; }
+    public string IconUrl { get; set; } = string.Empty;
 }
 
 public class ConferenceMeeting

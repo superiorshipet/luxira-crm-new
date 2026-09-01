@@ -9,10 +9,15 @@ public class SearchKeywordDbConfig : IDbConfig<SearchKeywordOption>
 {
     public void Configure(EntityTypeBuilder<SearchKeywordOption> builder)
     {
-        builder.ToTable("SearchKeywordOptions");
+        builder.ToTable("HomeSearchKeywords");
         builder.HasKey(s => s.Id);
-        builder.Property(s => s.Keyword).HasMaxLength(150).IsRequired();
-        builder.Property(s => s.TargetType).HasMaxLength(50);
-        builder.Property(s => s.Category).HasMaxLength(100);
+        builder.Property(s => s.Phrase).HasMaxLength(250).IsRequired();
+        builder.Property(s => s.NormalizedPhrase).HasMaxLength(250).IsRequired();
+        builder.Property(s => s.TargetType).HasMaxLength(50).IsRequired();
+        builder.Property(s => s.TargetValue).HasMaxLength(150).IsRequired();
+        builder.Property(s => s.DisplayLabel).HasMaxLength(200);
+        builder.Property(s => s.Category).HasMaxLength(100).IsRequired();
+        builder.Property(s => s.CreatedBy).HasMaxLength(128);
+        builder.Property(s => s.UpdatedBy).HasMaxLength(128);
     }
 }

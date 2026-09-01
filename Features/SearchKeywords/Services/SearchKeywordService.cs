@@ -24,12 +24,12 @@ public class SearchKeywordService
         var items = await _repository.SearchAsync(search, targetType, category, isActive, ct);
         var records = items.Select(k => new SearchKeywordRecord(
             k.Id,
-            k.Keyword,
+            k.Phrase,
             k.TargetType,
             k.Category,
             k.TargetValue,
             k.IsActive,
-            k.SortOrder
+            0
         )).ToList();
 
         return new SearchKeywordListResult(records, records.Count);
@@ -65,23 +65,36 @@ public class SearchKeywordService
 
         var entity = new SearchKeywordOption
         {
-            Keyword = request.Keyword,
-            TargetType = request.TargetType,
-            Category = request.Category,
-            TargetValue = request.TargetValue,
-            SortOrder = request.SortOrder,
-            IsActive = true
+            Phrase = request.Keyword.Trim(),
+            NormalizedPhrase = NormalizePhrase(request.Keyword),
+            TargetType = request.TargetType?.Trim() ?? "OrderStatus",
+            Category = request.Category?.Trim() ?? "عام",
+            TargetValue = request.TargetValue?.Trim() ?? string.Empty,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
         };
 
         var created = await _repository.AddAsync(entity, ct);
         return new SearchKeywordRecord(
             created.Id,
-            created.Keyword,
+            created.Phrase,
             created.TargetType,
             created.Category,
             created.TargetValue,
             created.IsActive,
-            created.SortOrder
+            0
         );
     }
+
+    private static string NormalizePhrase(string value) =>
+        value.Trim().ToLowerInvariant()
+            .Replace('أ', 'ا')
+            .Replace('إ', 'ا')
+            .Replace('آ', 'ا')
+            .Replace('ة', 'ه')
+            .Replace('ى', 'ي')
+            .Replace('ؤ', 'و')
+            .Replace('ئ', 'ي')
+            .Replace("ـ", string.Empty)
+            .Replace("  ", " ");
 }

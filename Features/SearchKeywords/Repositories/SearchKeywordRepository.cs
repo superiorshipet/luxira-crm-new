@@ -24,7 +24,7 @@ public class SearchKeywordRepository
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(k => k.Keyword.Contains(search));
+            query = query.Where(keyword => keyword.Phrase.Contains(search));
         }
 
         if (!string.IsNullOrWhiteSpace(targetType))
@@ -42,7 +42,7 @@ public class SearchKeywordRepository
             query = query.Where(k => k.IsActive == isActive.Value);
         }
 
-        return await query.OrderBy(k => k.SortOrder).ThenBy(k => k.Keyword).ToListAsync(ct);
+        return await query.OrderBy(keyword => keyword.Category).ThenBy(keyword => keyword.Phrase).ToListAsync(ct);
     }
 
     public async Task<SearchKeywordOption> AddAsync(SearchKeywordOption option, CancellationToken ct = default)
