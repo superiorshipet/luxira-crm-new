@@ -32,8 +32,8 @@ public class EmployeeActivityController : ControllerBase
 
         var sessions = await _context.EmployeeAttendanceLogs
             .Include(a => a.Employee)
-            .Where(a => a.CheckIn >= from && a.CheckIn <= to)
-            .OrderByDescending(a => a.CheckIn)
+            .Where(a => a.CheckInAt >= from && a.CheckInAt <= to)
+            .OrderByDescending(a => a.CheckInAt)
             .AsNoTracking()
             .ToListAsync(ct);
 

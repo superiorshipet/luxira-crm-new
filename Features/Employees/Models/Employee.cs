@@ -31,12 +31,31 @@ public class Employee
 public class EmployeeAttendanceLog
 {
     public int Id { get; set; }
-    public int EmployeeId { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public int? EmployeeId { get; set; }
     public Employee? Employee { get; set; }
-    public DateTime CheckIn { get; set; }
-    public DateTime? CheckOut { get; set; }
-    public string? IpAddress { get; set; }
-    public string? Note { get; set; }
+    public string? EmployeeEmail { get; set; }
+    public string? EmployeeName { get; set; }
+    public DateTime CheckInAt { get; set; }
+    public DateTime? CheckOutAt { get; set; }
+    public string? FaceImagePath { get; set; }
+    public string? FaceImageS3Key { get; set; }
+    public string? CheckOutFaceImagePath { get; set; }
+    public string? CheckOutFaceImageS3Key { get; set; }
+    public string? CheckInIpAddress { get; set; }
+    public string? CheckInLocation { get; set; }
+    public string? CheckOutIpAddress { get; set; }
+    public string? CheckOutLocation { get; set; }
+    public decimal? SalaryAtCheckIn { get; set; }
+    public decimal? DeductionAmount { get; set; }
+    public string? DeductionReason { get; set; }
+    public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public int? ShiftId { get; set; }
+    public DateTime? ShiftStartAt { get; set; }
+    public DateTime? ShiftEndAt { get; set; }
+    public DateTime? BreakStartAt { get; set; }
 }
 
 public class EmployeeWorkShift
@@ -44,10 +63,22 @@ public class EmployeeWorkShift
     public int Id { get; set; }
     public int EmployeeId { get; set; }
     public Employee? Employee { get; set; }
-    public string ShiftName { get; set; } = string.Empty;
-    public TimeSpan StartTime { get; set; }
-    public TimeSpan EndTime { get; set; }
-    public int DayOfWeek { get; set; }
+    public TimeSpan ShiftStartTime { get; set; }
+    public TimeSpan ShiftEndTime { get; set; }
+    public string? AllowedIpAddress { get; set; }
+    public string? Notes { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsLoginBlocked { get; set; }
+    public DateTime? LoginBlockedAt { get; set; }
+    public string? LoginBlockReason { get; set; }
+    public DateTime? AdminUnblockedUntil { get; set; }
+    public DateTime? AdminUnblockedAt { get; set; }
+    public string? AdminUnblockedByUserId { get; set; }
+    public int BreakDurationMinutes { get; set; } = 30;
+    public TimeSpan? ScheduledBreakStart { get; set; }
+    public TimeSpan? ScheduledBreakEnd { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
 
 public class EmployeeActivityLog
@@ -120,16 +151,6 @@ public class EmployeeTransaction
     public string? Note { get; set; }
 }
 
-public class EmployeeBreak
-{
-    public int Id { get; set; }
-    public int EmployeeId { get; set; }
-    public Employee? Employee { get; set; }
-    public DateTime StartTime { get; set; } = DateTime.UtcNow;
-    public DateTime? EndTime { get; set; }
-    public string? Reason { get; set; }
-}
-
 public class EmployeeViolation
 {
     public int Id { get; set; }
@@ -192,4 +213,3 @@ public class ScreenRecord
     public string? VideoS3Key { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
-

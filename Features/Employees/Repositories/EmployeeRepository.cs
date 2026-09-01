@@ -80,10 +80,10 @@ public class EmployeeRepository
         {
             var dayStart = date.Value.Date;
             var dayEnd = dayStart.AddDays(1);
-            query = query.Where(a => a.CheckIn >= dayStart && a.CheckIn < dayEnd);
+            query = query.Where(a => a.CheckInAt >= dayStart && a.CheckInAt < dayEnd);
         }
 
-        return await query.OrderByDescending(a => a.CheckIn).ToListAsync(ct);
+        return await query.OrderByDescending(a => a.CheckInAt).ToListAsync(ct);
     }
 
     public async Task<EmployeeSalaryPayment> AddSalaryPaymentAsync(EmployeeSalaryPayment payment, CancellationToken ct = default)

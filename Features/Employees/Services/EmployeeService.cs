@@ -91,14 +91,19 @@ public class EmployeeService
 
         var log = new EmployeeAttendanceLog
         {
+            UserId = employee.ApplicationUserId ??
+                throw new BadRequestException("Employee is not linked to an application user."),
             EmployeeId = request.EmployeeId,
-            CheckIn = DateTime.UtcNow,
-            IpAddress = ipAddress,
-            Note = request.Note
+            EmployeeName = employee.Name,
+            CheckInAt = DateTime.UtcNow,
+            CheckInIpAddress = ipAddress,
+            Notes = request.Note,
+            SalaryAtCheckIn = employee.Salary,
+            CreatedAt = DateTime.UtcNow
         };
 
         var created = await _repository.AddAttendanceLogAsync(log, ct);
-        return new AttendanceLogDto(created.Id, created.EmployeeId, employee.Name, created.CheckIn, created.CheckOut, created.Note);
+        return new AttendanceLogDto(created.Id, created.EmployeeId ?? 0, employee.Name, created.CheckInAt, created.CheckOutAt, created.Notes);
     }
 
     public async Task<AttendanceLogDto> CheckOutAsync(CheckOutRequest request, CancellationToken ct = default)
@@ -109,15 +114,17 @@ public class EmployeeService
             throw new NotFoundException($"Attendance log with ID {request.AttendanceLogId} not found.");
         }
 
-        log.CheckOut = DateTime.UtcNow;
+        log.CheckOutAt = DateTime.UtcNow;
         if (!string.IsNullOrWhiteSpace(request.Note))
         {
-            log.Note = string.IsNullOrEmpty(log.Note) ? request.Note : $"{log.Note} | {request.Note}";
+            log.Notes = string.IsNullOrEmpty(log.Notes) ? request.Note : $"{log.Notes} | {request.Note}";
         }
 
         await _repository.UpdateAttendanceLogAsync(log, ct);
-        var employee = await _repository.GetByIdAsync(log.EmployeeId, ct);
-        return new AttendanceLogDto(log.Id, log.EmployeeId, employee?.Name ?? string.Empty, log.CheckIn, log.CheckOut, log.Note);
+        var employee = log.EmployeeId.HasValue
+            ? await _repository.GetByIdAsync(log.EmployeeId.Value, ct)
+            : null;
+        return new AttendanceLogDto(log.Id, log.EmployeeId ?? 0, employee?.Name ?? log.EmployeeName ?? string.Empty, log.CheckInAt, log.CheckOutAt, log.Notes);
     }
 
     public async Task<List<AttendanceLogDto>> GetAttendanceLogsAsync(int? employeeId = null, DateTime? date = null, CancellationToken ct = default)
@@ -125,11 +132,11 @@ public class EmployeeService
         var logs = await _repository.GetAttendanceLogsAsync(employeeId, date, ct);
         return logs.Select(l => new AttendanceLogDto(
             l.Id,
-            l.EmployeeId,
+            l.EmployeeId ?? 0,
             l.Employee?.Name ?? string.Empty,
-            l.CheckIn,
-            l.CheckOut,
-            l.Note
+            l.CheckInAt,
+            l.CheckOutAt,
+            l.Notes
         )).ToList();
     }
 
@@ -185,8 +192,8 @@ public class EmployeeService
         foreach (var emp in employees)
         {
             var attendedDays = await _context.EmployeeAttendanceLogs
-                .Where(a => a.EmployeeId == emp.Id && a.CheckIn >= startDate && a.CheckIn < endDate)
-                .Select(a => a.CheckIn.Date)
+                .Where(a => a.EmployeeId == emp.Id && a.CheckInAt >= startDate && a.CheckInAt < endDate)
+                .Select(a => a.CheckInAt.Date)
                 .Distinct()
                 .CountAsync(ct);
 

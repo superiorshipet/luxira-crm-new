@@ -99,8 +99,8 @@ public class AttendanceController : ControllerBase
         var today = IstanbulTimeHelper.Now.Date;
         var logs = await _context.EmployeeAttendanceLogs
             .Include(a => a.Employee)
-            .Where(a => a.CheckIn >= today)
-            .OrderByDescending(a => a.CheckIn)
+            .Where(a => a.CheckInAt >= today)
+            .OrderByDescending(a => a.CheckInAt)
             .Take(50)
             .AsNoTracking()
             .ToListAsync(ct);
@@ -122,7 +122,7 @@ public class AttendanceController : ControllerBase
         var today = IstanbulTimeHelper.Now.Date;
         var logs = await _context.EmployeeAttendanceLogs
             .Include(a => a.Employee)
-            .Where(a => a.CheckIn >= today && a.CheckIn.TimeOfDay > new TimeSpan(9, 30, 0))
+            .Where(a => a.CheckInAt >= today && a.CheckInAt.TimeOfDay > new TimeSpan(9, 30, 0))
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -135,7 +135,7 @@ public class AttendanceController : ControllerBase
     {
         var today = IstanbulTimeHelper.Now.Date;
         var checkedInEmpIds = await _context.EmployeeAttendanceLogs
-            .Where(a => a.CheckIn >= today)
+            .Where(a => a.CheckInAt >= today)
             .Select(a => a.EmployeeId)
             .Distinct()
             .ToListAsync(ct);

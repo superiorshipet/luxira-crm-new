@@ -35,10 +35,8 @@ public class ShiftAccessController : ControllerBase
 
         var now = IstanbulTimeHelper.Now;
         var currentTime = now.TimeOfDay;
-        var dayOfWeek = (int)now.DayOfWeek;
-
         var shifts = await _context.EmployeeWorkShifts
-            .Where(s => s.EmployeeId == employee.Id && s.DayOfWeek == dayOfWeek)
+            .Where(s => s.EmployeeId == employee.Id && s.IsActive)
             .ToListAsync(ct);
 
         if (shifts.Count == 0)
@@ -47,7 +45,10 @@ public class ShiftAccessController : ControllerBase
             return Ok(new { hasAccess = true, isShiftActive = true, shift = "Open" });
         }
 
-        var activeShift = shifts.FirstOrDefault(s => currentTime >= s.StartTime && currentTime <= s.EndTime);
+        var activeShift = shifts.FirstOrDefault(shift =>
+            shift.ShiftStartTime <= shift.ShiftEndTime
+                ? currentTime >= shift.ShiftStartTime && currentTime <= shift.ShiftEndTime
+                : currentTime >= shift.ShiftStartTime || currentTime <= shift.ShiftEndTime);
         var isShiftActive = activeShift != null;
 
         return Ok(new
@@ -55,7 +56,9 @@ public class ShiftAccessController : ControllerBase
             hasAccess = isShiftActive,
             isShiftActive,
             currentTime = currentTime.ToString(@"hh\:mm"),
-            activeShift = activeShift?.ShiftName
+            activeShift = activeShift is null
+                ? null
+                : $"{activeShift.ShiftStartTime:hh\\:mm}-{activeShift.ShiftEndTime:hh\\:mm}"
         });
     }
 }

@@ -37,6 +37,11 @@ public class EmployeeAttendanceLogDbConfig : IDbConfig<EmployeeAttendanceLog>
     {
         builder.ToTable("EmployeeAttendanceLogs");
         builder.HasKey(a => a.Id);
+        builder.Property(a => a.UserId).HasMaxLength(450).IsRequired();
+        builder.Property(a => a.SalaryAtCheckIn).HasPrecision(18, 2);
+        builder.Property(a => a.DeductionAmount).HasPrecision(18, 2);
+        builder.Property(a => a.FaceImageS3Key).HasMaxLength(450);
+        builder.Property(a => a.CheckOutFaceImageS3Key).HasMaxLength(450);
     }
 }
 
@@ -114,15 +119,6 @@ public class EmployeeTransactionDbConfig : IDbConfig<EmployeeTransaction>
         builder.ToTable("EmployeeTransactions");
         builder.HasKey(t => t.Id);
         builder.Property(t => t.Amount).HasPrecision(18, 2);
-    }
-}
-
-public class EmployeeBreakDbConfig : IDbConfig<EmployeeBreak>
-{
-    public void Configure(EntityTypeBuilder<EmployeeBreak> builder)
-    {
-        builder.ToTable("EmployeeBreaks");
-        builder.HasKey(b => b.Id);
     }
 }
 

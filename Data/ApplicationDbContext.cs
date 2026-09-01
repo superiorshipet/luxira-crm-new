@@ -59,7 +59,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeTask> EmployeeTasks => Set<EmployeeTask>();
     public DbSet<EmployeeError> EmployeeErrors => Set<EmployeeError>();
     public DbSet<EmployeeTransaction> EmployeeTransactions => Set<EmployeeTransaction>();
-    public DbSet<EmployeeBreak> EmployeeBreaks => Set<EmployeeBreak>();
     public DbSet<EmployeeViolation> EmployeeViolations => Set<EmployeeViolation>();
     public DbSet<EmployeeRating> EmployeeRatings => Set<EmployeeRating>();
     public DbSet<PersonalNote> PersonalNotes => Set<PersonalNote>();
