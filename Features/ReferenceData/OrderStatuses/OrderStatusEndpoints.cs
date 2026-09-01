@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Luxira.Api.Authentication;
+using Luxira.Api.Features.Auth;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Luxira.Api.Features.ReferenceData.OrderStatuses;

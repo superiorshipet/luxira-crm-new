@@ -23,8 +23,7 @@ public class VoiceSearchController : ControllerBase
     public async Task<ActionResult<SearchKeywordListResult>> ProcessVoiceQuery([FromBody] VoiceQueryRequest request, CancellationToken ct)
     {
         // Search using transcribed voice text query
-        var filter = new SearchKeywordFilterRequest(request.TranscribedText, null, 1, 20);
-        var result = await _service.GetKeywordsAsync(filter, ct);
+        var result = await _service.ListKeywordsAsync(search: request.TranscribedText, ct: ct);
         return Ok(result);
     }
 }

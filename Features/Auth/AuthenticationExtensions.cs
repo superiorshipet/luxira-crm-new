@@ -2,17 +2,17 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Luxira.Api.Authentication;
+namespace Luxira.Api.Features.Auth;
 
-internal static class AuthenticationExtensions
+public static class AuthenticationExtensions
 {
-    internal static IServiceCollection AddLuxiraAuthentication(
+    public static IServiceCollection AddLuxiraAuthentication(
         this IServiceCollection services)
     {
         services

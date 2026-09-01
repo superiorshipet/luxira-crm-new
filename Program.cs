@@ -1,12 +1,9 @@
 using Luxira.Api.Core;
 using Luxira.Api.Data;
 using Luxira.Api.OpenApi;
-using Luxira.Api.Features.ReferenceData.Countries;
-using Luxira.Api.Features.ReferenceData.FailureReasons;
-using Luxira.Api.Features.ReferenceData.OrderSources;
-using Luxira.Api.Features.ReferenceData.OrderStatuses;
 using Luxira.Api.Utils.Middlewares;
 using Microsoft.EntityFrameworkCore;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,9 +12,11 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (builder.Environment.IsEnvironment("Testing") || string.IsNullOrEmpty(connectionString))
+    if (builder.Environment.IsEnvironment("Testing") || 
+        string.IsNullOrEmpty(connectionString) || 
+        connectionString.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase))
     {
-        var dbName = connectionString?.StartsWith("InMemory:", StringComparison.Ordinal) == true 
+        var dbName = connectionString?.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase) == true 
             ? connectionString["InMemory:".Length..] 
             : "LuxiraTestDb";
         options.UseInMemoryDatabase(dbName);
@@ -78,15 +77,10 @@ foreach (var module in modules)
     module.Configure(app);
 }
 
-// Reference Data Endpoints
-app.MapCountryController();
-app.MapFailureReasonController();
-app.MapOrderStatusEndpoints();
-app.MapOrderSourceEndpoints();
-
 // Map all Feature Controllers
 app.MapControllers();
 
 app.Run();
+
 
 public partial class Program;

@@ -92,7 +92,7 @@ public class PotentialOrderController : ControllerBase
             DeliveryPrice: request.DeliveryPrice,
             CustomerDeliveryPrice: request.CustomerDeliveryPrice,
             ChatUrl: pot.ChatUrl,
-            Items: request.Items
+            Items: request.Items ?? new()
         );
 
         var userId = User.GetUserId() ?? "system";

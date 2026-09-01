@@ -22,7 +22,6 @@ public class BreakController : ControllerBase
     }
 
     [HttpPost("start")]
-    [HttpPost("Start")]
     public async Task<ActionResult<EmployeeBreakDto>> StartBreak([FromBody] StartBreakRequest request, CancellationToken ct)
     {
         var b = new EmployeeBreak
@@ -39,7 +38,6 @@ public class BreakController : ControllerBase
     }
 
     [HttpPost("{id:int}/end")]
-    [HttpPost("End/{id:int}")]
     public async Task<ActionResult<EmployeeBreakDto>> EndBreak([FromRoute] int id, CancellationToken ct)
     {
         var b = await _context.EmployeeBreaks.FindAsync([id], ct);

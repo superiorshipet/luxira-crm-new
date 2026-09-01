@@ -24,19 +24,19 @@ public class DataListController : ControllerBase
     }
 
     [HttpGet("GetAllCountries")]
-    public ActionResult<CountryContract[]> GetAllCountries() => Ok(CountryCatalog.All);
+    public IActionResult GetAllCountries() => Ok(CountryCatalog.All);
 
     [HttpGet("GetPfdCountries")]
-    public ActionResult<CountryContract[]> GetPfdCountries() => Ok(CountryCatalog.PreparationForDelivery);
+    public IActionResult GetPfdCountries() => Ok(CountryCatalog.PreparationForDelivery);
 
     [HttpGet("GetAllFailureReasons")]
-    public ActionResult<FailureReasonContract[]> GetAllFailureReasons() => Ok(FailureReasonCatalog.All);
+    public IActionResult GetAllFailureReasons() => Ok(FailureReasonCatalog.All);
 
     [HttpGet("GetAllOrderSources")]
-    public ActionResult<OrderSourceContract[]> GetAllOrderSources() => Ok(OrderSourceCatalog.All);
+    public IActionResult GetAllOrderSources() => Ok(OrderSourceCatalog.All);
 
     [HttpGet("GetAllOrderStatuses")]
-    public ActionResult<OrderStatusResponse[]> GetAllOrderStatuses() => Ok(OrderStatusCatalog.Administrators);
+    public IActionResult GetAllOrderStatuses() => Ok(OrderStatusCatalog.Administrators);
 
     [HttpGet("GetAllDeliveryCompanies")]
     public async Task<IActionResult> GetAllDeliveryCompanies([FromQuery] int? countryId, CancellationToken ct)
@@ -47,7 +47,7 @@ public class DataListController : ControllerBase
             query = query.Where(d => d.Country == countryId.Value);
         }
 
-        var list = await query.Select(d => new { id = d.Id, name = d.Name, logoUrl = d.LogoUrl ?? "/static/DefaultImage.svg" }).ToListAsync(ct);
+        var list = await query.Select(d => new { id = d.Id, name = d.Name, logoUrl = d.ImageUrl ?? "/static/DefaultImage.svg" }).ToListAsync(ct);
         return Ok(list);
     }
 }

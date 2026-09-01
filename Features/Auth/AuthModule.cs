@@ -1,4 +1,3 @@
-using Luxira.Api.Authentication;
 using Luxira.Api.Core;
 using Luxira.Api.Features.Auth.Repositories;
 using Luxira.Api.Features.Auth.Services;

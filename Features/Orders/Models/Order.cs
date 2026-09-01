@@ -127,10 +127,13 @@ public class OrderBonusConfiguration
 public class OrderPost
 {
     public int Id { get; set; }
-    public int OrderId { get; set; }
-    public Order? Order { get; set; }
-    public string? PostCode { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int Country { get; set; }
+    public string PostId { get; set; } = string.Empty;
+    public string? PostUrl { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? StoreName { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 }
 
 public class OrderFollowUpRequest
