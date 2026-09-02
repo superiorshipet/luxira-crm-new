@@ -142,16 +142,20 @@ public class OrderController : ControllerBase
         var query = _context.Orders.AsNoTracking().AsQueryable();
         if (country.HasValue) query = query.Where(o => o.Country == country.Value);
 
-        var total = await query.CountAsync(ct);
         var closedStatuses = OrderStatusCodes.ClosedStatuses;
-        var active = await query.CountAsync(o => !closedStatuses.Contains(o.OrderStatus), ct);
-        var delivered = await query.CountAsync(
-            o => o.OrderStatus == OrderStatusCodes.Delivered,
-            ct);
-        var delayed = await query.CountAsync(o => o.IsDelayed, ct);
-        var complaints = await query.CountAsync(o => o.IsComplaints, ct);
+        var counts = await query
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                total = group.Count(),
+                active = group.Count(order => !closedStatuses.Contains(order.OrderStatus)),
+                delivered = group.Count(order => order.OrderStatus == OrderStatusCodes.Delivered),
+                delayed = group.Count(order => order.IsDelayed),
+                complaints = group.Count(order => order.IsComplaints),
+            })
+            .FirstOrDefaultAsync(ct);
 
-        return Ok(new { total, active, delivered, delayed, complaints });
+        return Ok(counts ?? new { total = 0, active = 0, delivered = 0, delayed = 0, complaints = 0 });
     }
 
     [HttpGet("failure-reason-counts")]
@@ -208,10 +212,54 @@ public class OrderController : ControllerBase
 
     [HttpGet("validate-total-price")]
     [HttpGet("/Order/ValidateTotalPrice")]
-    public IActionResult ValidateTotalPrice([FromQuery] decimal totalPrice, [FromQuery] decimal itemsPrice, [FromQuery] decimal deliveryPrice)
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
+    public async Task<IActionResult> ValidateTotalPrice(
+        [FromQuery] int? country,
+        [FromQuery] int? manufacturingCompanyId,
+        [FromQuery] decimal? totalPrice,
+        [FromQuery] bool strict = false,
+        [FromQuery] decimal? itemsPrice = null,
+        [FromQuery] decimal? deliveryPrice = null,
+        CancellationToken ct = default)
     {
-        bool isValid = Math.Abs(totalPrice - (itemsPrice + deliveryPrice)) < 0.01m;
-        return Ok(new { isValid, expectedTotal = itemsPrice + deliveryPrice, providedTotal = totalPrice });
+        if (country.HasValue && manufacturingCompanyId.HasValue)
+        {
+            if (User.IsInRole("Admin") || User.IsInRole("Administrator") ||
+                User.IsInRole("ExecutiveDirector") || User.IsInRole("FollowUpDepartment"))
+            {
+                return Ok(new { valid = true, bypass = true });
+            }
+
+            if (!totalPrice.HasValue || manufacturingCompanyId <= 0)
+            {
+                return Ok(new { valid = true, pending = true });
+            }
+
+            var minimum = await _context.CountryMinimumPrices
+                .AsNoTracking()
+                .Where(price => price.Country == country.Value &&
+                                price.ManufacturingCompanyId == manufacturingCompanyId.Value)
+                .Select(price => (decimal?)price.MinimumPriceForOffers)
+                .FirstOrDefaultAsync(ct);
+            if (!minimum.HasValue || totalPrice.Value >= minimum.Value)
+            {
+                return Ok(new { valid = true });
+            }
+
+            var message = $"لا يمكننك تنزيل طلب بأقل من الحد الأدنى {minimum.Value}";
+            return strict
+                ? Ok(new { valid = false, message, minimum = minimum.Value })
+                : Ok(new { valid = true, warning = true, message, minimum = minimum.Value });
+        }
+
+        if (!totalPrice.HasValue || !itemsPrice.HasValue || !deliveryPrice.HasValue)
+        {
+            return Ok(new { isValid = true, pending = true });
+        }
+
+        var expectedTotal = itemsPrice.Value + deliveryPrice.Value;
+        var isValid = Math.Abs(totalPrice.Value - expectedTotal) < 0.01m;
+        return Ok(new { isValid, expectedTotal, providedTotal = totalPrice.Value });
     }
 
     [HttpGet("validate-min-price")]
@@ -279,10 +327,33 @@ public class OrderController : ControllerBase
 
     [HttpGet("delivery-payment-methods")]
     [HttpGet("/Order/GetDeliveryCompanyPaymentMethods")]
-    public IActionResult GetDeliveryCompanyPaymentMethods([FromQuery] int deliveryCompanyId)
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
+    public async Task<IActionResult> GetDeliveryCompanyPaymentMethods(
+        [FromQuery] int deliveryCompanyId,
+        CancellationToken ct)
     {
-        var methods = new[] { "Cash on Delivery", "Prepaid", "Bank Transfer", "Credit Card" };
-        return Ok(methods);
+        var settings = await _context.DeliveryCompanies
+            .AsNoTracking()
+            .Where(company => company.Id == deliveryCompanyId)
+            .Select(company => new
+            {
+                deliveryCompanyId = company.Id,
+                companyName = company.Name,
+                supportsCashPayment = company.SupportsCashPayment,
+                supportsBankTransferPayment = company.SupportsBankTransferPayment,
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return settings is null
+            ? Ok(new { success = false, message = "لم يتم العثور على شركة التوصيل المختارة." })
+            : Ok(new
+            {
+                success = true,
+                settings.deliveryCompanyId,
+                settings.companyName,
+                settings.supportsCashPayment,
+                settings.supportsBankTransferPayment,
+            });
     }
 
     [HttpGet("delivery-companies-filter")]

@@ -38,7 +38,6 @@ ASPNETCORE_ENVIRONMENT=Testing \
 ASPNETCORE_URLS="$base_url" \
 dotnet run \
     --project Luxira.csproj \
-    --no-build \
     --configuration "$verification_configuration" \
     --no-launch-profile \
     >"$server_log" 2>&1 &
@@ -170,6 +169,11 @@ jq --exit-status '
     .info.schema == "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" and
     (.item | length) > 0
 ' "$postman_document" >/dev/null
+
+node tools/check-postman-coverage.mjs \
+    "$openapi_document" \
+    postman/coverage-manifest.json \
+    "$postman_document"
 
 echo "Verified Postman import document at $base_url/swagger/v1/swagger.json"
 echo "Verified direct Postman import through project URL $base_url/"

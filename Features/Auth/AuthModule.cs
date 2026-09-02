@@ -15,6 +15,7 @@ public class AuthModule : IModule
         services.AddScoped<UserRepository>();
         services.AddScoped<IPasswordHasher<ApplicationUser>, PasswordHasher<ApplicationUser>>();
         services.AddScoped<JwtService>();
+        services.AddScoped<AuthCookieService>();
         services.AddScoped<AuthService>();
         services.AddScoped<UserService>();
     }

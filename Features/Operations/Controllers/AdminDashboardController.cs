@@ -22,7 +22,10 @@ public class AdminDashboardController : ControllerBase
     [HttpGet("GetSummary")]
     public async Task<IActionResult> GetSummary(CancellationToken ct)
     {
-        int activeUsers = await _context.Users.CountAsync(u => u.IsActive, ct);
+        var now = DateTimeOffset.UtcNow;
+        int activeUsers = await _context.Users.CountAsync(
+            u => !u.LockoutEnd.HasValue || u.LockoutEnd <= now,
+            ct);
         int totalEmployees = await _context.Employees.CountAsync(e => e.IsActive, ct);
         int totalWarehouses = await _context.Warehouses.CountAsync(w => w.IsShown, ct);
         int totalStores = await _context.ManufacturingCompanies.CountAsync(m => m.IsShown, ct);

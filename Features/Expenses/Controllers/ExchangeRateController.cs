@@ -11,7 +11,7 @@ namespace Luxira.Api.Features.Expenses.Controllers;
 
 [ApiController]
 [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
-[Route("api/v1/expenses/exchange-rates")]
+[Route("api/v1/exchange-rates")]
 [Route("ExchangeRate")]
 public class ExchangeRateController : ControllerBase
 {

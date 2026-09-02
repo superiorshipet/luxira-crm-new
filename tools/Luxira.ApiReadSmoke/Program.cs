@@ -74,6 +74,25 @@ var (token, _) = new JwtService(signingMaterial).GenerateToken(admin);
 using var client = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = Timeout.InfiniteTimeSpan };
 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+var realtimeFailures = new List<string>();
+var hubPaths = new[] { "/orderHub", "/messageHub", "/storeCodeEditorHub", "/conferenceHub" };
+using (var hubClient = new HttpClient
+{
+    BaseAddress = new Uri(baseUrl),
+    Timeout = TimeSpan.FromSeconds(15)
+})
+{
+    foreach (var hubPath in hubPaths)
+    {
+        using var content = new StringContent(string.Empty);
+        using var response = await hubClient.PostAsync(
+            $"{hubPath}/negotiate?negotiateVersion=1&access_token={Uri.EscapeDataString(token)}",
+            content);
+        if (!response.IsSuccessStatusCode)
+            realtimeFailures.Add($"{(int)response.StatusCode} {hubPath}");
+    }
+}
+
 using var openApiResponse = await client.GetAsync("/swagger/v1/swagger.json");
 openApiResponse.EnsureSuccessStatusCode();
 await using var openApiStream = await openApiResponse.Content.ReadAsStreamAsync();
@@ -111,11 +130,16 @@ foreach (var pathProperty in document.RootElement.GetProperty("paths").Enumerate
 }
 
 Console.WriteLine($"Authenticated canonical GET checks: {checkedRoutes}");
+Console.WriteLine($"Authenticated SignalR negotiate checks: {hubPaths.Length}");
+Console.WriteLine($"SignalR failures: {realtimeFailures.Count}");
+foreach (var failure in realtimeFailures) Console.WriteLine(failure);
 Console.WriteLine($"Server failures: {serverFailures.Count}");
 foreach (var failure in serverFailures) Console.WriteLine(failure);
 Console.WriteLine($"Timed out routes: {timedOutRoutes.Count}");
 foreach (var route in timedOutRoutes) Console.WriteLine($"TIMEOUT {route}");
-return serverFailures.Count == 0 && timedOutRoutes.Count == 0 ? 0 : 1;
+return realtimeFailures.Count == 0 && serverFailures.Count == 0 && timedOutRoutes.Count == 0
+    ? 0
+    : 1;
 
 static string ReplacePathParameters(string route) =>
     Regex.Replace(route, "\\{[^}:]+(?::[^}]+)?\\}", "1");

@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
@@ -8,7 +10,7 @@ namespace Luxira.Api.Features.Operations.Controllers;
 [ApiController]
 [AllowAnonymous]
 [Route("api/v1/postman")]
-public class PostmanCollectionController : ControllerBase
+public partial class PostmanCollectionController : ControllerBase
 {
     private readonly EndpointDataSource _endpointDataSource;
 
@@ -28,24 +30,36 @@ public class PostmanCollectionController : ControllerBase
 
         var endpoints = _endpointDataSource.Endpoints
             .OfType<RouteEndpoint>()
-            .Where(e => !string.IsNullOrEmpty(e.RoutePattern.RawText))
+            .Where(endpoint => endpoint.Metadata
+                .GetMetadata<IExcludeFromDescriptionMetadata>()?
+                .ExcludeFromDescription != true)
+            .SelectMany(endpoint =>
+            {
+                var httpMethods = endpoint.Metadata
+                    .GetMetadata<IHttpMethodMetadata>()?
+                    .HttpMethods;
+                return httpMethods is null
+                    ? []
+                    : httpMethods.Select(httpMethod => new PostmanEndpoint(
+                        endpoint,
+                        httpMethod,
+                        endpoint.RoutePattern.RawText ?? string.Empty));
+            })
+            .GroupBy(
+                endpoint => $"{endpoint.HttpMethod} {NormalizeOpenApiRoute(endpoint.RawRoute)}",
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
             .ToList();
 
         var folders = new Dictionary<string, List<object>>();
 
-        foreach (var endpoint in endpoints)
+        foreach (var postmanEndpoint in endpoints)
         {
-            var rawRoute = endpoint.RoutePattern.RawText!;
-            if (rawRoute.StartsWith("swagger", StringComparison.OrdinalIgnoreCase) ||
-                rawRoute.StartsWith("postman", StringComparison.OrdinalIgnoreCase) ||
-                rawRoute.StartsWith("openapi", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var httpMethodMetadata = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>();
-            var httpMethod = httpMethodMetadata?.HttpMethods.Count > 0 ? httpMethodMetadata.HttpMethods[0] : "GET";
+            var endpoint = postmanEndpoint.Endpoint;
+            var rawRoute = postmanEndpoint.RawRoute;
+            var httpMethod = postmanEndpoint.HttpMethod;
             var actionDescriptor = endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>();
+            var operationId = endpoint.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName;
 
             var controllerName = actionDescriptor?.ControllerName ?? "General";
             var actionName = actionDescriptor?.ActionName ?? endpoint.DisplayName ?? rawRoute;
@@ -107,8 +121,10 @@ public class PostmanCollectionController : ControllerBase
                 folders[folderName] = folderItems;
             }
 
-            var cleanPath = rawRoute.TrimStart('/');
-            var pathSegments = cleanPath.Split('/').ToList();
+            var cleanPath = ToPostmanPath(rawRoute).TrimStart('/');
+            var pathSegments = cleanPath.Length == 0
+                ? new List<string>()
+                : cleanPath.Split('/').ToList();
 
             var requestItem = new Dictionary<string, object>
             {
@@ -132,6 +148,12 @@ public class PostmanCollectionController : ControllerBase
                     }
                 }
             };
+
+            if (!string.IsNullOrWhiteSpace(operationId))
+            {
+                ((Dictionary<string, object>)requestItem["request"])["description"] =
+                    $"operationId: {operationId}";
+            }
 
             // If it's a login request, attach test script to auto-set token variable
             if (rawRoute.Contains("login", StringComparison.OrdinalIgnoreCase))
@@ -244,4 +266,22 @@ public class PostmanCollectionController : ControllerBase
 
         return new JsonResult(collection);
     }
+
+    private static string NormalizeOpenApiRoute(string route) =>
+        "/" + RouteParameterPattern().Replace(
+            route.Trim('/'),
+            match => $"{{{match.Groups[1].Value}}}");
+
+    private static string ToPostmanPath(string route) =>
+        RouteParameterPattern().Replace(
+            route,
+            match => $"{{{{{match.Groups[1].Value}}}}}");
+
+    [GeneratedRegex(@"\{\*{0,2}([^}:?]+)(?::[^}?]+)?\??\}")]
+    private static partial Regex RouteParameterPattern();
+
+    private sealed record PostmanEndpoint(
+        RouteEndpoint Endpoint,
+        string HttpMethod,
+        string RawRoute);
 }

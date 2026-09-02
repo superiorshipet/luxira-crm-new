@@ -27,26 +27,75 @@ public class CountryMinimumPricesController : ControllerBase
     [HttpGet("/CountryMinimumPrices/Index")]
     public async Task<IActionResult> Index(CancellationToken ct = default)
     {
-        var prices = await _context.ProductMinimumSellingPrices.AsNoTracking().ToListAsync(ct);
+        var prices = await _context.CountryMinimumPrices
+            .AsNoTracking()
+            .Select(price => new
+            {
+                price.Id,
+                price.Country,
+                price.ManufacturingCompanyId,
+                ManufacturingCompanyName = price.ManufacturingCompany != null
+                    ? price.ManufacturingCompany.Name
+                    : null,
+                price.MinimumPriceForOffers,
+                price.MaximumPriceForOffers,
+            })
+            .ToListAsync(ct);
         return Ok(prices);
     }
 
     [HttpPost("Create")]
     [HttpPost("/CountryMinimumPrices/Create")]
-    public async Task<IActionResult> Create([FromBody] CreateMinimumPriceRequest request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CountryMinimumPriceRequest request, CancellationToken ct)
     {
-        var minPrice = new ProductMinimumSellingPrice
+        var minPrice = new CountryMinimumPrice
         {
             Country = request.Country,
             ManufacturingCompanyId = request.ManufacturingCompanyId,
-            MainWarehouseId = request.MainWarehouseId,
-            MinimumSellingPrice = request.MinimumSellingPrice,
-            CreatedAt = DateTime.UtcNow
+            MinimumPriceForOffers = request.MinimumPriceForOffers,
+            MaximumPriceForOffers = request.MaximumPriceForOffers,
         };
 
-        await _context.ProductMinimumSellingPrices.AddAsync(minPrice, ct);
+        await _context.CountryMinimumPrices.AddAsync(minPrice, ct);
         await _context.SaveChangesAsync(ct);
         return Ok(minPrice);
+    }
+
+    [HttpGet("Edit/{id:int}")]
+    [HttpGet("/CountryMinimumPrices/Edit")]
+    public async Task<IActionResult> Edit(
+        [FromRoute] int? id,
+        [FromQuery(Name = "id")] int? queryId,
+        CancellationToken ct)
+    {
+        var targetId = id ?? queryId;
+        if (!targetId.HasValue) return NotFound();
+
+        var price = await _context.CountryMinimumPrices
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == targetId.Value, ct);
+        return price is null ? NotFound() : Ok(price);
+    }
+
+    [HttpPost("Edit/{id:int}")]
+    [HttpPost("/CountryMinimumPrices/Edit")]
+    public async Task<IActionResult> Edit(
+        [FromRoute] int? id,
+        [FromQuery(Name = "id")] int? queryId,
+        [FromBody] CountryMinimumPriceRequest request,
+        CancellationToken ct)
+    {
+        var targetId = id ?? queryId ?? request.Id;
+        var price = await _context.CountryMinimumPrices
+            .FirstOrDefaultAsync(item => item.Id == targetId, ct);
+        if (price is null) return NotFound();
+
+        price.Country = request.Country;
+        price.ManufacturingCompanyId = request.ManufacturingCompanyId;
+        price.MinimumPriceForOffers = request.MinimumPriceForOffers;
+        price.MaximumPriceForOffers = request.MaximumPriceForOffers;
+        await _context.SaveChangesAsync(ct);
+        return Ok(price);
     }
 }
 
@@ -127,3 +176,10 @@ public sealed record CreateMinimumPriceRequest(
     int ManufacturingCompanyId,
     int MainWarehouseId,
     decimal MinimumSellingPrice);
+
+public sealed record CountryMinimumPriceRequest(
+    int Id,
+    int Country,
+    int? ManufacturingCompanyId,
+    decimal MinimumPriceForOffers,
+    decimal? MaximumPriceForOffers);

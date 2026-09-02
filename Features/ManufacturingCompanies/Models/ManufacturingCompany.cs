@@ -86,6 +86,16 @@ public class ProductMinimumSellingPrice
     public decimal MinimumPrice { get => MinimumSellingPrice; set => MinimumSellingPrice = value; }
 }
 
+public class CountryMinimumPrice
+{
+    public int Id { get; set; }
+    public int Country { get; set; }
+    public int? ManufacturingCompanyId { get; set; }
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
+    public decimal MinimumPriceForOffers { get; set; }
+    public decimal? MaximumPriceForOffers { get; set; }
+}
+
 /// <summary>
 /// Maps to StoreCodeFolders table — schema verified against live DB.
 /// </summary>

@@ -47,7 +47,7 @@ function collectOpenApiOperations(document) {
     "trace",
   ]);
   const operations = [];
-  const missingOperationIds = [];
+  const routes = [];
 
   for (const [route, pathItem] of Object.entries(document.paths ?? {})) {
     for (const [method, operation] of Object.entries(pathItem ?? {})) {
@@ -56,16 +56,14 @@ function collectOpenApiOperations(document) {
       }
 
       const operationId = operation?.operationId?.trim();
-      if (!operationId) {
-        missingOperationIds.push(`${method.toUpperCase()} ${route}`);
-        continue;
+      routes.push(normalizeRoute(method, route));
+      if (operationId) {
+        operations.push(operationId);
       }
-
-      operations.push(operationId);
     }
   }
 
-  return { operations, missingOperationIds };
+  return { operations, routes };
 }
 
 function collectManifestOperations(manifest) {
@@ -82,14 +80,22 @@ function descriptionText(description) {
   return description?.content ?? "";
 }
 
-function collectPostmanOperations(items, result = []) {
+function collectPostmanCoverage(items, operations = [], routes = []) {
   for (const item of items ?? []) {
     if (Array.isArray(item.item)) {
-      collectPostmanOperations(item.item, result);
+      collectPostmanCoverage(item.item, operations, routes);
     }
 
     if (!item.request) {
       continue;
+    }
+
+    const method = item.request.method ?? "GET";
+    const rawUrl = typeof item.request.url === "string"
+      ? item.request.url
+      : item.request.url?.raw;
+    if (rawUrl) {
+      routes.push(normalizeRoute(method, rawUrl));
     }
 
     const description = [
@@ -102,11 +108,22 @@ function collectPostmanOperations(items, result = []) {
     );
 
     for (const match of matches) {
-      result.push(match[1]);
+      operations.push(match[1]);
     }
   }
 
-  return result;
+  return { operations, routes };
+}
+
+function normalizeRoute(method, rawRoute) {
+  const route = rawRoute
+    .replace(/^\{\{baseUrl\}\}/i, "")
+    .replace(/\{\{([^}]+)\}\}/g, "{$1}")
+    .replace(/\{\*{0,2}([^}:?]+)(?::[^}?]+)?\??\}/g, "{$1}")
+    .replace(/\?.*$/, "")
+    .replace(/^\/*/, "/")
+    .replace(/\/+$/, "") || "/";
+  return `${method.toUpperCase()} ${route.toLowerCase()}`;
 }
 
 function difference(left, right) {
@@ -129,16 +146,17 @@ const openApi = readJson(openApiPath);
 const manifest = readJson(manifestPath);
 const collection = readJson(collectionPath);
 
-const { operations: openApiOperations, missingOperationIds } =
+const { operations: openApiOperations, routes: openApiRoutes } =
   collectOpenApiOperations(openApi);
 const manifestOperations = collectManifestOperations(manifest).filter(Boolean);
-const postmanOperations = collectPostmanOperations(collection.item);
+const { operations: postmanOperations, routes: postmanRoutes } =
+  collectPostmanCoverage(collection.item);
 
 const failures = {
-  "OpenAPI endpoints without operationId": missingOperationIds,
   "Duplicate OpenAPI operationIds": duplicates(openApiOperations),
   "Duplicate manifest operationIds": duplicates(manifestOperations),
   "Duplicate primary Postman operation markers": duplicates(postmanOperations),
+  "Duplicate Postman routes": duplicates(postmanRoutes),
   "OpenAPI operations missing from manifest": difference(
     openApiOperations,
     manifestOperations,
@@ -152,6 +170,8 @@ const failures = {
     postmanOperations,
     openApiOperations,
   ),
+  "OpenAPI routes missing from Postman": difference(openApiRoutes, postmanRoutes),
+  "Stale Postman routes": difference(postmanRoutes, openApiRoutes),
 };
 
 let failed = false;
@@ -167,6 +187,5 @@ if (failed) {
 }
 
 console.log(
-  `Postman coverage is complete: ${openApiOperations.length} OpenAPI operations.`,
+  `Postman coverage is complete: ${openApiRoutes.length} OpenAPI routes and ${openApiOperations.length} named operations.`,
 );
-

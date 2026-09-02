@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="Luxira.csproj" />
+  <Project Path="tests/Luxira.Tests/Luxira.Tests.csproj" />
 </Solution>

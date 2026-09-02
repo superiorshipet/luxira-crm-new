@@ -15,7 +15,33 @@ public class JwtService
         _signingMaterial = signingMaterial;
     }
 
-    public (string Token, DateTime ExpiresAt) GenerateToken(ApplicationUser user)
+    public (string Token, DateTime ExpiresAt) GenerateToken(
+        ApplicationUser user,
+        IEnumerable<Claim>? additionalClaims = null)
+    {
+        var claims = CreateClaims(user, additionalClaims);
+
+        var securityKey = new SymmetricSecurityKey(_signingMaterial.Key);
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+        var expiresAt = DateTime.UtcNow.Add(_signingMaterial.AccessTokenLifetime);
+
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = expiresAt,
+            Issuer = _signingMaterial.Issuer,
+            Audience = _signingMaterial.Audience,
+            SigningCredentials = credentials
+        };
+
+        var handler = new JwtSecurityTokenHandler();
+        var token = handler.CreateToken(tokenDescriptor);
+        return (handler.WriteToken(token), expiresAt);
+    }
+
+    public IReadOnlyList<Claim> CreateClaims(
+        ApplicationUser user,
+        IEnumerable<Claim>? additionalClaims = null)
     {
         var claims = new List<Claim>
         {
@@ -49,21 +75,16 @@ public class JwtService
             }
         }
 
-        var securityKey = new SymmetricSecurityKey(_signingMaterial.Key);
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-        var expiresAt = DateTime.UtcNow.Add(_signingMaterial.AccessTokenLifetime);
-
-        var tokenDescriptor = new SecurityTokenDescriptor
+        if (additionalClaims is not null)
         {
-            Subject = new ClaimsIdentity(claims),
-            Expires = expiresAt,
-            Issuer = _signingMaterial.Issuer,
-            Audience = _signingMaterial.Audience,
-            SigningCredentials = credentials
-        };
+            foreach (var claim in additionalClaims)
+            {
+                claims.RemoveAll(existing =>
+                    existing.Type.Equals(claim.Type, StringComparison.Ordinal));
+                claims.Add(claim);
+            }
+        }
 
-        var handler = new JwtSecurityTokenHandler();
-        var token = handler.CreateToken(tokenDescriptor);
-        return (handler.WriteToken(token), expiresAt);
+        return claims;
     }
 }

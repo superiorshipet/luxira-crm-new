@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -10,6 +11,9 @@ namespace Luxira.Api.Features.Auth;
 
 public static class AuthenticationExtensions
 {
+    public const string SmartScheme = "Smart";
+    public const string BrowserCookieScheme = "LuxiraBrowser";
+
     public static IServiceCollection AddLuxiraAuthentication(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -19,7 +23,47 @@ public static class AuthenticationExtensions
             JwtSigningMaterial.Create(configuration, environment));
 
         services
-            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddAuthentication(options =>
+            {
+                options.DefaultScheme = SmartScheme;
+                options.DefaultAuthenticateScheme = SmartScheme;
+                options.DefaultChallengeScheme = SmartScheme;
+            })
+            .AddPolicyScheme(SmartScheme, SmartScheme, options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    var authorization = context.Request.Headers.Authorization.ToString();
+                    if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ||
+                        (!string.IsNullOrEmpty(context.Request.Query["access_token"]) &&
+                         IsHubPath(context.Request.Path)))
+                    {
+                        return JwtBearerDefaults.AuthenticationScheme;
+                    }
+
+                    return BrowserCookieScheme;
+                };
+            })
+            .AddCookie(BrowserCookieScheme, options =>
+            {
+                options.Cookie.Name = ".AspNetCore.Identity.Application";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.ExpireTimeSpan = TimeSpan.FromDays(3650);
+                options.SlidingExpiration = true;
+                options.Events.OnRedirectToLogin = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                };
+                options.Events.OnRedirectToAccessDenied = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                };
+            })
             .AddJwtBearer();
 
         services.AddOptions<JwtBearerOptions>(
@@ -47,7 +91,7 @@ public static class AuthenticationExtensions
                     {
                         var accessToken = context.Request.Query["access_token"];
                         if (!string.IsNullOrEmpty(accessToken) &&
-                            context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                            IsHubPath(context.HttpContext.Request.Path))
                         {
                             context.Token = accessToken;
                         }
@@ -98,6 +142,13 @@ public static class AuthenticationExtensions
 
         return services;
     }
+
+    private static bool IsHubPath(PathString path) =>
+        path.StartsWithSegments("/hubs") ||
+        path.StartsWithSegments("/orderHub") ||
+        path.StartsWithSegments("/messageHub") ||
+        path.StartsWithSegments("/storeCodeEditorHub") ||
+        path.StartsWithSegments("/conferenceHub");
 
     private sealed class JwtConfigurationStartupValidator(
         IOptionsMonitor<JwtBearerOptions> options) : IHostedService

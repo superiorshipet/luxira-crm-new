@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Luxira.Api.Features.Auth.DTOs;
 using Luxira.Api.Features.Auth.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -12,10 +11,12 @@ namespace Luxira.Api.Features.Auth.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AuthService _authService;
+    private readonly AuthCookieService _authCookieService;
 
-    public AuthController(AuthService authService)
+    public AuthController(AuthService authService, AuthCookieService authCookieService)
     {
         _authService = authService;
+        _authCookieService = authCookieService;
     }
 
     [AllowAnonymous]
@@ -24,6 +25,7 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var response = await _authService.LoginAsync(request, ct);
+        await _authCookieService.SignInTokenAsync(HttpContext, response.Token);
         return Ok(response);
     }
 
@@ -37,7 +39,6 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpPost("switch-user")]
-    [HttpPost("/AccountSwitch/SwitchUser")]
     public async Task<ActionResult<AuthResponse>> SwitchUser([FromBody] SwitchUserRequest request, CancellationToken ct)
     {
         var currentUserId = Luxira.Api.Utils.Extensions.ClaimsPrincipalExtensions.GetUserId(User);
@@ -47,6 +48,7 @@ public class AuthController : ControllerBase
         }
 
         var response = await _authService.SwitchUserAsync(currentUserId, request.TargetUserId, ct);
+        await _authCookieService.SignInTokenAsync(HttpContext, response.Token);
         return Ok(response);
     }
 }

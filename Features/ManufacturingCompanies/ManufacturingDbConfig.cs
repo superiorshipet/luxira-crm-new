@@ -63,6 +63,21 @@ public class ProductMinimumSellingPriceDbConfig : IDbConfig<ProductMinimumSellin
     }
 }
 
+public class CountryMinimumPriceDbConfig : IDbConfig<CountryMinimumPrice>
+{
+    public void Configure(EntityTypeBuilder<CountryMinimumPrice> builder)
+    {
+        builder.ToTable("CountryMinimumPrices");
+        builder.HasKey(price => price.Id);
+        builder.Property(price => price.MinimumPriceForOffers).HasPrecision(18, 2);
+        builder.Property(price => price.MaximumPriceForOffers).HasPrecision(18, 2);
+        builder.HasOne(price => price.ManufacturingCompany)
+            .WithMany()
+            .HasForeignKey(price => price.ManufacturingCompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public class StoreCodeFolderDbConfig : IDbConfig<StoreCodeFolder>
 {
     public void Configure(EntityTypeBuilder<StoreCodeFolder> builder)

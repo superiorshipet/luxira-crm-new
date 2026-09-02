@@ -83,6 +83,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<MainProduct> MainProducts => Set<MainProduct>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<ProductMinimumSellingPrice> ProductMinimumSellingPrices => Set<ProductMinimumSellingPrice>();
+    public DbSet<CountryMinimumPrice> CountryMinimumPrices => Set<CountryMinimumPrice>();
     public DbSet<StoreCodeFolder> StoreCodeFolders => Set<StoreCodeFolder>();
     public DbSet<StoreCodeEditHistory> StoreCodeEditHistories => Set<StoreCodeEditHistory>();
 
