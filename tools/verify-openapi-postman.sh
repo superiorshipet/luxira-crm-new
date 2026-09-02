@@ -63,6 +63,10 @@ curl --fail --silent --show-error \
     "$base_url/swagger/v1/swagger.json" \
     --output "$openapi_document"
 
+if [[ -n "${LUXIRA_OPENAPI_OUTPUT:-}" ]]; then
+    cp "$openapi_document" "$LUXIRA_OPENAPI_OUTPUT"
+fi
+
 curl --location --fail --silent --show-error \
     "$base_url/" \
     --output "$root_import_document"

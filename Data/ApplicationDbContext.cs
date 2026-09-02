@@ -82,6 +82,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<ManufacturingCompany> ManufacturingCompanies => Set<ManufacturingCompany>();
     public DbSet<MainProduct> MainProducts => Set<MainProduct>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductImageDraft> ProductImageDrafts => Set<ProductImageDraft>();
+    public DbSet<ProductImageUserPin> ProductImageUserPins => Set<ProductImageUserPin>();
+    public DbSet<EmployeeManufacturingCompany> EmployeeManufacturingCompanies => Set<EmployeeManufacturingCompany>();
     public DbSet<ProductMinimumSellingPrice> ProductMinimumSellingPrices => Set<ProductMinimumSellingPrice>();
     public DbSet<CountryMinimumPrice> CountryMinimumPrices => Set<CountryMinimumPrice>();
     public DbSet<StoreCodeFolder> StoreCodeFolders => Set<StoreCodeFolder>();
@@ -110,6 +113,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<HelpCenterChatMention> HelpCenterChatMentions => Set<HelpCenterChatMention>();
     public DbSet<HelpCenterChatSetting> HelpCenterChatSettings => Set<HelpCenterChatSetting>();
     public DbSet<HelpCenterChatMessageOrderLink> HelpCenterChatMessageOrderLinks => Set<HelpCenterChatMessageOrderLink>();
+    public DbSet<HelpCenterChatMessageHiddenForUser> HelpCenterChatMessageHiddenForUsers => Set<HelpCenterChatMessageHiddenForUser>();
+    public DbSet<HelpCenterChatUserPresence> HelpCenterChatUserPresence => Set<HelpCenterChatUserPresence>();
+    public DbSet<HelpCenterChatKeyword> HelpCenterChatKeywords => Set<HelpCenterChatKeyword>();
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
     public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
     public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();

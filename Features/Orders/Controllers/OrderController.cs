@@ -1,5 +1,6 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Orders.DTOs;
+using Luxira.Api.Features.Orders.Hubs;
 using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Features.Orders.Services;
 using Luxira.Api.Utils.Exceptions;
@@ -8,6 +9,7 @@ using Luxira.Api.Utils.Time;
 using Luxira.Api.Infrastructure.Caching;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Luxira.Api.Features.Orders.Controllers;
@@ -24,12 +26,18 @@ public class OrderController : ControllerBase
     private readonly OrderService _orderService;
     private readonly ApplicationDbContext _context;
     private readonly LuxiraCacheService _cache;
+    private readonly IHubContext<OrderHub> _hub;
 
-    public OrderController(OrderService orderService, ApplicationDbContext context, LuxiraCacheService cache)
+    public OrderController(
+        OrderService orderService,
+        ApplicationDbContext context,
+        LuxiraCacheService cache,
+        IHubContext<OrderHub> hub)
     {
         _orderService = orderService;
         _context = context;
         _cache = cache;
+        _hub = hub;
     }
 
     [HttpGet]
@@ -590,10 +598,154 @@ public class OrderController : ControllerBase
         return Ok(new { success = true, storeId = order.ManufacturingCompanyId });
     }
 
+    [HttpGet("/Order/Details")]
+    [HttpPost("/Order/Details")]
+    public async Task<ActionResult<OrderDto>> LegacyDetails([FromQuery] int id, CancellationToken ct) =>
+        Ok(await _orderService.GetOrderByIdAsync(id, ct));
+
+    [HttpGet("/Order/DetailsPartial")]
+    public async Task<ActionResult<OrderDto>> LegacyDetailsPartial([FromQuery] int id, CancellationToken ct) =>
+        Ok(await _orderService.GetOrderByIdAsync(id, ct));
+
+    [HttpPost("/Order/PostponeOrder")]
+    public async Task<IActionResult> PostponeOrder(
+        [FromForm] int orderId,
+        [FromForm] DateTime newCreatedDate,
+        CancellationToken ct)
+    {
+        var order = await _context.Orders.FirstOrDefaultAsync(item => item.Id == orderId, ct);
+        if (order is null) return NotFound($"Order with ID {orderId} not found.");
+        order.CreatedDate = newCreatedDate;
+        var newStatus = (newCreatedDate - IstanbulTimeHelper.Now).TotalDays > 2
+            ? OrderStatusCodes.Postponed
+            : OrderStatusCodes.New;
+        if ((order.OrderStatus == OrderStatusCodes.Postponed && newStatus == OrderStatusCodes.New) ||
+            newStatus == OrderStatusCodes.Postponed)
+        {
+            var previousStatus = order.OrderStatus;
+            order.OrderStatus = newStatus;
+            _context.OrderStatusHistories.Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = newStatus,
+                CreatedAt = IstanbulTimeHelper.Now,
+                ApplicationUserId = User.GetUserId(),
+                Name = $"PreviousStatus:{previousStatus}",
+            });
+        }
+        await _context.SaveChangesAsync(ct);
+        await _hub.Clients.All.SendAsync("OrderRealtimeChanged", new { orderId, reason = "order_postponed" }, ct);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("/Order/HideOrder")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    public async Task<IActionResult> HideOrder([FromForm] int orderId, [FromForm] bool isHidden, CancellationToken ct)
+    {
+        var order = await _context.Orders.FirstOrDefaultAsync(item => item.Id == orderId, ct);
+        if (order is null) return NotFound($"Order with ID {orderId} not found.");
+        order.IsHidden = isHidden;
+        await _context.SaveChangesAsync(ct);
+        var payload = new { orderId, isHidden = order.IsHidden };
+        await Task.WhenAll(
+            _hub.Clients.All.SendAsync("OrderHiddenStatusUpdated", payload, ct),
+            _hub.Clients.All.SendAsync("OrderRealtimeChanged", new { orderId, reason = "hidden_status_updated" }, ct));
+        return Ok($"الطلب بالمعرّف {orderId} الآن {(isHidden ? "hidden" : "unhidden")}.");
+    }
+
+    [HttpPost("/Order/SetSpecial")]
+    public async Task<IActionResult> SetSpecial([FromForm] int id, CancellationToken ct)
+    {
+        var order = await _context.Orders.FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (order is null) return NotFound();
+        order.IsClientSpecial = !order.IsClientSpecial;
+        await _context.SaveChangesAsync(ct);
+        await Task.WhenAll(
+            _hub.Clients.All.SendAsync("UpdateOrderClientType", new { OrderId = id, IsClientSpecial = order.IsClientSpecial }, ct),
+            _hub.Clients.All.SendAsync("OrderRealtimeChanged", new { orderId = id, reason = "client_type_updated" }, ct));
+        return Ok(new { redirectUrl = $"/Order/Details?id={id}" });
+    }
+
+    [HttpPost("/Order/SetIsComplaints")]
+    public async Task<IActionResult> SetIsComplaints([FromForm] int id, CancellationToken ct)
+    {
+        var order = await _context.Orders.FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (order is null) return NotFound();
+        order.IsComplaints = !order.IsComplaints;
+        await _context.SaveChangesAsync(ct);
+        await Task.WhenAll(
+            _hub.Clients.All.SendAsync("UpdateOrderComplaintsType", new { OrderId = id, IsComplaints = order.IsComplaints }, ct),
+            _hub.Clients.All.SendAsync("OrderRealtimeChanged", new { orderId = id, reason = "complaints_updated" }, ct));
+        return Ok(new { redirectUrl = $"/Order/Details?id={id}" });
+    }
+
+    [HttpPost("/Order/SetBonusPaidForEmployee")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> SetBonusPaidForEmployee([FromBody] List<int>? orderIds, CancellationToken ct)
+    {
+        if (orderIds is null || orderIds.Count == 0) return BadRequest("No order IDs provided.");
+        var ids = orderIds.Where(id => id > 0).Distinct().ToList();
+        var affected = await _context.Orders.Where(order => ids.Contains(order.Id))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(order => order.IsBonusPaidForEmployee, true), ct);
+        return Ok(new { success = true, updatedCount = affected, message = "تم الدفع ", redirectUrl = "/Financial/Employees" });
+    }
+
+    [HttpGet("/Order/GetAllOrderIdsForEmployeeBonus")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    public async Task<IActionResult> GetAllOrderIdsForEmployeeBonus(
+        [FromQuery] string? employeeId,
+        [FromQuery] bool? isEmployeebonus,
+        CancellationToken ct)
+    {
+        var query = _context.Orders.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrEmpty(employeeId)) query = query.Where(order => order.ApplicationUserId == employeeId);
+        if (isEmployeebonus.HasValue) query = query.Where(order => order.IsBonus == isEmployeebonus.Value);
+        return Ok(await query.Select(order => order.Id).ToListAsync(ct));
+    }
+
+    [HttpPost("/Order/RemoveWarehouse")]
+    public async Task<IActionResult> RemoveWarehouse(
+        [FromForm] int orderId,
+        [FromForm] int warehouseId,
+        CancellationToken ct)
+    {
+        var order = await _context.Orders.Include(item => item.OrderWarehouses)
+            .FirstOrDefaultAsync(item => item.Id == orderId, ct);
+        if (order is null) return NotFound();
+        if (order.OrderStatus == OrderStatusCodes.Delivered)
+            return Content("تم التسليم لا تستطيع التعديل عليه");
+        var orderWarehouse = order.OrderWarehouses.FirstOrDefault(item => item.WarehouseId == warehouseId);
+        if (orderWarehouse is null) return NotFound();
+        var warehouse = await _context.Warehouses.FirstOrDefaultAsync(item => item.Id == warehouseId, ct);
+        if (warehouse is not null)
+        {
+            if (IsActiveInventoryStatus(order.OrderStatus)) warehouse.Amount += orderWarehouse.Amount;
+            else if (IsReservedInventoryStatus(order.OrderStatus))
+            {
+                warehouse.ReservedAmount -= orderWarehouse.Amount;
+                warehouse.Amount += orderWarehouse.Amount;
+            }
+        }
+        _context.OrderWarehouses.Remove(orderWarehouse);
+        await _context.SaveChangesAsync(ct);
+        return Ok();
+    }
+
     private string StatusSelectionKey() => $"orders:status-selection:{CurrentUserCacheId()}";
     private string DraftKey() => $"orders:create-draft:{CurrentUserCacheId()}";
     private string CurrentUserCacheId() => User.GetUserId() ??
         throw new UnauthorizedAccessException("Authenticated user ID is missing.");
+
+    private static bool IsActiveInventoryStatus(int status) => status is
+        OrderStatusCodes.New or OrderStatusCodes.Prepared or OrderStatusCodes.Processed or
+        OrderStatusCodes.InDelivery or OrderStatusCodes.TemporarilyDelivered or OrderStatusCodes.Delivered or
+        OrderStatusCodes.BalanceUpdated or OrderStatusCodes.Paid;
+
+    private static bool IsReservedInventoryStatus(int status) =>
+        status == OrderStatusCodes.Postponed || status is
+            OrderStatusCodes.Incomplete or OrderStatusCodes.IncompleteStage1 or OrderStatusCodes.IncompleteStage2 or
+            OrderStatusCodes.IncompleteStage3 or OrderStatusCodes.IncompleteStage4 or OrderStatusCodes.IncompleteStage5 or
+            OrderStatusCodes.IncompleteStage6;
 }
 
 public record StatusSelectionRequest(List<int> OrderIds, int Status);

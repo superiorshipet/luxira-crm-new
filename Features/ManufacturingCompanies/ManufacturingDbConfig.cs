@@ -53,6 +53,44 @@ public class ProductImageDbConfig : IDbConfig<ProductImage>
     }
 }
 
+public class ProductImageDraftDbConfig : IDbConfig<ProductImageDraft>
+{
+    public void Configure(EntityTypeBuilder<ProductImageDraft> builder)
+    {
+        builder.ToTable("ProductImageDrafts");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.ImageUrl).IsRequired();
+        builder.Property(item => item.ProductName).HasMaxLength(255).IsRequired();
+        builder.HasOne(item => item.ManufacturingCompany).WithMany()
+            .HasForeignKey(item => item.ManufacturingCompanyId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class ProductImageUserPinDbConfig : IDbConfig<ProductImageUserPin>
+{
+    public void Configure(EntityTypeBuilder<ProductImageUserPin> builder)
+    {
+        builder.ToTable("ProductImageUserPins");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.ApplicationUserId).HasMaxLength(450).IsRequired();
+        builder.HasIndex(item => new { item.ProductImageId, item.ApplicationUserId }).IsUnique();
+        builder.HasOne(item => item.ProductImage).WithMany()
+            .HasForeignKey(item => item.ProductImageId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class EmployeeManufacturingCompanyDbConfig : IDbConfig<EmployeeManufacturingCompany>
+{
+    public void Configure(EntityTypeBuilder<EmployeeManufacturingCompany> builder)
+    {
+        builder.ToTable("EmployeeManufacturingCompany");
+        builder.HasKey(item => new { item.ApplicationUserId, item.ManufacturingCompanyId });
+        builder.Property(item => item.ApplicationUserId).HasMaxLength(450).IsRequired();
+        builder.HasIndex(item => item.EmployeeId);
+        builder.HasIndex(item => item.ManufacturingCompanyId);
+    }
+}
+
 public class ProductMinimumSellingPriceDbConfig : IDbConfig<ProductMinimumSellingPrice>
 {
     public void Configure(EntityTypeBuilder<ProductMinimumSellingPrice> builder)

@@ -116,6 +116,51 @@ public class HelpCenterChatMessageOrderLinkDbConfig : IDbConfig<HelpCenterChatMe
     }
 }
 
+public class HelpCenterChatMessageHiddenForUserDbConfig : IDbConfig<HelpCenterChatMessageHiddenForUser>
+{
+    public void Configure(EntityTypeBuilder<HelpCenterChatMessageHiddenForUser> builder)
+    {
+        builder.ToTable("HelpCenterChatMessageHiddenForUsers");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.UserId).HasMaxLength(450).IsRequired();
+        builder.HasIndex(item => new { item.MessageId, item.UserId }).IsUnique();
+    }
+}
+
+public class HelpCenterChatUserPresenceDbConfig : IDbConfig<HelpCenterChatUserPresence>
+{
+    public void Configure(EntityTypeBuilder<HelpCenterChatUserPresence> builder)
+    {
+        builder.ToTable("HelpCenterChatUserPresence");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.UserId).HasMaxLength(450).IsRequired();
+        builder.Property(item => item.UserName).HasMaxLength(250).IsRequired();
+        builder.Property(item => item.UserImageUrl).HasMaxLength(1000);
+        builder.HasIndex(item => item.UserId).IsUnique();
+        builder.HasIndex(item => item.LastSeenAt);
+    }
+}
+
+public class HelpCenterChatKeywordDbConfig : IDbConfig<HelpCenterChatKeyword>
+{
+    public void Configure(EntityTypeBuilder<HelpCenterChatKeyword> builder)
+    {
+        builder.ToTable("HelpCenterChatKeywords");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Phrase).HasMaxLength(250).IsRequired();
+        builder.Property(item => item.NormalizedPhrase).HasMaxLength(250).IsRequired();
+        builder.Property(item => item.ActionType).HasMaxLength(50).IsRequired();
+        builder.Property(item => item.Category).HasMaxLength(100).IsRequired();
+        builder.Property(item => item.AutoReplyText).HasColumnType("nvarchar(max)");
+        builder.Property(item => item.IncompleteAutoReplyText).HasColumnType("nvarchar(max)");
+        builder.Property(item => item.CreatedAt).HasColumnType("datetime");
+        builder.Property(item => item.CreatedBy).HasMaxLength(128);
+        builder.Property(item => item.UpdatedAt).HasColumnType("datetime");
+        builder.Property(item => item.UpdatedBy).HasMaxLength(128);
+        builder.HasIndex(item => new { item.IsActive, item.ActionType });
+    }
+}
+
 public class WhatsAppMessageDbConfig : IDbConfig<WhatsAppMessage>
 {
     public void Configure(EntityTypeBuilder<WhatsAppMessage> builder)

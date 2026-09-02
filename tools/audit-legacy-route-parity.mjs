@@ -44,10 +44,16 @@ for (const fileName of readdirSync(controllersRoot).sort()) {
   if (ignoredControllers.has(controllerName)) continue;
 
   const source = readFileSync(join(controllersRoot, fileName), "utf8");
-  const classIndex = source.search(new RegExp(`class\\s+${controllerName}Controller\\b`));
-  const classAttributes = classIndex < 0
+  const escapedControllerName = controllerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const classMatch = source.match(new RegExp(
+    `public\\s+class\\s+${escapedControllerName}Controller\\b`,
+  ));
+  const classPrefix = classMatch?.index === undefined
     ? ""
-    : trailingAttributes(source.slice(0, classIndex));
+    : source.slice(0, classMatch.index);
+  const classAttributes = classPrefix.match(
+    /((?:\s*\[[^\r\n]*\]\s*)+)$/,
+  )?.[1] ?? "";
   const classRoutes = routeTemplates(classAttributes);
 
   for (const match of source.matchAll(actionPattern)) {
@@ -205,11 +211,6 @@ function methodTemplates(attributes) {
 function routeTemplates(attributes) {
   return [...attributes.matchAll(/\[Route\s*\(\s*"([^"]+)"[^)]*\)[^\]]*\]/gi)]
     .map((match) => match[1]);
-}
-
-function trailingAttributes(prefix) {
-  const match = prefix.match(/((?:\s*\[[^\]]+\]\s*)+)$/);
-  return match?.[1] ?? "";
 }
 
 function operationKey(method, route) {

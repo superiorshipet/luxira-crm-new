@@ -157,7 +157,7 @@ public class EmployeeController : ControllerBase
             if (!request.OrderPackagingNotificationTime.HasValue || deliveryCompanyIds.Count == 0)
                 throw new BadRequestException("Packaging time and at least one delivery company are required.");
             var validCount = await _context.DeliveryCompanies.AsNoTracking().CountAsync(
-                company => deliveryCompanyIds.Contains(company.Id) && company.IsActive && company.Country == 2,
+                company => deliveryCompanyIds.Contains(company.Id) && company.IsActive && company.Country == 7,
                 ct);
             if (validCount != deliveryCompanyIds.Count)
                 throw new BadRequestException("Every packaging delivery company must be an active Turkey company.");
@@ -239,7 +239,7 @@ public class EmployeeController : ControllerBase
         var now = IstanbulTimeHelper.Now;
         var scheduledAt = now.Date.Add(employee.OrderPackagingNotificationTime.Value);
         var query = _context.Orders.AsNoTracking().Where(order =>
-            !order.IsHidden && order.Country == 2 && deliveryCompanyIds.Contains(order.DeliveryCompanyId));
+            !order.IsHidden && order.Country == 7 && deliveryCompanyIds.Contains(order.DeliveryCompanyId));
         var newCount = await query.CountAsync(order => order.OrderStatus == OrderStatusCodes.New, ct);
         var preparedCount = await query.CountAsync(order => order.OrderStatus == OrderStatusCodes.Prepared, ct);
         return Ok(new

@@ -70,6 +70,36 @@ public class ProductImage
     public string? CreatedByName { get; set; }
 }
 
+public class ProductImageDraft
+{
+    public int Id { get; set; }
+    public string ImageUrl { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public int ManufacturingCompanyId { get; set; }
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+}
+
+public class ProductImageUserPin
+{
+    public int Id { get; set; }
+    public int ProductImageId { get; set; }
+    public ProductImage? ProductImage { get; set; }
+    public string ApplicationUserId { get; set; } = string.Empty;
+    public DateTime PinnedAt { get; set; }
+    public string? PinnedByName { get; set; }
+}
+
+public class EmployeeManufacturingCompany
+{
+    public int EmployeeId { get; set; }
+    public int ManufacturingCompanyId { get; set; }
+    public string ApplicationUserId { get; set; } = string.Empty;
+    public bool CanSeeManufacturingCompany { get; set; } = true;
+}
+
 public class ProductMinimumSellingPrice
 {
     public int Id { get; set; }

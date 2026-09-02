@@ -4,7 +4,7 @@ public class HelpCenterChatMessage
 {
     public long Id { get; set; }
     public string SenderUserId { get; set; } = string.Empty;
-    public string? SenderName { get; set; }
+    public string SenderName { get; set; } = string.Empty;
     public string? SenderImageUrl { get; set; }
     public string? MessageText { get; set; }
     public string MessageKind { get; set; } = "Text";
@@ -93,6 +93,40 @@ public class HelpCenterChatMessageOrderLink
     public string LinkedByUserId { get; set; } = string.Empty;
     public string LinkedByName { get; set; } = string.Empty;
     public DateTime LinkedAt { get; set; }
+}
+
+public class HelpCenterChatMessageHiddenForUser
+{
+    public long Id { get; set; }
+    public long MessageId { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public DateTime HiddenAt { get; set; }
+}
+
+public class HelpCenterChatUserPresence
+{
+    public long Id { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string? UserImageUrl { get; set; }
+    public DateTime LastSeenAt { get; set; }
+    public bool IsChatOpen { get; set; }
+}
+
+public class HelpCenterChatKeyword
+{
+    public int Id { get; set; }
+    public string Phrase { get; set; } = string.Empty;
+    public string NormalizedPhrase { get; set; } = string.Empty;
+    public string ActionType { get; set; } = "AutoConversion";
+    public string Category { get; set; } = "عام";
+    public string? AutoReplyText { get; set; }
+    public string? IncompleteAutoReplyText { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedBy { get; set; }
 }
 
 public class WhatsAppMessage

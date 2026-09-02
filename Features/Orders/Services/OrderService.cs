@@ -15,6 +15,15 @@ namespace Luxira.Api.Features.Orders.Services;
 
 public partial class OrderService
 {
+    private const int TurkeyCountryId = 7;
+    private static readonly IReadOnlyDictionary<int, string> CountryDialCodes = new Dictionary<int, string>
+    {
+        [1] = "964", [2] = "971", [3] = "974", [4] = "218",
+        [5] = "968", [6] = "970", [7] = "90", [8] = "962",
+        [9] = "965", [10] = "973", [11] = "966", [12] = "216",
+        [13] = "212", [14] = "213", [15] = "961", [16] = "20",
+    };
+    private static readonly HashSet<int> NoLeadingZeroLocalCountries = [3, 5, 9, 10, 12];
     private static readonly ConcurrentDictionary<string, DateTime> CreationThrottle = new();
     private static readonly TimeSpan ThrottleWindow = TimeSpan.FromSeconds(30);
 
@@ -82,7 +91,7 @@ public partial class OrderService
         if (request.OrderSource != 2 && string.IsNullOrWhiteSpace(request.ChatUrl))
             throw new BadRequestException("حقل رابط المحادثة مطلوب.");
 
-        if (request.Country == 2 && ArabicRegex().IsMatch(request.Address ?? string.Empty))
+        if (request.Country == TurkeyCountryId && ArabicRegex().IsMatch(request.Address ?? string.Empty))
             throw new BadRequestException("لا يُسمح بإدخال عنوان عربي لدولة تركيا. اكتب العنوان بحروف إنجليزية أو تركية فقط.");
 
         var normalizedPhone = NormalizePhoneNumber(request.TelephoneNumber, request.Country);
@@ -108,7 +117,7 @@ public partial class OrderService
         }
 
         int initialStatus = OrderStatusCodes.New;
-        if (request.Country == 2 && (request.Address ?? string.Empty).Trim().Length < 15)
+        if (request.Country == TurkeyCountryId && (request.Address ?? string.Empty).Trim().Length < 15)
         {
             initialStatus = OrderStatusCodes.Incomplete;
         }
@@ -551,24 +560,35 @@ public partial class OrderService
     private static string NormalizePhoneNumber(string phone, int country)
     {
         if (string.IsNullOrWhiteSpace(phone)) return string.Empty;
-        var digits = new string(phone.Where(char.IsDigit).ToArray());
-
-        if (country == 1) // العراق
+        var buffer = new char[phone.Length];
+        var length = 0;
+        foreach (var character in phone)
         {
-            if (digits.StartsWith("00964", StringComparison.Ordinal)) digits = digits[5..];
-            else if (digits.StartsWith("964", StringComparison.Ordinal)) digits = digits[3..];
-            else if (digits.StartsWith('0')) digits = digits[1..];
-            return $"964{digits}";
+            var normalized = character switch
+            {
+                >= '٠' and <= '٩' => (char)('0' + character - '٠'),
+                >= '۰' and <= '۹' => (char)('0' + character - '۰'),
+                _ => character,
+            };
+            if (normalized is not ('⁦' or '⁧' or '⁨' or '⁩' or '-' or ' '))
+                buffer[length++] = normalized;
         }
-        else if (country == 2) // تركيا
+        var cleaned = new string(buffer, 0, length);
+        foreach (var pair in CountryDialCodes.OrderByDescending(item => item.Value.Length))
         {
-            if (digits.StartsWith("0090", StringComparison.Ordinal)) digits = digits[4..];
-            else if (digits.StartsWith("90", StringComparison.Ordinal)) digits = digits[2..];
-            else if (digits.StartsWith('0')) digits = digits[1..];
-            return $"90{digits}";
+            var internationalPrefix = "00" + pair.Value;
+            var plusPrefix = "+" + pair.Value;
+            if (!cleaned.StartsWith(internationalPrefix, StringComparison.Ordinal) &&
+                !cleaned.StartsWith(plusPrefix, StringComparison.Ordinal)) continue;
+            var prefixLength = cleaned[0] == '+' ? plusPrefix.Length : internationalPrefix.Length;
+            var local = cleaned[prefixLength..];
+            cleaned = NoLeadingZeroLocalCountries.Contains(pair.Key) ? local : "0" + local;
+            break;
         }
-
-        return digits.TrimStart('0');
+        if (NoLeadingZeroLocalCountries.Contains(country) && country != 12 &&
+            cleaned.Length == 9 && cleaned.StartsWith('0'))
+            cleaned = cleaned[1..];
+        return cleaned;
     }
 
     private static OrderDto MapToDto(Order o) => new(
