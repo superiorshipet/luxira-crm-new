@@ -166,9 +166,9 @@ public class EmployeeSalaryPayment
 public class EmployeeBonusRate
 {
     public int Id { get; set; }
-    public int EmployeeId { get; set; }
+    public string EmployeeId { get; set; } = string.Empty;
     public decimal ProBonusPercentage { get; set; }
-    public int ProThreshold { get; set; }
+    public decimal ProThreshold { get; set; }
     public bool IsBonusPanelHidden { get; set; }
     public bool IsBonusAmountsRevealed { get; set; }
     public decimal BonusPercentage { get; set; }
@@ -180,8 +180,8 @@ public class EmployeeBonusRate
 public class EmployeeBonusPayment
 {
     public int Id { get; set; }
-    public int EmployeeId { get; set; }
-    public Employee? Employee { get; set; }
+    public string EmployeeId { get; set; } = string.Empty;
+    public ApplicationUser? Employee { get; set; }
     public DateTime DatePaid { get; set; } = DateTime.UtcNow;
     public decimal AmountPaid { get; set; }
     public decimal ProExtraAmount { get; set; }
@@ -256,7 +256,7 @@ public class EmployeeTransaction
     public int Id { get; set; }
     public int EmployeeId { get; set; }
     public decimal Amount { get; set; }
-    public string TransactionType { get; set; } = string.Empty; // Advance, Bonus, Deduction
+    public EmployeeTransactionType TransactionType { get; set; }
     public DateTime Date { get; set; } = DateTime.UtcNow;
     public string? Reason { get; set; }
     public int? EmployeePaymentSummaryId { get; set; }
@@ -288,7 +288,7 @@ public class EmployeeRating
 
 public class PersonalNote
 {
-    public int Id { get; set; }
+    public long Id { get; set; }
     public string ApplicationUserId { get; set; } = string.Empty;
     public string HtmlContent { get; set; } = string.Empty;
     public string PlainText { get; set; } = string.Empty;
@@ -301,7 +301,7 @@ public class PersonalNote
 
 public class ManagementRequest
 {
-    public int Id { get; set; }
+    public long Id { get; set; }
     public string ApplicationUserId { get; set; } = string.Empty;
     public string EmployeeName { get; set; } = string.Empty;
     public string? EmployeeEmail { get; set; }
@@ -312,6 +312,14 @@ public class ManagementRequest
     public DateTime? DecidedAt { get; set; }
     public string? DecidedByUserId { get; set; }
     public string? DecidedByName { get; set; }
+}
+
+public enum EmployeeTransactionType
+{
+    Deduction = 0,
+    Bonus = 1,
+    Advance = 2,
+    Overtime = 3,
 }
 
 public class ScreenRecord

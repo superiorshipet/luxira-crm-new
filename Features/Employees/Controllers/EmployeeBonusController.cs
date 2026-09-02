@@ -62,8 +62,12 @@ public class EmployeeBonusController : ControllerBase
     [HttpGet("/EmployeeBonus/BonusDetails")]
     public async Task<IActionResult> BonusDetails([FromQuery] int employeeId, CancellationToken ct)
     {
+        var applicationUserId = await _context.Employees
+            .Where(employee => employee.Id == employeeId)
+            .Select(employee => employee.ApplicationUserId)
+            .FirstOrDefaultAsync(ct);
         var details = await _context.EmployeeBonusPayments
-            .Where(b => b.EmployeeId == employeeId)
+            .Where(b => b.EmployeeId == applicationUserId)
             .OrderByDescending(b => b.DatePaid)
             .ToListAsync(ct);
 
@@ -75,9 +79,16 @@ public class EmployeeBonusController : ControllerBase
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
     public async Task<IActionResult> Pay([FromBody] PayBonusEmployeeRequest request, CancellationToken ct)
     {
+        var applicationUserId = await _context.Employees
+            .Where(employee => employee.Id == request.EmployeeId)
+            .Select(employee => employee.ApplicationUserId)
+            .FirstOrDefaultAsync(ct);
+        if (string.IsNullOrWhiteSpace(applicationUserId))
+            throw new BadRequestException("Employee is not linked to an application user.");
+
         var payment = new EmployeeBonusPayment
         {
-            EmployeeId = request.EmployeeId,
+            EmployeeId = applicationUserId,
             AmountPaid = request.Amount,
             DatePaid = IstanbulTimeHelper.Now
         };

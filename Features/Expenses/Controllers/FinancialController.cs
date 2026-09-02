@@ -227,12 +227,12 @@ public class FinancialController : ControllerBase
                 .AsNoTracking()
                 .ToListAsync(ct);
 
-            var deductions = transactions.Where(t => t.TransactionType == "خصم" || t.TransactionType == "Deduction").Sum(t => t.Amount);
-            var rewards = transactions.Where(t => t.TransactionType == "مكافأة" || t.TransactionType == "Bonus").Sum(t => t.Amount);
-            var advances = transactions.Where(t => t.TransactionType == "سلفة" || t.TransactionType == "Advance").Sum(t => t.Amount);
+            var deductions = transactions.Where(t => t.TransactionType == EmployeeTransactionType.Deduction).Sum(t => t.Amount);
+            var rewards = transactions.Where(t => t.TransactionType == EmployeeTransactionType.Bonus).Sum(t => t.Amount);
+            var advances = transactions.Where(t => t.TransactionType == EmployeeTransactionType.Advance).Sum(t => t.Amount);
 
             var bonuses = await _context.EmployeeBonusPayments
-                .Where(b => b.EmployeeId == emp.Id && b.DatePaid >= sDate && b.DatePaid <= eDate)
+                .Where(b => b.EmployeeId == emp.ApplicationUserId && b.DatePaid >= sDate && b.DatePaid <= eDate)
                 .SumAsync(b => (decimal?)b.AmountPaid, ct) ?? 0m;
 
             var salary = emp.Salary;
@@ -285,7 +285,7 @@ public class FinancialController : ControllerBase
             return NotFound("Employee not found.");
 
         var bonuses = await _context.EmployeeBonusPayments
-            .Where(b => b.EmployeeId == employeeId)
+            .Where(b => b.EmployeeId == employee.ApplicationUserId)
             .OrderByDescending(b => b.DatePaid)
             .AsNoTracking()
             .ToListAsync(ct);

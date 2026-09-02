@@ -2,7 +2,7 @@ namespace Luxira.Api.Features.Communication.Models;
 
 public class HelpCenterChatMessage
 {
-    public int Id { get; set; }
+    public long Id { get; set; }
     public string SenderUserId { get; set; } = string.Empty;
     public string? SenderName { get; set; }
     public string? SenderImageUrl { get; set; }
@@ -16,9 +16,83 @@ public class HelpCenterChatMessage
     public DateTime? DeletedAt { get; set; }
     public string? DeletedByUserId { get; set; }
     public string? DeletedByName { get; set; }
-    public int? ReplyToMessageId { get; set; }
+    public long? ReplyToMessageId { get; set; }
     public DateTime? EditedAt { get; set; }
     public string? ClientMessageId { get; set; }
+}
+
+public class HelpCenterChatReadState
+{
+    public int Id { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public long LastReadMessageId { get; set; }
+    public DateTime? LastReadAt { get; set; }
+}
+
+public class HelpCenterChatMessageEdit
+{
+    public long Id { get; set; }
+    public long MessageId { get; set; }
+    public string EditorUserId { get; set; } = string.Empty;
+    public string EditorName { get; set; } = string.Empty;
+    public string? OldMessageText { get; set; }
+    public string? NewMessageText { get; set; }
+    public DateTime EditedAt { get; set; }
+}
+
+public class HelpCenterChatReaction
+{
+    public long Id { get; set; }
+    public long MessageId { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string Emoji { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+public class HelpCenterChatPin
+{
+    public long Id { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public long MessageId { get; set; }
+    public DateTime PinnedAt { get; set; }
+}
+
+public class HelpCenterChatMessageRead
+{
+    public long Id { get; set; }
+    public long MessageId { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string? UserImageUrl { get; set; }
+    public DateTime ReadAt { get; set; }
+}
+
+public class HelpCenterChatMention
+{
+    public long Id { get; set; }
+    public long MessageId { get; set; }
+    public string MentionedUserId { get; set; } = string.Empty;
+}
+
+public class HelpCenterChatSetting
+{
+    public int Id { get; set; }
+    public bool IsMuted { get; set; }
+    public bool IsReadOnly { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
+}
+
+public class HelpCenterChatMessageOrderLink
+{
+    public long Id { get; set; }
+    public long MessageId { get; set; }
+    public int OrderId { get; set; }
+    public string LinkedByUserId { get; set; } = string.Empty;
+    public string LinkedByName { get; set; } = string.Empty;
+    public DateTime LinkedAt { get; set; }
 }
 
 public class WhatsAppMessage

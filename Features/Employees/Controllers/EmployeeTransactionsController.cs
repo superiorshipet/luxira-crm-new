@@ -40,7 +40,9 @@ public class EmployeeTransactionsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(type))
         {
-            query = query.Where(t => t.TransactionType == type);
+            if (!TryParseTransactionType(type, out var parsedType))
+                throw new BadRequestException("Unsupported transaction type.");
+            query = query.Where(t => t.TransactionType == parsedType);
         }
 
         if (fromDate.HasValue)
@@ -71,7 +73,7 @@ public class EmployeeTransactionsController : ControllerBase
         {
             EmployeeId = request.EmployeeId,
             Amount = request.Amount,
-            TransactionType = request.TransactionType, // Advance, Bonus, Deduction, Loan
+            TransactionType = ParseTransactionType(request.TransactionType),
             Reason = request.Note,
             Date = DateTime.UtcNow
         };
@@ -80,6 +82,26 @@ public class EmployeeTransactionsController : ControllerBase
         await _context.SaveChangesAsync(ct);
 
         return Ok(trans);
+    }
+
+    private static EmployeeTransactionType ParseTransactionType(string value) =>
+        TryParseTransactionType(value, out var result)
+            ? result
+            : throw new BadRequestException("Unsupported transaction type.");
+
+    private static bool TryParseTransactionType(
+        string? value,
+        out EmployeeTransactionType result)
+    {
+        result = value?.Trim() switch
+        {
+            "خصم" or "Deduction" => EmployeeTransactionType.Deduction,
+            "مكافأة" or "Bonus" => EmployeeTransactionType.Bonus,
+            "سلفة" or "Advance" => EmployeeTransactionType.Advance,
+            "ساعات_دوام_إضافية" or "Overtime" => EmployeeTransactionType.Overtime,
+            _ => (EmployeeTransactionType)(-1),
+        };
+        return (int)result >= 0;
     }
 }
 

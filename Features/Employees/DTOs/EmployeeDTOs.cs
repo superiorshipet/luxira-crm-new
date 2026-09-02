@@ -79,7 +79,7 @@ public record RecordSalaryPaymentRequest(
 
 public record EmployeeBonusPaymentDto(
     int Id,
-    int EmployeeId,
+    string EmployeeId,
     string? EmployeeName,
     decimal Amount,
     DateTime Date

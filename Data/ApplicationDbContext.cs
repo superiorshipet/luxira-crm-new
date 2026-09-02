@@ -102,6 +102,14 @@ public class ApplicationDbContext : DbContext
 
     // Communication & Messages
     public DbSet<HelpCenterChatMessage> HelpCenterChatMessages => Set<HelpCenterChatMessage>();
+    public DbSet<HelpCenterChatReadState> HelpCenterChatReadStates => Set<HelpCenterChatReadState>();
+    public DbSet<HelpCenterChatMessageEdit> HelpCenterChatMessageEdits => Set<HelpCenterChatMessageEdit>();
+    public DbSet<HelpCenterChatReaction> HelpCenterChatReactions => Set<HelpCenterChatReaction>();
+    public DbSet<HelpCenterChatPin> HelpCenterChatPins => Set<HelpCenterChatPin>();
+    public DbSet<HelpCenterChatMessageRead> HelpCenterChatMessageReads => Set<HelpCenterChatMessageRead>();
+    public DbSet<HelpCenterChatMention> HelpCenterChatMentions => Set<HelpCenterChatMention>();
+    public DbSet<HelpCenterChatSetting> HelpCenterChatSettings => Set<HelpCenterChatSetting>();
+    public DbSet<HelpCenterChatMessageOrderLink> HelpCenterChatMessageOrderLinks => Set<HelpCenterChatMessageOrderLink>();
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
     public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
     public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();

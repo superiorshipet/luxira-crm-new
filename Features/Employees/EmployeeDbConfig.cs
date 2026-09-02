@@ -61,6 +61,7 @@ public class EmployeeActivityLogDbConfig : IDbConfig<EmployeeActivityLog>
     {
         builder.ToTable("EmployeeActivityLogs");
         builder.HasKey(l => l.Id);
+        builder.Property(l => l.ActivityDate).HasColumnType("date");
     }
 }
 
@@ -97,7 +98,9 @@ public class EmployeeBonusRateDbConfig : IDbConfig<EmployeeBonusRate>
     {
         builder.ToTable("EmployeeBonusRates");
         builder.HasKey(r => r.Id);
+        builder.Property(r => r.EmployeeId).HasMaxLength(450).IsRequired();
         builder.Property(r => r.ProBonusPercentage).HasPrecision(18, 2);
+        builder.Property(r => r.ProThreshold).HasPrecision(18, 2);
         builder.Property(r => r.BonusPercentage).HasPrecision(18, 2);
         builder.Property(r => r.BonusProcessingPercentage).HasPrecision(18, 2);
         builder.Property(r => r.ProBonusProcessingPercentage).HasPrecision(18, 2);
@@ -111,6 +114,7 @@ public class EmployeeBonusPaymentDbConfig : IDbConfig<EmployeeBonusPayment>
     {
         builder.ToTable("EmployeeBonusPayments");
         builder.HasKey(p => p.Id);
+        builder.Property(p => p.EmployeeId).HasMaxLength(450).IsRequired();
         builder.Property(p => p.AmountPaid).HasPrecision(18, 2);
         builder.Property(p => p.ProExtraAmount).HasPrecision(18, 2);
         builder.Property(p => p.ProcessingAmount).HasPrecision(18, 2);
@@ -169,6 +173,7 @@ public class EmployeeTransactionDbConfig : IDbConfig<EmployeeTransaction>
         builder.ToTable("EmployeeTransactions");
         builder.HasKey(t => t.Id);
         builder.Property(t => t.Amount).HasPrecision(18, 2);
+        builder.Property(t => t.TransactionType).HasConversion<int>();
     }
 }
 

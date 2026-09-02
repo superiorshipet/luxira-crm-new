@@ -19,5 +19,7 @@ public class SearchKeywordDbConfig : IDbConfig<SearchKeywordOption>
         builder.Property(s => s.Category).HasMaxLength(100).IsRequired();
         builder.Property(s => s.CreatedBy).HasMaxLength(128);
         builder.Property(s => s.UpdatedBy).HasMaxLength(128);
+        builder.Property(s => s.CreatedAt).HasColumnType("datetime");
+        builder.Property(s => s.UpdatedAt).HasColumnType("datetime");
     }
 }

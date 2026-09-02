@@ -44,6 +44,7 @@ var runSelectSmoke = args.Any(argument =>
 var missingTables = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 var missingColumns = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 var unsafeNullability = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+var mismatchedTypes = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 var mismatchedTableKeys = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
 foreach (var table in relationalModel.Tables)
@@ -81,6 +82,14 @@ foreach (var table in relationalModel.Tables)
                 unsafeNullability.Add($"{tableKey}.{column.Name}");
                 mismatchedTableKeys.Add(tableKey);
             }
+            if (!StoreTypeFamily(column.StoreType).Equals(
+                    StoreTypeFamily(databaseColumn.DataType),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                mismatchedTypes.Add(
+                    $"{tableKey}.{column.Name} model={column.StoreType} database={databaseColumn.DataType}");
+                mismatchedTableKeys.Add(tableKey);
+            }
         }
     }
 }
@@ -92,6 +101,8 @@ Console.WriteLine($"Missing columns: {missingColumns.Count}");
 foreach (var column in missingColumns) Console.WriteLine($"COLUMN {column}");
 Console.WriteLine($"Unsafe nullable columns: {unsafeNullability.Count}");
 foreach (var column in unsafeNullability) Console.WriteLine($"NULLABILITY {column}");
+Console.WriteLine($"Type mismatches: {mismatchedTypes.Count}");
+foreach (var column in mismatchedTypes) Console.WriteLine($"TYPE {column}");
 Console.WriteLine("Actual columns for mismatched existing tables:");
 foreach (var tableKey in mismatchedTableKeys.Except(missingTables, StringComparer.OrdinalIgnoreCase))
 {
@@ -105,7 +116,8 @@ foreach (var tableKey in mismatchedTableKeys.Except(missingTables, StringCompare
     Console.WriteLine($"ACTUAL {tableKey}: {string.Join(',', actual)}");
 }
 
-if (missingTables.Count == 0 && missingColumns.Count == 0 && unsafeNullability.Count == 0 && runSelectSmoke)
+if (missingTables.Count == 0 && missingColumns.Count == 0 &&
+    unsafeNullability.Count == 0 && mismatchedTypes.Count == 0 && runSelectSmoke)
 {
     var selectedTables = 0;
     foreach (var table in relationalModel.Tables)
@@ -124,16 +136,23 @@ if (missingTables.Count == 0 && missingColumns.Count == 0 && unsafeNullability.C
     Console.WriteLine($"Read-only SELECT smoke checks passed: {selectedTables}");
 }
 
-return missingTables.Count == 0 && missingColumns.Count == 0 && unsafeNullability.Count == 0 ? 0 : 1;
+return missingTables.Count == 0 && missingColumns.Count == 0 &&
+    unsafeNullability.Count == 0 && mismatchedTypes.Count == 0 ? 0 : 1;
 
 static string EscapeIdentifier(string identifier) =>
     $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
+
+static string StoreTypeFamily(string storeType)
+{
+    var separator = storeType.IndexOf('(');
+    return (separator >= 0 ? storeType[..separator] : storeType).Trim();
+}
 
 static async Task<List<DatabaseColumn>> ReadColumnsAsync(DbConnection connection)
 {
     await using var command = connection.CreateCommand();
     command.CommandText = """
-        SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, IS_NULLABLE
+        SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, IS_NULLABLE, DATA_TYPE
         FROM INFORMATION_SCHEMA.COLUMNS
         ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION;
         """;
@@ -145,9 +164,15 @@ static async Task<List<DatabaseColumn>> ReadColumnsAsync(DbConnection connection
             reader.GetString(0),
             reader.GetString(1),
             reader.GetString(2),
-            reader.GetString(3).Equals("YES", StringComparison.OrdinalIgnoreCase)));
+            reader.GetString(3).Equals("YES", StringComparison.OrdinalIgnoreCase),
+            reader.GetString(4)));
     }
     return columns;
 }
 
-internal sealed record DatabaseColumn(string Schema, string Table, string Column, bool IsNullable);
+internal sealed record DatabaseColumn(
+    string Schema,
+    string Table,
+    string Column,
+    bool IsNullable,
+    string DataType);

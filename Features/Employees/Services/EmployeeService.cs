@@ -239,7 +239,7 @@ public class EmployeeService
             decimal earnedSalary = Math.Round(dailyRate * effectiveDays, 2);
 
             decimal bonuses = await _context.EmployeeBonusPayments
-                .Where(b => b.EmployeeId == emp.Id && b.DatePaid >= startDate && b.DatePaid < endDate)
+                .Where(b => b.EmployeeId == emp.ApplicationUserId && b.DatePaid >= startDate && b.DatePaid < endDate)
                 .SumAsync(b => (decimal?)b.AmountPaid, ct) ?? 0;
 
             decimal deductions = await _context.EmployeeViolations
@@ -247,7 +247,8 @@ public class EmployeeService
                 .SumAsync(v => (decimal?)v.PenaltyAmount, ct) ?? 0;
 
             decimal advances = await _context.EmployeeTransactions
-                .Where(t => t.EmployeeId == emp.Id && t.Date >= startDate && t.Date < endDate && t.TransactionType == "Advance")
+                .Where(t => t.EmployeeId == emp.Id && t.Date >= startDate && t.Date < endDate &&
+                            t.TransactionType == EmployeeTransactionType.Advance)
                 .SumAsync(t => (decimal?)t.Amount, ct) ?? 0;
 
             decimal paidAmount = await _context.EmployeeSalaryPayments
@@ -293,7 +294,11 @@ public class EmployeeService
         var query = _context.EmployeeBonusPayments.Include(b => b.Employee).AsNoTracking().AsQueryable();
         if (employeeId.HasValue && employeeId.Value > 0)
         {
-            query = query.Where(b => b.EmployeeId == employeeId.Value);
+            var applicationUserId = await _context.Employees
+                .Where(employee => employee.Id == employeeId.Value)
+                .Select(employee => employee.ApplicationUserId)
+                .FirstOrDefaultAsync(ct);
+            query = query.Where(b => b.EmployeeId == applicationUserId);
         }
 
         var list = await query.OrderByDescending(b => b.DatePaid).ToListAsync(ct);
@@ -307,10 +312,14 @@ public class EmployeeService
         {
             throw new NotFoundException($"Employee {request.EmployeeId} not found.");
         }
+        if (string.IsNullOrWhiteSpace(emp.ApplicationUserId))
+        {
+            throw new BadRequestException("Employee is not linked to an application user.");
+        }
 
         var payment = new EmployeeBonusPayment
         {
-            EmployeeId = request.EmployeeId,
+            EmployeeId = emp.ApplicationUserId,
             AmountPaid = request.Amount,
             DatePaid = DateTime.UtcNow
         };
