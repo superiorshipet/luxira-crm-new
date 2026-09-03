@@ -15,7 +15,7 @@ public class EmployeeRepository
 
     public async Task<List<Employee>> GetAllAsync(bool? isActive = null, CancellationToken ct = default)
     {
-        var query = _context.Employees.AsNoTracking().AsQueryable();
+        var query = _context.Employees.AsNoTracking().Where(employee => !employee.IsDeleted);
         if (isActive.HasValue)
         {
             query = query.Where(e => e.IsActive == isActive.Value);
@@ -28,12 +28,12 @@ public class EmployeeRepository
         return await _context.Employees
             .Include(e => e.AttendanceLogs)
             .Include(e => e.SalaryPayments)
-            .FirstOrDefaultAsync(e => e.Id == id, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, ct);
     }
 
     public async Task<Employee?> GetByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        return await _context.Employees.FirstOrDefaultAsync(e => e.ApplicationUserId == userId, ct);
+        return await _context.Employees.FirstOrDefaultAsync(e => e.ApplicationUserId == userId && !e.IsDeleted, ct);
     }
 
     public async Task<Employee> AddAsync(Employee employee, CancellationToken ct = default)

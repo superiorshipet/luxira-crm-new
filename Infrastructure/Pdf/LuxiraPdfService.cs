@@ -1,5 +1,6 @@
 using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Features.Warehouses.Models;
+using Luxira.Api.Features.Employees.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -71,6 +72,31 @@ public class LuxiraPdfService
             }
         });
 
+        return document.GeneratePdf();
+    }
+
+    public byte[] GenerateEmployeeTransactionReceiptPdf(EmployeeTransaction transaction)
+    {
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A5);
+                page.Margin(1, Unit.Centimetre);
+                page.DefaultTextStyle(style => style.FontSize(12));
+                page.Header().Text($"إيصال حركة موظف #{transaction.Id}").Bold().FontSize(17).AlignCenter();
+                page.Content().PaddingVertical(18).Column(column =>
+                {
+                    column.Spacing(8);
+                    column.Item().Text($"الموظف: {transaction.Employee?.DisplayName ?? transaction.Employee?.Name ?? transaction.EmployeeId.ToString()}");
+                    column.Item().Text($"نوع الحركة: {transaction.TransactionType}");
+                    column.Item().Text($"المبلغ: {transaction.Amount:N2}").Bold();
+                    column.Item().Text($"السبب: {transaction.Reason ?? "-"}");
+                    column.Item().Text($"التاريخ: {transaction.Date:yyyy-MM-dd HH:mm}");
+                });
+                page.Footer().AlignCenter().Text("Luxira CRM").FontSize(9);
+            });
+        });
         return document.GeneratePdf();
     }
 

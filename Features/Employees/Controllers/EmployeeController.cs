@@ -1,10 +1,12 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Employees.DTOs;
+using Luxira.Api.Features.Employees.Models;
 using Luxira.Api.Features.Employees.Services;
 using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
+using Luxira.Api.Infrastructure.S3;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,17 +22,20 @@ public class EmployeeController : ControllerBase
 {
     private readonly EmployeeService _service;
     private readonly ApplicationDbContext _context;
+    private readonly S3StorageService _storage;
 
-    public EmployeeController(EmployeeService service, ApplicationDbContext context)
+    public EmployeeController(EmployeeService service, ApplicationDbContext context, S3StorageService storage)
     {
         _service = service;
         _context = context;
+        _storage = storage;
     }
 
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/Employee/Index")]
     [HttpGet("/Employee/GetEmployees")]
+    [HttpPost("/Employee/Index")]
     public async Task<ActionResult<List<EmployeeDto>>> GetEmployees([FromQuery] bool? isActive, CancellationToken ct)
     {
         var result = await _service.GetEmployeesAsync(isActive, ct);
@@ -68,6 +73,7 @@ public class EmployeeController : ControllerBase
 
     [HttpGet("stores")]
     [HttpGet("/Employee/EmployeeStores")]
+    [HttpPost("/Employee/EmployeeStores")]
     public async Task<IActionResult> EmployeeStores(CancellationToken ct)
     {
         var stores = await _context.ManufacturingCompanies.Where(m => m.IsShown).Select(m => new { m.Id, m.Name }).ToListAsync(ct);
@@ -267,6 +273,178 @@ public class EmployeeController : ControllerBase
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, id, isAllowed });
     }
+
+    [HttpGet("/Employee/GetPendingDownloadsGatePermission")]
+    public IActionResult GetPendingDownloadsGatePermission() => Ok(new
+    {
+        success = true,
+        canBypassPendingDownloadsGate = User.IsInRole("Admin") || User.IsInRole("ExecutiveDirector"),
+        canEnterPendingDownloadsPage = true,
+        pendingDownloadsAccessRestricted = false,
+        pendingDownloadsAccessBeforeShiftEndMinutes = 0,
+        pendingDownloadsAccessStartsAt = (DateTime?)null,
+        pendingDownloadsShiftEndAt = (DateTime?)null,
+        pendingDownloadsRequiredCountryIds = Array.Empty<int>(),
+        pendingDownloadsRequiredDeliveryCompanyIds = Array.Empty<int>(),
+        appliesToAllCountries = true,
+        appliesToAllDeliveryCompanies = true
+    });
+
+    [HttpGet("/Employee/Create")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr,TeamLeader")]
+    public async Task<IActionResult> Create(CancellationToken ct) => Ok(new
+    {
+        users = await _context.Users.AsNoTracking()
+            .Where(user => !_context.Employees.Any(employee => employee.ApplicationUserId == user.Id && !employee.IsDeleted))
+            .OrderBy(user => user.Name ?? user.UserName)
+            .Select(user => new { user.Id, Name = user.Name ?? user.UserName, user.Email }).ToListAsync(ct)
+    });
+
+    [HttpGet("/Employee/Edit")]
+    public async Task<IActionResult> Edit([FromQuery] int id, CancellationToken ct) => Ok(await _service.GetEmployeeByIdAsync(id, ct));
+
+    [HttpPost("/Employee/Edit")]
+    public async Task<IActionResult> Edit([FromQuery] int id, [FromBody] UpdateEmployeeRequest request, CancellationToken ct) =>
+        Ok(await _service.UpdateEmployeeAsync(id, request, ct));
+
+    [HttpGet("/Employee/Details")]
+    [HttpPost("/Employee/Details")]
+    public async Task<IActionResult> Details([FromQuery] int id, CancellationToken ct) => Ok(await _service.GetEmployeeByIdAsync(id, ct));
+
+    [HttpPost("/Employee/DeleteEmployeeAccount")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> DeleteEmployeeAccount([FromForm] int id, CancellationToken ct)
+    {
+        var employee = await _context.Employees.FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, ct);
+        if (employee is null) return NotFound(new { success = false, message = "الموظف غير موجود." });
+        employee.IsDeleted = true;
+        employee.IsActive = false;
+        employee.IsShown = false;
+        employee.DeletedAt = IstanbulTimeHelper.Now;
+        employee.DeletedByUserId = User.GetUserId();
+        employee.DeletedByName = User.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(employee.ApplicationUserId))
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(item => item.Id == employee.ApplicationUserId, ct);
+            if (user is not null) user.LockoutEnd = DateTimeOffset.MaxValue;
+        }
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("/Employee/RestoreDeletedEmployee")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> RestoreDeletedEmployee([FromForm] int id, CancellationToken ct)
+    {
+        var employee = await _context.Employees.FirstOrDefaultAsync(item => item.Id == id && item.IsDeleted, ct);
+        if (employee is null) return NotFound(new { success = false, message = "الموظف غير موجود في المحذوفات." });
+        employee.IsDeleted = false;
+        employee.IsActive = true;
+        employee.IsShown = true;
+        employee.DeletedAt = null;
+        employee.DeletedByUserId = null;
+        employee.DeletedByName = null;
+        if (!string.IsNullOrWhiteSpace(employee.ApplicationUserId))
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(item => item.Id == employee.ApplicationUserId, ct);
+            if (user is not null) user.LockoutEnd = null;
+        }
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("/Employee/RestoreAllDeletedEmployees")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> RestoreAllDeletedEmployees(CancellationToken ct)
+    {
+        var employees = await _context.Employees.Where(item => item.IsDeleted).ToListAsync(ct);
+        var userIds = employees.Select(item => item.ApplicationUserId).Where(id => id != null).Cast<string>().ToList();
+        foreach (var employee in employees)
+        {
+            employee.IsDeleted = false;
+            employee.IsActive = true;
+            employee.IsShown = true;
+            employee.DeletedAt = null;
+            employee.DeletedByUserId = null;
+            employee.DeletedByName = null;
+        }
+        await _context.Users.Where(user => userIds.Contains(user.Id)).ExecuteUpdateAsync(setters => setters.SetProperty(user => user.LockoutEnd, (DateTimeOffset?)null), ct);
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, restoredCount = employees.Count });
+    }
+
+    [HttpPost("/Employee/UpdateCurrentProfileImage")]
+    [RequestSizeLimit(15 * 1024 * 1024)]
+    public async Task<IActionResult> UpdateCurrentProfileImage([FromForm] IFormFile? profileImageFile, [FromForm] string? profileImageBase64, CancellationToken ct)
+    {
+        var employee = await _context.Employees.FirstOrDefaultAsync(item => item.ApplicationUserId == User.GetUserId() && !item.IsDeleted, ct);
+        if (employee is null) return NotFound(new { success = false, message = "الموظف غير موجود." });
+        if (profileImageFile is null || profileImageFile.Length == 0 || !(profileImageFile.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ?? false))
+            return BadRequest(new { success = false, message = "الصورة غير صالحة." });
+        var stored = await _storage.UploadAsync(profileImageFile, "employee-profiles", User.GetUserId(), ct);
+        employee.ImageUrl = stored.PublicUrl;
+        employee.ImageS3Key = stored.S3Key;
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, imageUrl = employee.ImageUrl });
+    }
+
+    [HttpPost("/Employee/DeleteCurrentProfileImage")]
+    public async Task<IActionResult> DeleteCurrentProfileImage(CancellationToken ct)
+    {
+        var changed = await _context.Employees.Where(item => item.ApplicationUserId == User.GetUserId() && !item.IsDeleted)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.ImageUrl, (string?)null).SetProperty(item => item.ImageS3Key, (string?)null), ct);
+        return changed == 0 ? NotFound() : Ok(new { success = true });
+    }
+
+    [HttpGet("/Employee/GetSoftwareDevelopers")]
+    public async Task<IActionResult> GetSoftwareDevelopers(CancellationToken ct)
+    {
+        string[] roles = ["SoftwareDeveloper", "MarketingDepartment"];
+        var users = await (from employee in _context.Employees.AsNoTracking()
+                           join userRole in _context.UserRoles.AsNoTracking() on employee.ApplicationUserId equals userRole.UserId
+                           join role in _context.Roles.AsNoTracking() on userRole.RoleId equals role.Id
+                           where !employee.IsDeleted && employee.IsActive && role.Name != null && roles.Contains(role.Name)
+                           select new { employee.Id, UserId = employee.ApplicationUserId, Name = employee.DisplayName ?? employee.Name, employee.ImageUrl, Role = role.Name })
+            .Distinct().OrderBy(item => item.Name).ToListAsync(ct);
+        return Ok(new { success = true, items = users });
+    }
+
+    [HttpPost("/Employee/AssignDevelopmentTask")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> AssignDevelopmentTask([FromForm] int taskId, [FromForm] int employeeId, CancellationToken ct)
+    {
+        var employee = await _context.Employees.AsNoTracking().FirstOrDefaultAsync(item => item.Id == employeeId && !item.IsDeleted && item.IsActive, ct);
+        if (employee is null || string.IsNullOrWhiteSpace(employee.ApplicationUserId) || !await _context.EmployeeTasks.AnyAsync(task => task.Id == taskId, ct))
+            return BadRequest(new { success = false, message = "المهمة أو الموظف غير صحيح." });
+        var assignment = await _context.EmployeeTaskAssignments.FirstOrDefaultAsync(item => item.EmployeeTaskId == taskId, ct);
+        if (assignment is null)
+        {
+            assignment = new EmployeeTaskAssignment { EmployeeTaskId = taskId };
+            _context.EmployeeTaskAssignments.Add(assignment);
+        }
+        assignment.EmployeeUserId = employee.ApplicationUserId;
+        assignment.EmployeeName = employee.DisplayName ?? employee.Name;
+        assignment.EmployeeImageUrl = employee.ImageUrl;
+        assignment.AssignedAt = IstanbulTimeHelper.Now;
+        assignment.Status = "New";
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, assignment.Id });
+    }
+
+    [HttpPost("/Employee/UnassignDevelopmentTask")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> UnassignDevelopmentTask([FromForm] int taskId, CancellationToken ct)
+    {
+        var count = await _context.EmployeeTaskAssignments.Where(item => item.EmployeeTaskId == taskId).ExecuteDeleteAsync(ct);
+        return Ok(new { success = true, deletedCount = count });
+    }
+
+    [HttpGet("/Employee/GetDevelopmentTaskAssignments")]
+    public async Task<IActionResult> GetDevelopmentTaskAssignments(CancellationToken ct) => Ok(new
+    {
+        success = true,
+        items = await _context.EmployeeTaskAssignments.AsNoTracking().OrderByDescending(item => item.AssignedAt).ToListAsync(ct)
+    });
 
     private static List<int> ParseIds(string? value) => (value ?? string.Empty)
         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

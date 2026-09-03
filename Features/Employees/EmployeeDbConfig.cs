@@ -19,6 +19,8 @@ public class EmployeeDbConfig : IDbConfig<Employee>
         builder.Property(e => e.Address).HasMaxLength(255).IsRequired();
         builder.Property(e => e.Salary).HasPrecision(18, 2);
         builder.Property(e => e.OrderPackagingDeliveryCompanyIds).HasMaxLength(1000);
+        builder.Property(e => e.DeletedByUserId).HasMaxLength(450);
+        builder.Property(e => e.DeletedByName).HasMaxLength(250);
 
         builder.HasMany(e => e.AttendanceLogs)
             .WithOne(a => a.Employee)
@@ -163,6 +165,32 @@ public class EmployeeErrorDbConfig : IDbConfig<EmployeeError>
         builder.ToTable("EmployeeErrors");
         builder.HasKey(e => e.Id);
         builder.Property(e => e.ErrorText).HasMaxLength(4000).IsRequired();
+        builder.Property(e => e.EmployeeNameSnapshot).HasMaxLength(200);
+        builder.Property(e => e.ChatType).HasMaxLength(30);
+        builder.Property(e => e.PageUrl).HasMaxLength(1000);
+        builder.Property(e => e.CreatedByUserId).HasMaxLength(450);
+        builder.Property(e => e.CreatedByUserName).HasMaxLength(256).HasColumnName("CreatedByName");
+        builder.Property(e => e.UpdatedByUserId).HasMaxLength(450);
+        builder.Property(e => e.UpdatedByName).HasMaxLength(256);
+        builder.Property(e => e.DeletedByUserId).HasMaxLength(450);
+        builder.Property(e => e.DeletedByName).HasMaxLength(256);
+    }
+}
+
+public class EmployeeErrorEditHistoryDbConfig : IDbConfig<EmployeeErrorEditHistory>
+{
+    public void Configure(EntityTypeBuilder<EmployeeErrorEditHistory> builder)
+    {
+        builder.ToTable("EmployeeErrorEditHistories");
+        builder.HasKey(history => history.Id);
+        builder.Property(history => history.EmployeeNameSnapshot).HasMaxLength(200);
+        builder.Property(history => history.OldPageUrl).HasMaxLength(1000);
+        builder.Property(history => history.NewPageUrl).HasMaxLength(1000);
+        builder.Property(history => history.OldChatType).HasMaxLength(30);
+        builder.Property(history => history.NewChatType).HasMaxLength(30);
+        builder.Property(history => history.EditedByUserId).HasMaxLength(450);
+        builder.Property(history => history.EditedByName).HasMaxLength(256);
+        builder.Property(history => history.EditedByUserName).HasMaxLength(256);
     }
 }
 
@@ -174,6 +202,8 @@ public class EmployeeTransactionDbConfig : IDbConfig<EmployeeTransaction>
         builder.HasKey(t => t.Id);
         builder.Property(t => t.Amount).HasPrecision(18, 2);
         builder.Property(t => t.TransactionType).HasConversion<int>();
+        builder.Property(t => t.DeletedByUserName).HasMaxLength(250);
+        builder.HasOne(t => t.Employee).WithMany().HasForeignKey(t => t.EmployeeId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

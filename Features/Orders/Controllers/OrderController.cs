@@ -842,9 +842,10 @@ public class OrderController : ControllerBase
 
         var stored = await _storage.UploadAsync(file, type == "order" ? "images/orders" : "images/receipts", User.GetUserId(), ct);
         var images = await _cache.GetOrCreateAsync(DraftImagesKey(draftId), _ => Task.FromResult(new Dictionary<string, string>()), TimeSpan.FromDays(1), ct: ct);
-        images[type] = stored.PublicUrl;
+        var imageUrl = stored.PublicUrl ?? throw new InvalidOperationException("Uploaded image URL is missing.");
+        images[type] = imageUrl;
         await _cache.SetAsync(DraftImagesKey(draftId), images, TimeSpan.FromDays(1), ct: ct);
-        return Ok(new { success = true, imageUrl = stored.PublicUrl });
+        return Ok(new { success = true, imageUrl });
     }
 
     [AllowAnonymous]
@@ -949,6 +950,130 @@ public class OrderController : ControllerBase
         return Ok(new { success = true, orderId, imageUrl = imageUrl ?? "" });
     }
 
+    [HttpPost("/Order/UpdateStatus")]
+    public async Task<IActionResult> UpdateStatusLegacy(
+        [FromForm] int id,
+        [FromForm] int orderStatus,
+        [FromForm] string? reason,
+        CancellationToken ct)
+    {
+        if (!OrderStatusCodes.IsDefined(orderStatus)) return BadRequest(new { success = false, message = "حالة الطلب غير صحيحة." });
+        var result = await _orderService.UpdateOrderStatusAsync(
+            id,
+            new UpdateOrderStatusRequest(orderStatus, reason, null),
+            OrderStatusActor.FromPrincipal(User),
+            ct);
+        return Ok(new { success = true, order = result });
+    }
+
+    [HttpPost("/Order/UpdateOrderApplicationUser")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> UpdateOrderApplicationUser(
+        [FromForm] int orderId,
+        [FromForm] string newApplicationUserId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(newApplicationUserId)) return BadRequest("Invalid user ID provided.");
+        if (!await _context.Employees.AsNoTracking().AnyAsync(employee => employee.ApplicationUserId == newApplicationUserId, ct))
+            return NotFound($"Employee with ID {newApplicationUserId} not found.");
+        var changed = await _context.Orders.Where(order => order.Id == orderId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(order => order.ApplicationUserId, newApplicationUserId)
+                .SetProperty(order => order.LastEditedDate, IstanbulTimeHelper.Now), ct);
+        if (changed == 0) return NotFound($"Order with ID {orderId} not found.");
+        await _hub.Clients.All.SendAsync("OrderRealtimeChanged", new { orderId, reason = "assigned_employee_updated" }, ct);
+        return Ok(new { success = true, orderId, applicationUserId = newApplicationUserId });
+    }
+
+    [HttpPost("/Order/UpdateStatusForMultiple")]
+    public async Task<IActionResult> UpdateStatusForMultiple(
+        [FromForm] List<int>? ids,
+        [FromForm] int orderStatus,
+        [FromForm] string? reason,
+        CancellationToken ct)
+    {
+        var orderIds = (ids ?? []).Where(id => id > 0).Distinct().Take(5_000).ToList();
+        if (orderIds.Count == 0 || !OrderStatusCodes.IsDefined(orderStatus)) return BadRequest(new { success = false, message = "لم يتم تحديد طلبات أو حالة صحيحة." });
+        var count = await _orderService.BatchUpdateOrderStatusAsync(
+            new BatchUpdateOrderStatusRequest(orderIds, orderStatus, reason, null),
+            OrderStatusActor.FromPrincipal(User),
+            ct);
+        return Ok(new { success = true, updatedCount = count });
+    }
+
+    [HttpPost("/Order/AdvanceFailureStatus")]
+    public async Task<IActionResult> AdvanceFailureStatus([FromForm] List<int>? ids, [FromForm] string? reason, CancellationToken ct)
+    {
+        var orderIds = (ids ?? []).Where(id => id > 0).Distinct().Take(5_000).ToList();
+        var statuses = await _context.Orders.AsNoTracking().Where(order => orderIds.Contains(order.Id))
+            .Select(order => new { order.Id, order.OrderStatus }).ToListAsync(ct);
+        var updated = 0;
+        foreach (var group in statuses.GroupBy(item => NextFailureStatus(item.OrderStatus)).Where(group => group.Key.HasValue))
+        {
+            updated += await _orderService.BatchUpdateOrderStatusAsync(
+                new BatchUpdateOrderStatusRequest(group.Select(item => item.Id).ToList(), group.Key!.Value, reason, null),
+                OrderStatusActor.FromPrincipal(User),
+                ct);
+        }
+        return Ok(new { success = true, updatedCount = updated });
+    }
+
+    [HttpPost("/Order/MarkAsPrepared")]
+    public async Task<IActionResult> MarkAsPrepared([FromForm] List<int>? ids, CancellationToken ct)
+    {
+        var orderIds = (ids ?? []).Where(id => id > 0).Distinct().Take(5_000).ToList();
+        if (orderIds.Count == 0) return BadRequest(new { success = false, message = "No orders found to update." });
+        var updated = await _orderService.BatchUpdateOrderStatusAsync(
+            new BatchUpdateOrderStatusRequest(orderIds, OrderStatusCodes.Prepared, null, null),
+            OrderStatusActor.FromPrincipal(User),
+            ct);
+        return Ok(new { success = true, updatedCount = updated });
+    }
+
+    [HttpPost("/Order/DeleteOrderStatusHistoryAsync")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteOrderStatusHistoryAsync([FromForm] int id, CancellationToken ct)
+    {
+        var history = await _context.OrderStatusHistories.FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (history is null) return NotFound(new { success = false, message = "Order status history not found" });
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        var latest = await _context.OrderStatusHistories.Where(item => item.OrderId == history.OrderId)
+            .OrderByDescending(item => item.CreatedAt).ThenByDescending(item => item.Id).Take(2).ToListAsync(ct);
+        if (latest.FirstOrDefault()?.Id == history.Id && latest.ElementAtOrDefault(1)?.Status is int previousStatus && history.OrderId.HasValue)
+            await _context.Orders.Where(order => order.Id == history.OrderId.Value)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(order => order.OrderStatus, previousStatus), ct);
+        _context.OrderStatusHistories.Remove(history);
+        await _context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await _hub.Clients.All.SendAsync("OrderStatusHistoryDelete", new { orderId = history.OrderId, historyId = id, isDeleted = true, isHidden = false }, ct);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("/Order/DeleteOrdersStatusHistoryAsync")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteOrdersStatusHistoryAsync([FromForm] string ids, CancellationToken ct)
+    {
+        var orderIds = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => int.TryParse(value, out var id) ? id : 0).Where(id => id > 0).Distinct().Take(5_000).ToList();
+        if (orderIds.Count == 0) return BadRequest(new { success = false, message = "Invalid Order IDs format" });
+        var histories = await _context.OrderStatusHistories.Where(item => item.OrderId.HasValue && orderIds.Contains(item.OrderId.Value))
+            .OrderByDescending(item => item.CreatedAt).ThenByDescending(item => item.Id).ToListAsync(ct);
+        var latestByOrder = histories.GroupBy(item => item.OrderId!.Value).Select(group => group.First()).ToList();
+        var priorStatuses = histories.GroupBy(item => item.OrderId!.Value)
+            .Select(group => new { OrderId = group.Key, Status = group.Skip(1).Select(item => item.Status).FirstOrDefault() })
+            .Where(item => item.Status.HasValue).ToList();
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        foreach (var prior in priorStatuses)
+            await _context.Orders.Where(order => order.Id == prior.OrderId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(order => order.OrderStatus, prior.Status!.Value), ct);
+        _context.OrderStatusHistories.RemoveRange(latestByOrder);
+        await _context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        var deleted = latestByOrder.Select(item => new { orderId = item.OrderId, historyId = item.Id, isDeleted = true, isHidden = false }).ToList();
+        await _hub.Clients.All.SendAsync("OrderStatusHistoryDelete", deleted, ct);
+        return Ok(new { success = true, deletedCount = deleted.Count, deletedIds = latestByOrder.Select(item => item.Id) });
+    }
+
     private string StatusSelectionKey() => $"orders:status-selection:{CurrentUserCacheId()}";
     private string DraftKey() => $"orders:create-draft:{CurrentUserCacheId()}";
     private string DraftImagesKey(string draftId) => $"orders:create-draft-images:{CurrentUserCacheId()}:{draftId.Trim()}";
@@ -993,7 +1118,8 @@ public class OrderController : ControllerBase
         {
             var digit = alphabet.IndexOf(character);
             if (digit < 0) return false;
-            value = checked(value * alphabet.Length + digit);
+            if (value > (long.MaxValue - digit) / alphabet.Length) return false;
+            value = value * alphabet.Length + digit;
         }
         var raw = value - 173891;
         if (raw <= 0 || raw % 7919 != 0 || raw / 7919 > int.MaxValue) return false;
@@ -1013,6 +1139,18 @@ public class OrderController : ControllerBase
             OrderStatusCodes.Incomplete or OrderStatusCodes.IncompleteStage1 or OrderStatusCodes.IncompleteStage2 or
             OrderStatusCodes.IncompleteStage3 or OrderStatusCodes.IncompleteStage4 or OrderStatusCodes.IncompleteStage5 or
             OrderStatusCodes.IncompleteStage6;
+
+    private static int? NextFailureStatus(int status) => status switch
+    {
+        OrderStatusCodes.FailedDelivery => OrderStatusCodes.FailedDeliveryStage2,
+        OrderStatusCodes.FailedDeliveryStage1 => OrderStatusCodes.FailedDeliveryStage2,
+        OrderStatusCodes.FailedDeliveryStage2 => OrderStatusCodes.FailedDeliveryStage3,
+        OrderStatusCodes.FailedDeliveryStage3 => OrderStatusCodes.FailedDeliveryStage4,
+        OrderStatusCodes.FailedDeliveryStage4 => OrderStatusCodes.FailedDeliveryStage5,
+        OrderStatusCodes.FailedDeliveryStage5 => OrderStatusCodes.FailedDeliveryStage6,
+        OrderStatusCodes.FailedDeliveryStage6 => OrderStatusCodes.FailedDeliveryStage7,
+        _ => null
+    };
 }
 
 public record StatusSelectionRequest(List<int> OrderIds, int Status);

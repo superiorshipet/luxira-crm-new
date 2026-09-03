@@ -23,6 +23,10 @@ public class Employee
     public DateTime HireDate { get => DateAdded; set => DateAdded = value; }
     public bool IsActive { get; set; } = true;
     public bool IsShown { get; set; } = true;
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
     public bool AllowMobileOrTabletLogin { get; set; }
     public bool ApplyShiftAccess { get; set; } = true;
     public bool? AllowScreenRecording { get; set; }
@@ -237,13 +241,21 @@ public class EmployeeError
     public int EmployeeId { get; set; }
     public Employee? Employee { get; set; }
     public string ErrorText { get; set; } = string.Empty;
+    public string? EmployeeNameSnapshot { get; set; }
+    public string? ChatType { get; set; }
     public string? ImageUrl { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? CreatedByUserId { get; set; }
     public string? CreatedByUserName { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
     public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
     public string? PageUrl { get; set; }
+    public string? LinkedOrderPostIds { get; set; }
     public string? EmployeeReason { get; set; }
     public int ErrorCount { get; set; }
     public bool IsAcknowledged { get; set; }
@@ -251,16 +263,41 @@ public class EmployeeError
     public int SeverityLevel { get; set; }
 }
 
+public class EmployeeErrorEditHistory
+{
+    public int Id { get; set; }
+    public int EmployeeErrorId { get; set; }
+    public int EmployeeId { get; set; }
+    public string? EmployeeNameSnapshot { get; set; }
+    public string? OldPageUrl { get; set; }
+    public string? NewPageUrl { get; set; }
+    public string? OldChatType { get; set; }
+    public string? NewChatType { get; set; }
+    public string? OldErrorText { get; set; }
+    public string? NewErrorText { get; set; }
+    public string? OldImageUrl { get; set; }
+    public string? NewImageUrl { get; set; }
+    public DateTime? EditedAt { get; set; }
+    public string? EditedByUserId { get; set; }
+    public string? EditedByName { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public string? EditedByUserName { get; set; }
+}
+
 public class EmployeeTransaction
 {
     public int Id { get; set; }
     public int EmployeeId { get; set; }
+    public Employee? Employee { get; set; }
     public decimal Amount { get; set; }
     public EmployeeTransactionType TransactionType { get; set; }
     public DateTime Date { get; set; } = DateTime.UtcNow;
     public string? Reason { get; set; }
     public int? EmployeePaymentSummaryId { get; set; }
     public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserName { get; set; }
+    public string? EditHistoryJson { get; set; }
 }
 
 public class EmployeeViolation

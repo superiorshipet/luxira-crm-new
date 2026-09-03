@@ -61,6 +61,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeTask> EmployeeTasks => Set<EmployeeTask>();
     public DbSet<EmployeeTaskAssignment> EmployeeTaskAssignments => Set<EmployeeTaskAssignment>();
     public DbSet<EmployeeError> EmployeeErrors => Set<EmployeeError>();
+    public DbSet<EmployeeErrorEditHistory> EmployeeErrorEditHistories => Set<EmployeeErrorEditHistory>();
     public DbSet<EmployeeTransaction> EmployeeTransactions => Set<EmployeeTransaction>();
     public DbSet<EmployeeViolation> EmployeeViolations => Set<EmployeeViolation>();
     public DbSet<EmployeeRating> EmployeeRatings => Set<EmployeeRating>();
