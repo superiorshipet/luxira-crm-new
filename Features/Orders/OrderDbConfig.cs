@@ -75,6 +75,17 @@ public class OrderStatusHistoryDbConfig : IDbConfig<OrderStatusHistory>
     }
 }
 
+public class OrderStatusHistoryDeliveryCompanySnapshotDbConfig : IDbConfig<OrderStatusHistoryDeliveryCompanySnapshot>
+{
+    public void Configure(EntityTypeBuilder<OrderStatusHistoryDeliveryCompanySnapshot> builder)
+    {
+        builder.ToTable("OrderStatusHistoryDeliveryCompanySnapshots");
+        builder.HasKey(snapshot => snapshot.OrderStatusHistoryId);
+        builder.Property(snapshot => snapshot.DeliveryCompanyName).HasMaxLength(300);
+        builder.HasIndex(snapshot => new { snapshot.OrderId, snapshot.OrderStatusHistoryId });
+    }
+}
+
 public class OrderEditHistoryDbConfig : IDbConfig<OrderEditHistory>
 {
     public void Configure(EntityTypeBuilder<OrderEditHistory> builder)

@@ -38,6 +38,7 @@ public class ApplicationDbContext : DbContext
     // Orders & Operations
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+    public DbSet<OrderStatusHistoryDeliveryCompanySnapshot> OrderStatusHistoryDeliveryCompanySnapshots => Set<OrderStatusHistoryDeliveryCompanySnapshot>();
     public DbSet<OrderEditHistory> OrderEditHistories => Set<OrderEditHistory>();
     public DbSet<OrderWarehouse> OrderWarehouses => Set<OrderWarehouse>();
     public DbSet<OrderReport> OrderReports => Set<OrderReport>();

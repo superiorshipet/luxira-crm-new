@@ -55,6 +55,14 @@ builder.Services.AddMemoryCache(opts =>
     opts.SizeLimit = 10_000;          // Max 10 000 cache "size units"
     opts.CompactionPercentage = 0.1;  // Remove 10% of entries when limit is hit
 });
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.Cookie.Name = ".Luxira.Session";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.IdleTimeout = TimeSpan.FromHours(8);
+});
 
 // ─── Dynamic Discovery: all IModule implementations ──────────────────────────
 var modules = typeof(Program).Assembly.GetTypes()
@@ -153,6 +161,7 @@ app.UseResponseCaching();
 app.MapLuxiraOpenApi();
 
 app.UseRouting();
+app.UseSession();
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();

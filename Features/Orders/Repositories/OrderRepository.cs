@@ -61,6 +61,10 @@ public class OrderRepository
             query = query.Where(o => o.ApplicationUserId == filter.UserId);
         }
 
+        var paymentMethod = filter.PaymentMethod?.Trim().ToLowerInvariant();
+        if (paymentMethod == "cash") query = query.Where(order => !order.IsPaid);
+        else if (paymentMethod is "bank" or "banktransfer" or "bank-transfer") query = query.Where(order => order.IsPaid);
+
         if (filter.FromDate.HasValue)
         {
             query = query.Where(o => o.CreatedDate >= filter.FromDate.Value);

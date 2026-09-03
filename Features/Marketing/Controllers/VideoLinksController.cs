@@ -40,8 +40,8 @@ public class VideoLinksController : ControllerBase
         return Ok(new
         {
             stores,
-            cardStores = stores.Where(item => usedStoreIds.Contains(GetStoreId(item))).ToList(),
-            links = rows.Select(ToItem).ToList()
+            cardStores = stores.Where(item => usedStoreIds.Contains(item.Id)).ToList(),
+            links = rows.Select(item => ToItem(item)).ToList()
         });
     }
 
@@ -162,16 +162,13 @@ public class VideoLinksController : ControllerBase
     public async Task<IActionResult> History(int? storeId, CancellationToken ct) =>
         Ok(new { stores = await GetStores(ct), history = await GetHistory(storeId, null, ct), storeFilterId = storeId });
 
-    private async Task<List<object>> GetStores(CancellationToken ct)
+    private async Task<List<VideoStoreOption>> GetStores(CancellationToken ct)
     {
         var rows = await _context.ManufacturingCompanies.AsNoTracking().OrderBy(item => item.Name)
             .Select(item => new { item.Id, item.Name, item.ImageUrl }).ToListAsync(ct);
-        return rows.Select(item => (object)new
-        {
-            item.Id,
-            Name = string.IsNullOrWhiteSpace(item.Name) ? $"متجر رقم {item.Id}" : item.Name.Trim(),
-            ImageUrl = NormalizeImage(item.ImageUrl)
-        }).ToList();
+        return rows.Select(item => new VideoStoreOption(item.Id,
+            string.IsNullOrWhiteSpace(item.Name) ? $"متجر رقم {item.Id}" : item.Name.Trim(),
+            NormalizeImage(item.ImageUrl))).ToList();
     }
 
     private async Task<List<object>> GetTrashItems(int? storeId, CancellationToken ct)
@@ -277,14 +274,14 @@ public class VideoLinksController : ControllerBase
         };
     }
 
-    private static int GetStoreId(object item) => (int)(item.GetType().GetProperty("Id")?.GetValue(item) ?? 0);
-
     private static string FormatArabicDate(DateTime? value)
     {
         if (!value.HasValue) return string.Empty;
         var suffix = value.Value.Hour < 12 ? "ص" : "م";
         return value.Value.ToString("yyyy/MM/dd hh:mm", CultureInfo.InvariantCulture) + " " + suffix;
     }
+
+    private sealed record VideoStoreOption(int Id, string Name, string ImageUrl);
 }
 
 public sealed record VideoLinkUpsertRequest(int? Id, int ManufacturingCompanyId, string Url);

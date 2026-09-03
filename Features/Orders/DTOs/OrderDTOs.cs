@@ -98,6 +98,7 @@ public record OrderFilterRequest(
     string? UserId = null,
     DateTime? FromDate = null,
     DateTime? ToDate = null,
+    string? PaymentMethod = null,
     int Page = 1,
     int PageSize = 50
 );

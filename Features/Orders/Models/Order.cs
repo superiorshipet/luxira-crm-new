@@ -92,6 +92,15 @@ public class OrderStatusHistory
     public bool IsHidden { get; set; }
 }
 
+public class OrderStatusHistoryDeliveryCompanySnapshot
+{
+    public int OrderStatusHistoryId { get; set; }
+    public int OrderId { get; set; }
+    public int? DeliveryCompanyId { get; set; }
+    public string? DeliveryCompanyName { get; set; }
+    public DateTime CapturedAt { get; set; }
+}
+
 public class OrderEditHistory
 {
     public int Id { get; set; }

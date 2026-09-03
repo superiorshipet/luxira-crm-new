@@ -68,6 +68,11 @@ public class OrderController : ControllerBase
     {
         var userId = User.GetUserId() ?? "system";
         var result = await _orderService.CreateOrderAsync(request, userId, ct);
+        if (User.IsInRole("CallCenter"))
+        {
+            HttpContext.Session.SetString(HomeController.ActivityKey(userId, "LastOrderCreatedUnix"),
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
         return CreatedAtAction(nameof(GetOrderById), new { id = result.Id }, result);
     }
 
@@ -192,6 +197,28 @@ public class OrderController : ControllerBase
             .ToListAsync(ct);
 
         return Ok(counts);
+    }
+
+    [HttpGet("status-history/{orderId:int}")]
+    [HttpGet("/Order/GetOrderStatusHistory")]
+    public async Task<IActionResult> GetOrderStatusHistory([FromQuery] int? id, int? orderId, CancellationToken ct)
+    {
+        var targetId = orderId ?? id ?? 0;
+        if (targetId <= 0) return BadRequest(new { success = false, message = "رقم الطلب غير صحيح." });
+        var items = await (from history in _context.OrderStatusHistories.AsNoTracking()
+                           join snapshot in _context.OrderStatusHistoryDeliveryCompanySnapshots.AsNoTracking()
+                               on history.Id equals snapshot.OrderStatusHistoryId into snapshots
+                           from snapshot in snapshots.DefaultIfEmpty()
+                           where history.OrderId == targetId
+                           orderby history.CreatedAt descending, history.Id descending
+                           select new
+                           {
+                               history.Id, history.OrderId, history.Status, history.Reason, history.Name, history.CreatedAt,
+                               history.ApplicationUserId, history.FailureReasonImageUrl, history.IsHidden,
+                               deliveryCompanyId = snapshot == null ? null : snapshot.DeliveryCompanyId,
+                               deliveryCompanyName = snapshot == null ? string.Empty : snapshot.DeliveryCompanyName ?? string.Empty
+                           }).ToListAsync(ct);
+        return Ok(new { success = true, orderId = targetId, items });
     }
 
     [HttpGet("status-counts")]

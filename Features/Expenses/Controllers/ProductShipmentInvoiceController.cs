@@ -1,4 +1,5 @@
 using Luxira.Api.Data;
+using Luxira.Api.Infrastructure.Pdf;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,44 +11,39 @@ namespace Luxira.Api.Features.Expenses.Controllers;
 [Route("ProductShipmentInvoice")]
 public class ProductShipmentInvoiceController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly LuxiraPdfService _pdf;
 
-    public ProductShipmentInvoiceController(ApplicationDbContext context)
+    public ProductShipmentInvoiceController(LuxiraPdfService pdf)
     {
-        _context = context;
+        _pdf = pdf;
     }
 
-    [HttpPost("price-offer")]
-    [HttpPost("/ProductShipmentInvoice/CreatePriceOffer")]
+    [HttpPost("/api/v1/financials/shipment-invoices/price-offer")]
     public IActionResult CreatePriceOffer([FromBody] CreatePriceOfferRequest request)
+        => CreatePriceOfferCore(request);
+
+    [HttpPost("/ProductShipmentInvoice/CreatePriceOffer")]
+    public IActionResult CreatePriceOfferLegacy([FromForm] CreatePriceOfferRequest request)
+        => CreatePriceOfferCore(request);
+
+    private IActionResult CreatePriceOfferCore(CreatePriceOfferRequest request)
     {
-        var totalAmount = request.Products.Sum(p => p.Price * p.Quantity);
-        var invoiceId = new Random().Next(1000, 10000);
-
-        var html = $@"<!DOCTYPE html>
-<html dir='rtl'>
-<head><meta charset='utf-8'><title>عرض سعر شحن #{invoiceId}</title>
-<style>body {{ font-family: Arial; padding: 20px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #333; padding: 8px; text-align: right; }}</style>
-</head>
-<body>
-  <h2>عرض سعر شحن #{invoiceId}</h2>
-  <p>شركة الشحن: {request.DeliveryCompanyName}</p>
-  <p>التاريخ: {DateTime.UtcNow:yyyy-MM-dd}</p>
-  <table>
-    <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
-    <tbody>
-      {string.Join("", request.Products.Select(p => $"<tr><td>{p.Name}</td><td>{p.Quantity}</td><td>{p.Price:N0}</td><td>{(p.Quantity * p.Price):N0}</td></tr>"))}
-    </tbody>
-  </table>
-  <h3>المجموع الكلي: {totalAmount:N0}</h3>
-</body></html>";
-
-        return Content(html, "text/html");
+        if (request.Products.Count == 0) return BadRequest(new { success = false, message = "أضف منتجًا واحدًا على الأقل." });
+        var invoiceId = Random.Shared.Next(1000, 10000);
+        var products = request.Products.Select(item => (item.Name, item.EffectiveQuantity, item.Price)).ToList();
+        var bytes = _pdf.GenerateShipmentPriceOfferPdf(request.DeliveryCompanyName, request.DeliveryCompanyAddress,
+            request.DeliveryCompanyPhoneNumber, request.DeliveryCompanyEmail, invoiceId, DateTime.Now, products);
+        Response.Headers.ContentDisposition = "inline; filename=OrdersReport.pdf";
+        return File(bytes, "application/pdf");
     }
 
     [HttpGet("/ProductShipmentInvoice/CreatePriceOffer")]
     public IActionResult CreatePriceOfferForm() => Ok(new { products = Array.Empty<object>() });
 }
 
-public record CreatePriceOfferRequest(string DeliveryCompanyName, List<PriceOfferItem> Products);
-public record PriceOfferItem(string Name, int Quantity, decimal Price);
+public sealed record CreatePriceOfferRequest(string DeliveryCompanyName, List<PriceOfferItem> Products,
+    string? DeliveryCompanyAddress = null, string? DeliveryCompanyPhoneNumber = null, string? DeliveryCompanyEmail = null);
+public sealed record PriceOfferItem(string Name, int Quantity, decimal Price, int Amount = 0)
+{
+    public int EffectiveQuantity => Amount > 0 ? Amount : Quantity;
+}

@@ -196,4 +196,52 @@ public class LuxiraPdfService
             page.Footer().AlignCenter().Text($"{DateTime.UtcNow:yyyy-MM-dd HH:mm}");
         })).GeneratePdf();
     }
+
+    public byte[] GenerateShipmentPriceOfferPdf(string companyName, string? address, string? phone, string? email,
+        int invoiceId, DateTime createdAt, IReadOnlyList<(string Name, int Quantity, decimal Price)> products)
+    {
+        var total = products.Sum(item => item.Quantity * item.Price);
+        return Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1.4f, Unit.Centimetre);
+            page.DefaultTextStyle(style => style.FontSize(11));
+            page.Header().Row(row =>
+            {
+                row.RelativeItem().Text($"فاتورة #{invoiceId}").Bold().FontSize(18);
+                row.RelativeItem().AlignRight().Text("Luxira CRM").Bold().FontSize(18);
+            });
+            page.Content().PaddingVertical(16).Column(column =>
+            {
+                column.Spacing(6);
+                column.Item().Text($"الشركة المستلمة: {companyName}").Bold();
+                column.Item().Text($"العنوان: {address ?? "-"}");
+                column.Item().Text($"الهاتف: {phone ?? "-"}");
+                column.Item().Text($"البريد الإلكتروني: {email ?? "-"}");
+                column.Item().Text($"تاريخ الإرسال: {createdAt:yyyy-MM-dd}");
+                column.Item().PaddingTop(12).Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(3); columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn();
+                    });
+                    table.Header(header =>
+                    {
+                        header.Cell().Text("اسم المنتج").Bold(); header.Cell().Text("الكمية").Bold();
+                        header.Cell().Text("سعر القطعة").Bold(); header.Cell().Text("المجموع").Bold();
+                    });
+                    foreach (var item in products)
+                    {
+                        table.Cell().Text(item.Name); table.Cell().Text(item.Quantity.ToString());
+                        table.Cell().Text(item.Price.ToString("N2")); table.Cell().Text((item.Quantity * item.Price).ToString("N2"));
+                    }
+                });
+                column.Item().PaddingTop(12).AlignRight().Text($"السعر الإجمالي: {total:N2}").Bold().FontSize(14);
+            });
+            page.Footer().AlignCenter().Text(text =>
+            {
+                text.Span("صفحة "); text.CurrentPageNumber(); text.Span(" من "); text.TotalPages();
+            });
+        })).GeneratePdf();
+    }
 }
