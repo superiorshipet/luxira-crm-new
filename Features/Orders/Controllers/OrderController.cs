@@ -7,6 +7,7 @@ using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
 using Luxira.Api.Infrastructure.Caching;
+using Luxira.Api.Infrastructure.S3;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -27,22 +28,26 @@ public class OrderController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly LuxiraCacheService _cache;
     private readonly IHubContext<OrderHub> _hub;
+    private readonly S3StorageService _storage;
 
     public OrderController(
         OrderService orderService,
         ApplicationDbContext context,
         LuxiraCacheService cache,
-        IHubContext<OrderHub> hub)
+        IHubContext<OrderHub> hub,
+        S3StorageService storage)
     {
         _orderService = orderService;
         _context = context;
         _cache = cache;
         _hub = hub;
+        _storage = storage;
     }
 
     [HttpGet]
     [HttpGet("/Order/GetOrders")]
     [HttpGet("/Order/Index")]
+    [HttpPost("/Order/Index")]
     public async Task<ActionResult<OrderListResult>> GetOrders([FromQuery] OrderFilterRequest filter, CancellationToken ct)
     {
         var result = await _orderService.GetOrdersAsync(filter, ct);
@@ -731,8 +736,270 @@ public class OrderController : ControllerBase
         return Ok();
     }
 
+    [HttpGet("/Order/UpdateAllStatuses")]
+    [Authorize(Roles = "Admin,ExecutiveDirector,FollowUpDepartment,OrderPreparer")]
+    public async Task<IActionResult> UpdateAllStatusesPage([FromQuery] OrderFilterRequest filter, CancellationToken ct) =>
+        Ok(await _orderService.GetOrdersAsync(filter with { PageSize = Math.Clamp(filter.PageSize, 1, 200) }, ct));
+
+    [HttpGet("/Order/CanEnterFailedDeliveryStatusUpdate")]
+    [Authorize(Roles = "Admin,ExecutiveDirector,FollowUpDepartment")]
+    public async Task<IActionResult> CanEnterFailedDeliveryStatusUpdate(CancellationToken ct)
+    {
+        if (!User.IsInRole("FollowUpDepartment"))
+            return Ok(new { success = true, allowed = true, unresolvedCount = 0 });
+
+        var userId = User.GetUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+            return Ok(new { success = true, allowed = false, unresolvedCount = 0, message = "لا يمكنك تحديث حالات فشل أخرى قبل حل الحالات الحالية." });
+
+        var accessibleStores = _context.EmployeeManufacturingCompanies.AsNoTracking()
+            .Where(access => access.ApplicationUserId == userId && access.CanSeeManufacturingCompany)
+            .Select(access => access.ManufacturingCompanyId);
+        var failures = OrderStatusCodes.FailureStatuses;
+        var unresolvedCount = await _context.Orders.AsNoTracking().CountAsync(order =>
+            !order.IsHidden &&
+            order.ManufacturingCompanyId.HasValue &&
+            accessibleStores.Contains(order.ManufacturingCompanyId.Value) &&
+            failures.Contains(order.OrderStatus), ct);
+
+        return Ok(new
+        {
+            success = true,
+            allowed = unresolvedCount == 0,
+            unresolvedCount,
+            message = unresolvedCount == 0 ? "" : "لا يمكنك تحديث حالات فشل أخرى وأنت لديك بالفعل حالات فشل تسليم. تواصل مع العملاء لحلها، ثم حدّث مرة أخرى."
+        });
+    }
+
+    [HttpGet("/Order/UpdateFailedDelivery")]
+    [HttpGet("/Order/UpdateDelivered")]
+    [Authorize(Roles = "Admin,ExecutiveDirector,FollowUpDepartment")]
+    public async Task<IActionResult> DeliveryStatusUpdatePage(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] int? countryId = null,
+        [FromQuery] int? storeId = null,
+        [FromQuery] int? deliverycompanyId = null,
+        [FromQuery] int? deliveryrepresentativeId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+        var query = _context.Orders.AsNoTracking().Where(order => !order.IsHidden && order.OrderStatus == OrderStatusCodes.InDelivery);
+        if (countryId.HasValue) query = query.Where(order => order.Country == countryId);
+        if (storeId is > 0) query = query.Where(order => order.ManufacturingCompanyId == storeId);
+        if (deliverycompanyId is > 0) query = query.Where(order => order.DeliveryCompanyId == deliverycompanyId);
+        if (deliveryrepresentativeId is > 0) query = query.Where(order => order.DeliveryCompanyId == deliveryrepresentativeId);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var value = search.Trim();
+            query = int.TryParse(value.TrimStart('#'), out var orderId)
+                ? query.Where(order => order.Id == orderId || order.ExternalOrderId == orderId)
+                : query.Where(order => order.CustomerName == value || order.TelephoneNumber == value || order.SecondTelephoneNumber == value);
+        }
+        var totalItems = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(order => order.CreatedDate)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(order => new { order.Id, order.ExternalOrderId, order.CustomerName, order.TelephoneNumber, order.Country, order.State, order.TotalPrice, order.DeliveryCompanyId, order.ManufacturingCompanyId, order.CreatedDate })
+            .ToListAsync(ct);
+        return Ok(new { items, currentPage = page, pageSize, totalItems });
+    }
+
+    [HttpGet("/Order/UpdateDeliverySplit")]
+    [HttpPost("/Order/UpdateDeliverySplit")]
+    [Authorize(Roles = "Admin,ExecutiveDirector,FollowUpDepartment")]
+    public IActionResult UpdateDeliverySplit() => Ok(new
+    {
+        failedDeliveryUrl = "/Order/UpdateFailedDelivery",
+        deliveredUrl = "/Order/UpdateDelivered"
+    });
+
+    [HttpPost("/Order/HiddenOrders")]
+    public Task<IActionResult> HiddenOrdersPost([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default) =>
+        HiddenOrders(page, pageSize, ct);
+
+    [HttpPost("/Order/HasCreateOrderDraftImage")]
+    public async Task<IActionResult> HasCreateOrderDraftImage([FromForm] string draftId, [FromForm] string imageType, CancellationToken ct)
+    {
+        var type = NormalizeDraftImageType(imageType);
+        if (string.IsNullOrWhiteSpace(draftId) || type is null) return Ok(new { exists = false });
+        var images = await _cache.GetOrCreateAsync(DraftImagesKey(draftId), _ => Task.FromResult(new Dictionary<string, string>()), TimeSpan.FromDays(1), ct: ct);
+        return Ok(new { exists = images.TryGetValue(type, out var url) && !string.IsNullOrWhiteSpace(url) });
+    }
+
+    [HttpPost("/Order/UploadCreateOrderDraftImage")]
+    [RequestSizeLimit(30 * 1024 * 1024)]
+    public async Task<IActionResult> UploadCreateOrderDraftImage(
+        [FromForm] string draftId,
+        [FromForm] string imageType,
+        [FromForm] IFormFile? file,
+        CancellationToken ct)
+    {
+        var type = NormalizeDraftImageType(imageType);
+        if (string.IsNullOrWhiteSpace(draftId) || type is null || file is null || file.Length == 0 || !(file.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ?? false))
+            return BadRequest(new { success = false, message = "الصورة غير صالحة." });
+
+        var stored = await _storage.UploadAsync(file, type == "order" ? "images/orders" : "images/receipts", User.GetUserId(), ct);
+        var images = await _cache.GetOrCreateAsync(DraftImagesKey(draftId), _ => Task.FromResult(new Dictionary<string, string>()), TimeSpan.FromDays(1), ct: ct);
+        images[type] = stored.PublicUrl;
+        await _cache.SetAsync(DraftImagesKey(draftId), images, TimeSpan.FromDays(1), ct: ct);
+        return Ok(new { success = true, imageUrl = stored.PublicUrl });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("/t/{trackingCode}")]
+    [HttpGet("/Order/TrackLavaShipment/{trackingCode}")]
+    [HttpGet("/Order/TrackFlareShipment/{trackingCode}")]
+    [HttpGet("/Order/TrackLoxxKingShipment/{trackingCode}")]
+    [HttpGet("/Order/TrackHayatShipment/{trackingCode}")]
+    [HttpGet("/Order/TrackLioraShipment/{trackingCode}")]
+    [HttpGet("/Order/TrackShipment/{trackingCode}")]
+    public async Task<IActionResult> TrackShipment(string trackingCode, CancellationToken ct)
+    {
+        Response.Headers["X-Robots-Tag"] = "noindex, nofollow, noarchive, nosnippet";
+        if (!TryResolveTrackingCode(trackingCode, out var orderId)) return NotFound();
+        var order = await _context.Orders.AsNoTracking()
+            .Where(item => item.Id == orderId && !item.IsHidden)
+            .Select(item => new
+            {
+                item.Id,
+                item.CustomerName,
+                item.OrderStatus,
+                statusText = OrderStatusCodes.GetDisplayName(item.OrderStatus),
+                item.CreatedDate,
+                item.FixedOrderDate,
+                storeName = _context.ManufacturingCompanies.Where(store => store.Id == item.ManufacturingCompanyId).Select(store => store.Name).FirstOrDefault()
+            })
+            .FirstOrDefaultAsync(ct);
+        return order is null ? NotFound() : Ok(order);
+    }
+
+    [HttpGet("/Order/GetOrderFollowUpStatus")]
+    public async Task<IActionResult> GetOrderFollowUpStatus([FromQuery] int orderId, [FromQuery] string requestType = "Complaint", CancellationToken ct = default)
+    {
+        var type = NormalizeFollowUpType(requestType);
+        if (orderId <= 0 || type is null) return BadRequest(new { success = false, message = "الطلب أو نوع المتابعة غير صحيح." });
+        var request = await _context.OrderFollowUpRequests.AsNoTracking()
+            .Where(item => item.OrderId == orderId && item.RequestType == type)
+            .OrderByDescending(item => item.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        var state = request is null ? "none" : request.IsClosed ? "closed" : request.ProcessingStartedAt.HasValue ? "processing" : "new";
+        return Ok(new
+        {
+            success = true,
+            state,
+            buttonText = state switch { "processing" => "قيد المعالجة", "new" => "تم الإرسال", _ => "إرسال" },
+            responsibleName = request?.ProcessingStartedByName ?? request?.ClosedByName ?? "",
+            processingStartedAt = request?.ProcessingStartedAt,
+            closedAt = request?.ClosedAt
+        });
+    }
+
+    [HttpPost("/Order/CreateOrderFollowUpRequest")]
+    public async Task<IActionResult> CreateOrderFollowUpRequest([FromBody] CreateFollowUpRequest request, CancellationToken ct)
+    {
+        var type = NormalizeFollowUpType(request.RequestType);
+        var note = request.Note?.Trim();
+        if (request.OrderId <= 0 || type is null || note?.Length > 2000 || (string.IsNullOrWhiteSpace(note) && string.IsNullOrWhiteSpace(request.ImageData)))
+            return BadRequest(new { success = false, message = "بيانات المتابعة غير صحيحة." });
+        if (!await _context.Orders.AsNoTracking().AnyAsync(order => order.Id == request.OrderId, ct)) return NotFound(new { success = false, message = "الطلب غير موجود." });
+        if (type == "Complaint" && await _context.OrderFollowUpRequests.AsNoTracking().AnyAsync(item => item.OrderId == request.OrderId && item.RequestType == type && !item.IsClosed, ct))
+            return Conflict(new { success = false, message = "تم إرسال الشكوى بالفعل." });
+
+        string? imageUrl = null;
+        string? imageKey = null;
+        if (!string.IsNullOrWhiteSpace(request.ImageData))
+        {
+            var parsed = ParseImageData(request.ImageData);
+            await using var stream = new MemoryStream(parsed.Bytes, writable: false);
+            var stored = await _storage.UploadStreamAsync(stream, parsed.Bytes.Length, "order-follow-up", $"follow-up-{request.OrderId}.{parsed.Extension}", parsed.ContentType, User.GetUserId(), ct);
+            imageUrl = stored.PublicUrl;
+            imageKey = stored.S3Key;
+        }
+
+        var entity = new OrderFollowUpRequest
+        {
+            OrderId = request.OrderId,
+            RequestType = type,
+            Note = note,
+            ImagePath = imageUrl,
+            ImageS3Key = imageKey,
+            CreatedByUserId = User.GetUserId(),
+            CreatedByName = User.Identity?.Name,
+            CreatedAt = IstanbulTimeHelper.Now
+        };
+        _context.OrderFollowUpRequests.Add(entity);
+        await _context.SaveChangesAsync(ct);
+        await _hub.Clients.All.SendAsync("OrderRealtimeChanged", new { orderId = request.OrderId, reason = "follow_up_created" }, ct);
+        return Ok(new { success = true, id = entity.Id, state = "new" });
+    }
+
+    [HttpGet("/Order/GetLatestFailureReasonImage")]
+    public async Task<IActionResult> GetLatestFailureReasonImage([FromQuery] int orderId, CancellationToken ct)
+    {
+        if (orderId <= 0) return BadRequest(new { success = false, message = "رقم الطلب غير صحيح" });
+        var canSee = await _context.Orders.AsNoTracking().AnyAsync(order => order.Id == orderId && !order.IsHidden, ct);
+        if (!canSee) return NotFound(new { success = false, message = "الطلب غير موجود أو ليس لديك صلاحية عليه" });
+        var imageUrl = await _context.OrderStatusHistories.AsNoTracking()
+            .Where(history => history.OrderId == orderId && history.FailureReasonImageUrl != null && history.FailureReasonImageUrl != "")
+            .OrderByDescending(history => history.CreatedAt)
+            .Select(history => history.FailureReasonImageUrl)
+            .FirstOrDefaultAsync(ct);
+        return Ok(new { success = true, orderId, imageUrl = imageUrl ?? "" });
+    }
+
     private string StatusSelectionKey() => $"orders:status-selection:{CurrentUserCacheId()}";
     private string DraftKey() => $"orders:create-draft:{CurrentUserCacheId()}";
+    private string DraftImagesKey(string draftId) => $"orders:create-draft-images:{CurrentUserCacheId()}:{draftId.Trim()}";
+    private static string? NormalizeDraftImageType(string? value) => value?.Trim().ToLowerInvariant() is "order" or "receipt" ? value.Trim().ToLowerInvariant() : null;
+    private static string? NormalizeFollowUpType(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "complaint" or "complaints" or "شكوى" or "شكوي" or "شكاوى" or "شكاوي" => "Complaint",
+        "productinterest" or "productlike" or "potentialcustomer" or "إعجاب بالمنتج" or "الاعجاب بالمنتج" or "عميل محتمل" => "ProductInterest",
+        _ => null
+    };
+
+    private static (byte[] Bytes, string ContentType, string Extension) ParseImageData(string imageData)
+    {
+        var comma = imageData.IndexOf(',');
+        var metadata = comma >= 0 ? imageData[..comma] : "data:image/jpeg;base64";
+        var payload = comma >= 0 ? imageData[(comma + 1)..] : imageData;
+        var contentType = metadata.Contains("image/png", StringComparison.OrdinalIgnoreCase) ? "image/png" :
+            metadata.Contains("image/webp", StringComparison.OrdinalIgnoreCase) ? "image/webp" : "image/jpeg";
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(payload); }
+        catch (FormatException) { throw new BadRequestException("الصورة غير صالحة."); }
+        if (bytes.Length == 0 || bytes.Length > 10 * 1024 * 1024) throw new BadRequestException("حجم الصورة غير صالح.");
+        return (bytes, contentType, contentType[(contentType.IndexOf('/') + 1)..]);
+    }
+
+    private static bool TryResolveTrackingCode(string? value, out int orderId)
+    {
+        orderId = 0;
+        var code = value?.Trim() ?? "";
+        if (int.TryParse(code, out orderId) && orderId > 0) return true;
+        if (code.StartsWith("trk-", StringComparison.OrdinalIgnoreCase)) code = code[4..];
+        return TryDecodeTrackingCode(code, "0123456789abcdefghijklmnopqrstuvwyz", out orderId) ||
+               TryDecodeTrackingCode(code, "0123456789abcdefghijklmnopqrstuvwxyz", out orderId);
+    }
+
+    private static bool TryDecodeTrackingCode(string code, string alphabet, out int orderId)
+    {
+        orderId = 0;
+        if (string.IsNullOrWhiteSpace(code)) return false;
+        long value = 0;
+        foreach (var character in code.ToLowerInvariant())
+        {
+            var digit = alphabet.IndexOf(character);
+            if (digit < 0) return false;
+            value = checked(value * alphabet.Length + digit);
+        }
+        var raw = value - 173891;
+        if (raw <= 0 || raw % 7919 != 0 || raw / 7919 > int.MaxValue) return false;
+        orderId = (int)(raw / 7919);
+        return true;
+    }
     private string CurrentUserCacheId() => User.GetUserId() ??
         throw new UnauthorizedAccessException("Authenticated user ID is missing.");
 
@@ -754,3 +1021,4 @@ public record FailedDeliveryRequest(string Reason);
 public record UpdateAllStatusesRequest(List<int> OrderIds, int NewStatus, string? Reason);
 public record UpdateInlineStoreRequest(int OrderId, int StoreId);
 public record UpdateInlineFieldRequest(int OrderId, string FieldName, string? NewValue);
+public record CreateFollowUpRequest(int OrderId, string? RequestType, string? Note, string? ImageData);

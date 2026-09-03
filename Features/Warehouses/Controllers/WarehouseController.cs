@@ -134,6 +134,73 @@ public class WarehouseController : ControllerBase
         return File(_pdf.GenerateWarehouseInventoryPdf(company.Name, warehouses), "application/pdf", $"warehouses-{deliveryCompanyId}.pdf");
     }
 
+    [HttpGet("/Warehouse/IndexRepresentative")]
+    [HttpPost("/Warehouse/IndexRepresentative")]
+    [Authorize(Roles = "Admin,DeliveryRepresentative,Accountant,OrderPreparer,Observer,ExecutiveDirector,FollowUpDepartment")]
+    public async Task<IActionResult> IndexRepresentative(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] int? countryId = null,
+        [FromQuery] string? cityId = null,
+        [FromQuery] int? deliveryRepresentativeId = null,
+        [FromQuery] int? mainWarehouseId = null,
+        [FromQuery] int? storeId = null,
+        CancellationToken ct = default)
+    {
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+
+        var query =
+            from warehouse in _context.Warehouses.AsNoTracking()
+            join deliveryCompany in _context.DeliveryCompanies.AsNoTracking()
+                on warehouse.DeliveryCompanyId equals deliveryCompany.Id
+            join mainWarehouse in _context.MainWarehouses.AsNoTracking()
+                on warehouse.MainWarehouseId equals mainWarehouse.Id into mainWarehouses
+            from mainWarehouse in mainWarehouses.DefaultIfEmpty()
+            join store in _context.ManufacturingCompanies.AsNoTracking()
+                on warehouse.ManufacturingCompanyId equals store.Id into stores
+            from store in stores.DefaultIfEmpty()
+            where deliveryCompany.IsRepresentative
+            select new { warehouse, deliveryCompany, mainWarehouse, store };
+
+        if (User.IsInRole("DeliveryRepresentative"))
+        {
+            var userId = User.GetUserId();
+            query = query.Where(row => row.deliveryCompany.UserId == userId);
+        }
+
+        if (countryId.HasValue) query = query.Where(row => row.warehouse.Countries == countryId.Value);
+        if (!string.IsNullOrWhiteSpace(cityId)) query = query.Where(row => row.warehouse.City == cityId);
+        if (deliveryRepresentativeId is > 0) query = query.Where(row => row.deliveryCompany.Id == deliveryRepresentativeId.Value);
+        if (mainWarehouseId is > 0) query = query.Where(row => row.warehouse.MainWarehouseId == mainWarehouseId.Value);
+        if (storeId is > 0) query = query.Where(row => row.warehouse.ManufacturingCompanyId == storeId.Value);
+
+        var totalItems = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(row => row.warehouse.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(row => new
+            {
+                row.warehouse.Id,
+                row.warehouse.Name,
+                ProductImage = row.mainWarehouse == null ? null : row.mainWarehouse.ImageUrl,
+                row.warehouse.Amount,
+                row.warehouse.ReservedAmount,
+                row.warehouse.Price,
+                DeliveryCompanyName = row.deliveryCompany.Name,
+                ManufacturingCompanyName = row.store == null ? null : row.store.Name,
+                row.warehouse.DateAdded,
+                row.warehouse.DateUpdated,
+                row.warehouse.Countries,
+                row.warehouse.IsShown,
+                row.warehouse.City
+            })
+            .ToListAsync(ct);
+
+        return Ok(new { items, currentPage = page, pageSize, totalItems });
+    }
+
     private IQueryable<Warehouse> WarehouseDetailsQuery() => _context.Warehouses.AsNoTracking().Include(item => item.MainWarehouse).Include(item => item.SubWarehouse);
 
 }
