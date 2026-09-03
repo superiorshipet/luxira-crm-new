@@ -26,6 +26,11 @@ public class PdfController : ControllerBase
 
     [HttpGet("orders")]
     [HttpGet("/Pdf/PrintOrder")]
+    [HttpPost("/Pdf/PrintOrder")]
+    [HttpGet("/Order/PrintOrder")]
+    [HttpPost("/Order/PrintOrder")]
+    [HttpGet("/Order/PrintSelectedOrders")]
+    [HttpPost("/Order/PrintSelectedOrders")]
     public async Task<IActionResult> PrintOrders(
         [FromQuery] int[]? ids,
         [FromQuery] string? orderIds,
@@ -120,6 +125,7 @@ public class PdfController : ControllerBase
 
     [HttpGet("delivery-manifest/{companyId:int}")]
     [HttpGet("/Pdf/PrintOrdersForDelivery")]
+    [HttpPost("/Pdf/PrintOrdersForDelivery")]
     public async Task<IActionResult> PrintDeliveryManifest(
         [RouteOrRequest] int? companyId,
         [FromQuery] int? id,
@@ -159,4 +165,99 @@ public class PdfController : ControllerBase
 
         return Content(html, "text/html");
     }
+
+    [HttpGet("Index")]
+    [HttpPost("Index")]
+    public IActionResult Index() => Ok(new
+    {
+        orderPrintUrl = "/Pdf/PrintOrder",
+        deliveryPrintUrl = "/Pdf/PrintOrdersForDelivery",
+        financialTransferPrintUrl = "/Pdf/PrintFinancialTransfersReceipts",
+        attendancePrintUrl = "/Pdf/PrintAttendanceLog"
+    });
+
+    [HttpGet("StoreDailyInvoice")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
+    public async Task<IActionResult> StoreDailyInvoice(int? storeId, DateTime? date, CancellationToken ct)
+    {
+        var targetDate = (date ?? DateTime.UtcNow).Date;
+        var end = targetDate.AddDays(1);
+        var query = _context.Orders.AsNoTracking().Include(order => order.DeliveryCompany).Include(order => order.OrderWarehouses)
+            .Where(order => order.CreatedDate >= targetDate && order.CreatedDate < end);
+        if (storeId.HasValue) query = query.Where(order => order.ManufacturingCompanyId == storeId.Value);
+        var orders = await query.OrderBy(order => order.Id).ToListAsync(ct);
+        return File(_pdfService.GenerateOrderReceiptPdf(orders), "application/pdf", $"store-daily-{targetDate:yyyyMMdd}.pdf");
+    }
+
+    [HttpGet("TestEmailInvoices")]
+    [HttpGet("TestDeliveryCompanyDailyInvoicesService")]
+    [HttpGet("TestDeliveryInvoicesEmail")]
+    [Authorize(Roles = "Admin,Administrator")]
+    public IActionResult TestInvoiceServices() => Ok(new
+    {
+        success = true,
+        message = "Invoice PDF services are available.",
+        emailDispatchRequiresBackgroundJob = true
+    });
+
+    [HttpGet("PrintOrdersForDeliveryDetails")]
+    public Task<IActionResult> PrintOrdersForDeliveryDetails(string? ids, CancellationToken ct) =>
+        PrintOrders(null, ids, true, ct);
+
+    [HttpGet("PrintFinancialTransfersReceipts")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
+    public Task<IActionResult> PrintFinancialTransfersReceipts(string? ids, CancellationToken ct) =>
+        PrintOrders(null, ids, true, ct);
+
+    [HttpGet("PrintEmployeeTransactionStatement")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
+    public async Task<IActionResult> PrintEmployeeTransactionStatement(int id, CancellationToken ct)
+    {
+        var transaction = await _context.EmployeeTransactions.AsNoTracking().Include(item => item.Employee)
+            .FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (transaction is null) return NotFound();
+        return File(_pdfService.GenerateEmployeeTransactionReceiptPdf(transaction), "application/pdf", $"employee-transaction-{id}.pdf");
+    }
+
+    [HttpGet("PrintEmployeeTransactionsStatement")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
+    public async Task<IActionResult> PrintEmployeeTransactionsStatement(int employeeId, DateTime? fromDate, DateTime? toDate, CancellationToken ct)
+    {
+        var query = _context.EmployeeTransactions.AsNoTracking().Include(item => item.Employee)
+            .Where(item => item.EmployeeId == employeeId);
+        if (fromDate.HasValue) query = query.Where(item => item.Date >= fromDate.Value.Date);
+        if (toDate.HasValue) query = query.Where(item => item.Date < toDate.Value.Date.AddDays(1));
+        var rows = await query.OrderBy(item => item.Date).ThenBy(item => item.Id).ToListAsync(ct);
+        return File(_pdfService.GenerateEmployeeTransactionsStatementPdf(rows), "application/pdf", $"employee-statement-{employeeId}.pdf");
+    }
+
+    [HttpGet("AttendancePdfFooter")]
+    [HttpPost("AttendancePdfFooter")]
+    public IActionResult AttendancePdfFooter() => Content($"Luxira CRM | {DateTime.UtcNow:yyyy-MM-dd HH:mm}", "text/plain");
+
+    [HttpGet("PrintAttendanceLog")]
+    [HttpPost("PrintAttendanceLog")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    public async Task<IActionResult> PrintAttendanceLog(string? ids, CancellationToken ct)
+    {
+        var parsedIds = ParseIds(ids);
+        if (parsedIds.Count == 0) return BadRequest("No attendance IDs provided.");
+        var rows = await _context.EmployeeAttendanceLogs.AsNoTracking().Where(item => parsedIds.Contains(item.Id))
+            .OrderBy(item => item.CheckInAt).ToListAsync(ct);
+        return File(_pdfService.GenerateAttendanceLogPdf(rows), "application/pdf", $"attendance-{DateTime.UtcNow:yyyyMMdd}.pdf");
+    }
+
+    private static List<int> ParseIds(string? ids) => (ids ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(value => int.TryParse(value, out var id) ? id : 0).Where(id => id > 0).Distinct().ToList();
+
+    [HttpGet("/Order/PrintSelectedOrdersForDelivery")]
+    [HttpPost("/Order/PrintSelectedOrdersForDelivery")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,FollowUpDepartment,ExecutiveDirector,DeliveryCompany,DeliveryRepresentative")]
+    public Task<IActionResult> PrintSelectedOrdersForDelivery(
+        [FromQuery] int[]? ids,
+        [FromQuery] string? orderIds,
+        [FromQuery] bool downloadPdf = false,
+        CancellationToken ct = default) =>
+        PrintOrders(ids, orderIds, downloadPdf, ct);
 }

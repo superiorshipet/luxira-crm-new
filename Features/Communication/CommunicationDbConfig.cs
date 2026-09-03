@@ -183,6 +183,19 @@ public class AdminNotificationDbConfig : IDbConfig<AdminNotification>
         builder.Property(n => n.RecipientName).HasMaxLength(200).IsRequired();
         builder.Property(n => n.CreatedByAdminUserId).HasMaxLength(450).IsRequired();
         builder.Property(n => n.CreatedByAdminName).HasMaxLength(200).IsRequired();
+        builder.Property(n => n.Message).HasMaxLength(1000).IsRequired();
+        builder.Property(n => n.IconUrl).HasMaxLength(500).IsRequired();
+        builder.HasIndex(n => new { n.RecipientUserId, n.IsRead, n.CreatedAt });
+    }
+}
+
+public class AdminNotificationReplyStateDbConfig : IDbConfig<AdminNotificationReplyState>
+{
+    public void Configure(EntityTypeBuilder<AdminNotificationReplyState> builder)
+    {
+        builder.ToTable("AdminEmployeeNotificationReplyStates");
+        builder.HasKey(state => state.AdminNotificationId);
+        builder.Property(state => state.ReplyText).HasMaxLength(1000);
     }
 }
 

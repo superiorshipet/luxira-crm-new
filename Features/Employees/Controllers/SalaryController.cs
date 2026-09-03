@@ -6,6 +6,7 @@ using Luxira.Api.Features.Employees.Services;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
+using Luxira.Api.Infrastructure.Pdf;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,11 +22,13 @@ public class SalaryController : ControllerBase
 {
     private readonly EmployeeService _service;
     private readonly ApplicationDbContext _context;
+    private readonly LuxiraPdfService _pdfService;
 
-    public SalaryController(EmployeeService service, ApplicationDbContext context)
+    public SalaryController(EmployeeService service, ApplicationDbContext context, LuxiraPdfService pdfService)
     {
         _service = service;
         _context = context;
+        _pdfService = pdfService;
     }
 
     [HttpGet("payroll")]
@@ -67,23 +70,51 @@ public class SalaryController : ControllerBase
 
     [HttpPost("update-due-amount")]
     [HttpPost("/EmployeeSalaries/UpdateSalaryDueAmount")]
-    public IActionResult UpdateSalaryDueAmount([FromBody] UpdateSalaryDueRequest request)
+    public async Task<IActionResult> UpdateSalaryDueAmount([FromBody] UpdateSalaryDueRequest request, CancellationToken ct)
     {
-        return NotImplemented("Manual salary due overrides require the full legacy payroll calculation port.");
+        if (request.EmployeeId <= 0 || request.Amount < 0) throw new BadRequestException("Invalid employee or amount.");
+        var payment = await GetOrCreateSalaryDraftAsync(request.EmployeeId, ct);
+        if (payment.IsPaid) throw new BadRequestException("Paid salary rows cannot be edited.");
+        payment.ManualAdjustmentAmount = request.Amount - payment.EarnedSalary + payment.TotalDeductions + payment.TotalAdvances - payment.TotalBonuses;
+        payment.ManualAdjustmentReason = "Manual final salary override";
+        payment.ManualAdjustmentAt = IstanbulTimeHelper.Now;
+        payment.ManualAdjustmentByUserId = User.GetUserId();
+        payment.ManualAdjustmentByUserName = User.Identity?.Name;
+        payment.RemainingAmount = request.Amount;
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, employeeId = request.EmployeeId, amount = payment.RemainingAmount, paymentId = payment.Id });
     }
 
     [HttpPost("update-days")]
     [HttpPost("/EmployeeSalaries/UpdateSalaryDays")]
-    public IActionResult UpdateSalaryDays([FromBody] UpdateSalaryDaysRequest request)
+    public async Task<IActionResult> UpdateSalaryDays([FromBody] UpdateSalaryDaysRequest request, CancellationToken ct)
     {
-        return NotImplemented("Manual salary-day overrides require the full legacy payroll calculation port.");
+        var payment = await GetOrCreateSalaryDraftAsync(request.EmployeeId, ct);
+        if (payment.IsPaid) throw new BadRequestException("Paid salary rows cannot be edited.");
+        payment.DaysWorked = Math.Clamp(request.Days, 0, payment.DaysInMonth);
+        payment.EarnedSalary = payment.DaysInMonth == 0 ? 0 : decimal.Round(payment.MonthlySalary * payment.DaysWorked / payment.DaysInMonth, 2);
+        payment.RemainingAmount = payment.EarnedSalary - payment.TotalDeductions - payment.TotalAdvances + payment.TotalBonuses + payment.ManualAdjustmentAmount;
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, employeeId = request.EmployeeId, daysWorked = payment.DaysWorked, amount = payment.RemainingAmount, paymentId = payment.Id });
     }
 
     [HttpPost("bulk-confirm")]
     [HttpPost("/EmployeeSalaries/BulkConfirmSalaryPayments")]
-    public IActionResult BulkConfirmSalaryPayments([FromBody] BulkSalaryConfirmRequest request, CancellationToken ct)
+    public async Task<IActionResult> BulkConfirmSalaryPayments([FromBody] BulkSalaryConfirmRequest request, CancellationToken ct)
     {
-        return NotImplemented("Bulk payroll confirmation is disabled until all rows can be validated and committed atomically.");
+        var ids = request.EmployeeIds.Where(id => id > 0).Distinct().ToArray();
+        if (ids.Length == 0) throw new BadRequestException("No employees selected.");
+        var drafts = await _context.EmployeeSalaryPayments.Where(payment => ids.Contains(payment.EmployeeId) && !payment.IsPaid && !payment.IsDeleted && !payment.IsPermanentlyDeleted).ToListAsync(ct);
+        if (drafts.Select(payment => payment.EmployeeId).Distinct().Count() != ids.Length) throw new BadRequestException("Every employee must have a salary draft before bulk confirmation.");
+        var now = IstanbulTimeHelper.Now;
+        foreach (var payment in drafts)
+        {
+            payment.IsPaid = true; payment.PaidAt = now; payment.PaidByUserId = User.GetUserId(); payment.PaidByUserName = User.Identity?.Name;
+            if (request.FromDate.HasValue) payment.PeriodFrom = request.FromDate.Value.Date;
+            if (request.ToDate.HasValue) payment.PeriodTo = request.ToDate.Value.Date;
+        }
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, confirmedCount = drafts.Count });
     }
 
     [HttpPost("delete-payment/{paymentId:int}")]
@@ -169,6 +200,7 @@ public class SalaryController : ControllerBase
     }
 
     [HttpPost("restore/{id:int}")]
+    [HttpPost("/EmployeeSalaries/RestoreSalaryPayment")]
     public async Task<IActionResult> Restore([RouteOrRequest] int id, CancellationToken ct)
     {
         var payment = await _context.EmployeeSalaryPayments
@@ -182,14 +214,85 @@ public class SalaryController : ControllerBase
         return Ok(new { success = true });
     }
 
-    private ObjectResult NotImplemented(string detail) => StatusCode(
-        StatusCodes.Status501NotImplemented,
-        new ProblemDetails
+    [HttpPost("/EmployeeSalaries/RestoreAllDeletedSalaryPayments")]
+    public async Task<IActionResult> RestoreAllDeletedSalaryPayments(CancellationToken ct)
+    {
+        var rows = await _context.EmployeeSalaryPayments.Where(payment => payment.IsDeleted && !payment.IsPermanentlyDeleted).ToListAsync(ct);
+        foreach (var payment in rows) { payment.IsDeleted = false; payment.DeletedAt = null; payment.DeletedByUserId = null; payment.DeletedByUserName = null; }
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, restoredCount = rows.Count });
+    }
+
+    [HttpGet("/EmployeeSalaries/PermanentDeleteHistory")]
+    public async Task<IActionResult> PermanentDeleteHistory(CancellationToken ct) => Ok(await _context.EmployeeSalaryPayments.AsNoTracking()
+        .Where(payment => payment.IsPermanentlyDeleted).OrderByDescending(payment => payment.PermanentlyDeletedAt).Take(500)
+        .Select(payment => new { payment.Id, payment.EmployeeId, payment.SalaryMonth, payment.RemainingAmount, payment.Currency, payment.PermanentlyDeletedAt, payment.PermanentlyDeletedByUserName }).ToListAsync(ct));
+
+    [HttpGet("/EmployeeSalaries/SalaryReceiptPdf")]
+    public async Task<IActionResult> SalaryReceiptPdf(int employeeId, DateTime? fromDate, DateTime? toDate, int? paymentId, CancellationToken ct)
+    {
+        var query = _context.EmployeeSalaryPayments.AsNoTracking().Include(payment => payment.Employee).Where(payment => payment.EmployeeId == employeeId && payment.IsPaid && !payment.IsDeleted);
+        if (paymentId.HasValue) query = query.Where(payment => payment.Id == paymentId.Value);
+        if (fromDate.HasValue) query = query.Where(payment => payment.PeriodTo >= fromDate.Value.Date);
+        if (toDate.HasValue) query = query.Where(payment => payment.PeriodFrom <= toDate.Value.Date);
+        var payment = await query.OrderByDescending(item => item.PaidAt).FirstOrDefaultAsync(ct);
+        return payment is null ? NotFound() : File(_pdfService.GenerateSalaryPaymentReceiptPdf(payment), "application/pdf", $"salary-{payment.Id}.pdf");
+    }
+
+    [HttpGet("/EmployeeSalaries/FinancialStatementPdf")]
+    public async Task<IActionResult> FinancialStatementPdf(int employeeId, DateTime? fromDate, DateTime? toDate, CancellationToken ct)
+    {
+        var query = _context.EmployeeTransactions.AsNoTracking().Include(transaction => transaction.Employee).Where(transaction => transaction.EmployeeId == employeeId);
+        if (fromDate.HasValue) query = query.Where(transaction => transaction.Date >= fromDate.Value.Date);
+        if (toDate.HasValue) query = query.Where(transaction => transaction.Date < toDate.Value.Date.AddDays(1));
+        return File(_pdfService.GenerateEmployeeTransactionsStatementPdf(await query.OrderBy(transaction => transaction.Date).ToListAsync(ct)), "application/pdf", $"financial-statement-{employeeId}.pdf");
+    }
+
+    [HttpGet("/EmployeeSalaries/SalaryStatementPdf")]
+    public async Task<IActionResult> SalaryStatementPdf(int employeeId, CancellationToken ct)
+    {
+        var rows = await _context.EmployeeSalaryPayments.AsNoTracking().Include(payment => payment.Employee).Where(payment => payment.EmployeeId == employeeId && !payment.IsDeleted)
+            .OrderBy(payment => payment.SalaryMonth).ToListAsync(ct);
+        return File(_pdfService.GenerateSalaryStatementPdf(rows), "application/pdf", $"salary-statement-{employeeId}.pdf");
+    }
+
+    [HttpGet("/EmployeeSalaries/TransferArchive")]
+    public async Task<IActionResult> TransferArchive(int? employeeId, CancellationToken ct)
+    {
+        var query = _context.EmployeeSalaryPayments.AsNoTracking().Where(payment => payment.IsPaid && !payment.IsDeleted);
+        if (employeeId.HasValue) query = query.Where(payment => payment.EmployeeId == employeeId.Value);
+        return Ok(await query.OrderByDescending(payment => payment.PaidAt).Take(500).ToListAsync(ct));
+    }
+
+    [HttpGet("/EmployeeSalaries/TestSalaryNotification")]
+    [HttpPost("/EmployeeSalaries/TestSalaryNotification")]
+    public async Task<IActionResult> TestSalaryNotification(int? employeeId, CancellationToken ct)
+    {
+        var count = await _context.EmployeeSalaryPayments.AsNoTracking().CountAsync(payment => !payment.IsPaid && !payment.IsDeleted && (!employeeId.HasValue || payment.EmployeeId == employeeId), ct);
+        return Ok(new { success = true, pendingSalaryCount = count, message = "Salary notification query completed." });
+    }
+
+    private async Task<EmployeeSalaryPayment> GetOrCreateSalaryDraftAsync(int employeeId, CancellationToken ct)
+    {
+        var employee = await _context.Employees.AsNoTracking().FirstOrDefaultAsync(item => item.Id == employeeId, ct)
+            ?? throw new NotFoundException("Employee not found.");
+        var now = IstanbulTimeHelper.Now;
+        var month = new DateTime(now.Year, now.Month, 1);
+        var payment = await _context.EmployeeSalaryPayments.FirstOrDefaultAsync(item => item.EmployeeId == employeeId && item.SalaryMonth == month && !item.IsPermanentlyDeleted, ct);
+        if (payment is not null) return payment;
+        var days = DateTime.DaysInMonth(month.Year, month.Month);
+        payment = new EmployeeSalaryPayment
         {
-            Status = StatusCodes.Status501NotImplemented,
-            Title = "Operation not implemented",
-            Detail = detail
-        });
+            EmployeeId = employeeId, SalaryMonth = month, PeriodFrom = month, PeriodTo = now.Date,
+            MonthlySalary = employee.Salary, DaysWorked = Math.Min(now.Day, days), DaysInMonth = days,
+            EarnedSalary = decimal.Round(employee.Salary * Math.Min(now.Day, days) / days, 2), Currency = "USD",
+            ReceiptNumber = $"SAL-{employeeId}-{now:yyyyMM}-{Guid.NewGuid():N}"[..Math.Min(80, $"SAL-{employeeId}-{now:yyyyMM}-{Guid.NewGuid():N}".Length)]
+        };
+        payment.RemainingAmount = payment.EarnedSalary;
+        _context.EmployeeSalaryPayments.Add(payment);
+        return payment;
+    }
+
 }
 
 public record UpdateSalaryDueRequest(int EmployeeId, decimal Amount);

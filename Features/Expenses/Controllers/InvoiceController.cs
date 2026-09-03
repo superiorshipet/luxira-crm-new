@@ -5,6 +5,8 @@ using System.Text.Encodings.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Luxira.Api.Infrastructure.Email;
+using Luxira.Api.Utils.Extensions;
 
 namespace Luxira.Api.Features.Expenses.Controllers;
 
@@ -22,11 +24,13 @@ public class InvoiceController : ControllerBase
 
     private readonly OrderService _orderService;
     private readonly ApplicationDbContext _context;
+    private readonly LuxiraEmailService _emailService;
 
-    public InvoiceController(OrderService orderService, ApplicationDbContext context)
+    public InvoiceController(OrderService orderService, ApplicationDbContext context, LuxiraEmailService emailService)
     {
         _orderService = orderService;
         _context = context;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -88,6 +92,39 @@ public class InvoiceController : ControllerBase
             string.Equals(item, request.Template, StringComparison.OrdinalIgnoreCase)) ?? "LotusBlue";
         var order = await _orderService.GetOrderByIdAsync(request.OrderId, ct);
         return Ok(new InvoicePreviewDto(template, order));
+    }
+
+    [HttpPost("TestDailyStoreNotifications")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    public async Task<IActionResult> TestDailyStoreNotifications(CancellationToken ct)
+    {
+        var date = DateTime.UtcNow.Date.AddDays(-1);
+        var rows = await _context.Orders.AsNoTracking().Where(order => order.CreatedDate >= date && order.CreatedDate < date.AddDays(1))
+            .GroupBy(order => order.ManufacturingCompanyId).Select(group => new { storeId = group.Key, orderCount = group.Count() }).ToListAsync(ct);
+        return Ok(new { success = true, date, stores = rows, message = "Daily invoice pipeline query completed." });
+    }
+
+    [HttpPost("EmailDownloadedPdf")]
+    [RequestSizeLimit(25 * 1024 * 1024)]
+    public async Task<IActionResult> EmailDownloadedPdf([FromForm] IFormFile? pdf, [FromForm] int? storeId, [FromForm] string? fileName, [FromForm] DateTime? startDate, [FromForm] DateTime? endDate, CancellationToken ct)
+    {
+        if (pdf is not { Length: > 0 } || pdf.Length > 25L * 1024 * 1024) return BadRequest(new { success = false, message = "ملف الفاتورة غير موجود أو أكبر من الحد المسموح." });
+        await using var memory = new MemoryStream();
+        await pdf.CopyToAsync(memory, ct);
+        var bytes = memory.ToArray();
+        if (bytes.Length < 5 || System.Text.Encoding.ASCII.GetString(bytes, 0, 5) != "%PDF-") return BadRequest(new { success = false, message = "الملف المرسل ليس ملف PDF صالحًا." });
+        var recipients = await (from userRole in _context.UserRoles.AsNoTracking()
+            join role in _context.Roles.AsNoTracking() on userRole.RoleId equals role.Id
+            join user in _context.Users.AsNoTracking() on userRole.UserId equals user.Id
+            where (role.Name == "Admin" || role.Name == "Administrator" || role.Name == "ExecutiveDirector") && user.Email != null
+            select user.Email!).Distinct().ToListAsync(ct);
+        if (recipients.Count == 0) return StatusCode(503, new { success = false, message = "لا يوجد بريد إلكتروني صالح للإدارة." });
+        var storeName = storeId.HasValue ? await _context.ManufacturingCompanies.AsNoTracking().Where(store => store.Id == storeId).Select(store => store.Name).FirstOrDefaultAsync(ct) : null;
+        var safeName = Path.GetFileName(string.IsNullOrWhiteSpace(fileName) ? pdf.FileName : fileName);
+        if (!safeName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) safeName += ".pdf";
+        var body = $"<p>فاتورة {System.Net.WebUtility.HtmlEncode(storeName ?? "المتجر")}</p><p>{startDate:yyyy-MM-dd} - {endDate:yyyy-MM-dd}</p>";
+        var results = await Task.WhenAll(recipients.Select(email => _emailService.SendEmailAsync(email, $"فاتورة {storeName ?? "المتجر"}", body, bytes, safeName, ct)));
+        return Ok(new { success = results.All(result => result), recipients = results.Count(result => result) });
     }
 }
 

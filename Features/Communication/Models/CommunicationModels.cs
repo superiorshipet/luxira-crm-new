@@ -160,6 +160,15 @@ public class AdminNotification
     public string IconUrl { get; set; } = string.Empty;
 }
 
+public class AdminNotificationReplyState
+{
+    public int AdminNotificationId { get; set; }
+    public bool RequiresReply { get; set; }
+    public string? ReplyText { get; set; }
+    public DateTimeOffset? RepliedAt { get; set; }
+    public bool ReplySeenByAdmin { get; set; }
+}
+
 public class SystemEmailLog
 {
     public const string DirectionOutgoing = "Outgoing";

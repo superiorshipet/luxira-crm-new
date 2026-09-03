@@ -86,6 +86,44 @@ public class OrderStatusHistoryDeliveryCompanySnapshotDbConfig : IDbConfig<Order
     }
 }
 
+public class StatusUpdateBatchLogDbConfig : IDbConfig<StatusUpdateBatchLog>
+{
+    public void Configure(EntityTypeBuilder<StatusUpdateBatchLog> builder)
+    {
+        builder.ToTable("StatusUpdateBatchLogs");
+        builder.HasKey(log => log.Id);
+        builder.Property(log => log.EmployeeUserId).HasMaxLength(450);
+        builder.Property(log => log.EmployeeName).HasMaxLength(250);
+        builder.Property(log => log.EmployeeImageUrl).HasMaxLength(1000);
+        builder.Property(log => log.CountryName).HasMaxLength(120);
+        builder.Property(log => log.StoreName).HasMaxLength(250);
+        builder.Property(log => log.FinalStatusName).HasMaxLength(120).IsRequired();
+        builder.HasIndex(log => log.UpdatedAt);
+        builder.HasIndex(log => log.BatchKey);
+        builder.HasIndex(log => new { log.EmployeeUserId, log.UpdatedAt });
+        builder.HasMany(log => log.Items).WithOne(item => item.BatchLog)
+            .HasForeignKey(item => item.BatchLogId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class StatusUpdateBatchLogItemDbConfig : IDbConfig<StatusUpdateBatchLogItem>
+{
+    public void Configure(EntityTypeBuilder<StatusUpdateBatchLogItem> builder)
+    {
+        builder.ToTable("StatusUpdateBatchLogItems");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.OrderCode).HasMaxLength(80).IsRequired();
+        builder.Property(item => item.FinalStatusName).HasMaxLength(120).IsRequired();
+        builder.Property(item => item.FailureReason).HasMaxLength(500);
+        builder.Property(item => item.DeliveryCompanyName).HasMaxLength(250);
+        builder.Property(item => item.CountryName).HasMaxLength(120);
+        builder.Property(item => item.StoreName).HasMaxLength(250);
+        builder.HasIndex(item => item.BatchLogId);
+        builder.HasIndex(item => item.OrderId);
+        builder.HasIndex(item => item.UpdatedAt);
+    }
+}
+
 public class OrderEditHistoryDbConfig : IDbConfig<OrderEditHistory>
 {
     public void Configure(EntityTypeBuilder<OrderEditHistory> builder)
@@ -159,6 +197,37 @@ public class OrderPostImageDbConfig : IDbConfig<OrderPostImage>
         builder.HasOne(image => image.OrderPost)
             .WithMany(post => post.Images)
             .HasForeignKey(image => image.OrderPostId);
+    }
+}
+
+public class OrderPostDeletedHistoryDbConfig : IDbConfig<OrderPostDeletedHistory>
+{
+    public void Configure(EntityTypeBuilder<OrderPostDeletedHistory> builder)
+    {
+        builder.ToTable("OrderPostDeletedHistories");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.AuthorUserId).HasMaxLength(450);
+        builder.Property(item => item.AuthorName).HasMaxLength(256);
+        builder.Property(item => item.DeletedByUserId).HasMaxLength(450);
+        builder.Property(item => item.DeletedByName).HasMaxLength(256);
+        builder.HasIndex(item => item.OrderPostId).IsUnique();
+        builder.HasIndex(item => new { item.OrderId, item.Type, item.DeletedAt });
+    }
+}
+
+public class OrderPostEmployeeDeductionDbConfig : IDbConfig<OrderPostEmployeeDeduction>
+{
+    public void Configure(EntityTypeBuilder<OrderPostEmployeeDeduction> builder)
+    {
+        builder.ToTable("OrderPostEmployeeDeductions");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.EmployeeName).HasMaxLength(256);
+        builder.Property(item => item.Amount).HasPrecision(18, 2);
+        builder.Property(item => item.OrderTotal).HasPrecision(18, 2);
+        builder.Property(item => item.CreatedByUserId).HasMaxLength(450);
+        builder.Property(item => item.CreatedByName).HasMaxLength(256);
+        builder.HasIndex(item => new { item.OrderId, item.CreatedAt });
+        builder.HasIndex(item => item.EmployeeTransactionId);
     }
 }
 

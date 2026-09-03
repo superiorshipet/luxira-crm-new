@@ -100,6 +100,101 @@ public class LuxiraPdfService
         return document.GeneratePdf();
     }
 
+    public byte[] GenerateEmployeeTransactionsStatementPdf(IReadOnlyList<EmployeeTransaction> transactions)
+    {
+        return Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1, Unit.Centimetre);
+            page.Header().Text("كشف حركات الموظف").Bold().FontSize(17).AlignCenter();
+            page.Content().PaddingVertical(12).Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.ConstantColumn(60); columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn(2);
+                });
+                table.Header(header =>
+                {
+                    header.Cell().Text("الرقم").Bold(); header.Cell().Text("التاريخ").Bold();
+                    header.Cell().Text("المبلغ").Bold(); header.Cell().Text("السبب").Bold();
+                });
+                foreach (var row in transactions)
+                {
+                    table.Cell().Text(row.Id.ToString()); table.Cell().Text(row.Date.ToString("yyyy-MM-dd"));
+                    table.Cell().Text(row.Amount.ToString("N2")); table.Cell().Text(row.Reason ?? row.TransactionType.ToString());
+                }
+            });
+            page.Footer().AlignCenter().Text($"الإجمالي: {transactions.Sum(item => item.Amount):N2}");
+        })).GeneratePdf();
+    }
+
+    public byte[] GenerateAttendanceLogPdf(IReadOnlyList<EmployeeAttendanceLog> rows)
+    {
+        return Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1, Unit.Centimetre);
+            page.Header().Text("سجل الحضور والانصراف").Bold().FontSize(17).AlignCenter();
+            page.Content().PaddingVertical(12).Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.RelativeColumn(2); columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn();
+                });
+                table.Header(header =>
+                {
+                    header.Cell().Text("الموظف").Bold(); header.Cell().Text("التاريخ").Bold();
+                    header.Cell().Text("الحضور").Bold(); header.Cell().Text("الانصراف").Bold();
+                });
+                foreach (var row in rows)
+                {
+                    table.Cell().Text(row.EmployeeName ?? row.EmployeeEmail ?? row.UserId);
+                    table.Cell().Text(row.CheckInAt.ToString("yyyy-MM-dd"));
+                    table.Cell().Text(row.CheckInAt.ToString("HH:mm"));
+                    table.Cell().Text(row.CheckOutAt?.ToString("HH:mm") ?? "-");
+                }
+            });
+            page.Footer().AlignCenter().Text($"Luxira CRM | {DateTime.UtcNow:yyyy-MM-dd HH:mm}");
+        })).GeneratePdf();
+    }
+
+    public byte[] GenerateSalaryPaymentReceiptPdf(EmployeeSalaryPayment payment)
+    {
+        return Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A5); page.Margin(1, Unit.Centimetre);
+            page.Header().Text($"إيصال راتب {payment.ReceiptNumber}").Bold().FontSize(17).AlignCenter();
+            page.Content().PaddingVertical(16).Column(column =>
+            {
+                column.Spacing(7);
+                column.Item().Text($"الموظف: {payment.Employee?.DisplayName ?? payment.Employee?.Name ?? payment.EmployeeId.ToString()}");
+                column.Item().Text($"الفترة: {payment.PeriodFrom:yyyy-MM-dd} - {payment.PeriodTo:yyyy-MM-dd}");
+                column.Item().Text($"أيام العمل: {payment.DaysWorked} / {payment.DaysInMonth}");
+                column.Item().Text($"الراتب المستحق: {payment.RemainingAmount:N2} {payment.Currency}").Bold();
+                column.Item().Text($"تاريخ الدفع: {payment.PaidAt:yyyy-MM-dd HH:mm}");
+            });
+        })).GeneratePdf();
+    }
+
+    public byte[] GenerateSalaryStatementPdf(IReadOnlyList<EmployeeSalaryPayment> payments)
+    {
+        return Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4); page.Margin(1, Unit.Centimetre);
+            page.Header().Text("كشف الرواتب").Bold().FontSize(17).AlignCenter();
+            page.Content().PaddingVertical(12).Table(table =>
+            {
+                table.ColumnsDefinition(columns => { columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn(); });
+                table.Header(header => { header.Cell().Text("الشهر").Bold(); header.Cell().Text("الأيام").Bold(); header.Cell().Text("المبلغ").Bold(); header.Cell().Text("الحالة").Bold(); });
+                foreach (var payment in payments)
+                {
+                    table.Cell().Text(payment.SalaryMonth.ToString("yyyy-MM")); table.Cell().Text($"{payment.DaysWorked}/{payment.DaysInMonth}");
+                    table.Cell().Text($"{payment.RemainingAmount:N2} {payment.Currency}"); table.Cell().Text(payment.IsPaid ? "مدفوع" : "مسودة");
+                }
+            });
+        })).GeneratePdf();
+    }
+
     public byte[] GenerateDeliveryManifestPdf(string companyName, List<Order> orders)
     {
         var document = Document.Create(container =>

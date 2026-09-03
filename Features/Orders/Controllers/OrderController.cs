@@ -22,7 +22,7 @@ namespace Luxira.Api.Features.Orders.Controllers;
 [Route("api/orders")]
 [Route("api/order")]
 [Route("Order")]
-public class OrderController : ControllerBase
+public partial class OrderController : ControllerBase
 {
     private readonly OrderService _orderService;
     private readonly ApplicationDbContext _context;
@@ -124,6 +124,7 @@ public class OrderController : ControllerBase
     {
         var actor = OrderStatusActor.FromPrincipal(User);
         int updated = await _orderService.BatchUpdateOrderStatusAsync(request, actor, ct);
+        await RecordStatusUpdateBatchAsync(request.OrderIds, request.NewStatus, request.Reason, ct);
         return Ok(new { updatedCount = updated, message = $"Successfully updated {updated} orders." });
     }
 
@@ -598,6 +599,7 @@ public class OrderController : ControllerBase
             new BatchUpdateOrderStatusRequest(request.OrderIds, request.NewStatus, request.Reason, null),
             OrderStatusActor.FromPrincipal(User),
             ct);
+        await RecordStatusUpdateBatchAsync(request.OrderIds, request.NewStatus, request.Reason, ct);
         return Ok(new { success = true, updatedCount = updated });
     }
 
@@ -1013,6 +1015,7 @@ public class OrderController : ControllerBase
         return Ok(new { success = true, orderId, applicationUserId = newApplicationUserId });
     }
 
+    [HttpGet("/Order/UpdateStatusForMultiple")]
     [HttpPost("/Order/UpdateStatusForMultiple")]
     public async Task<IActionResult> UpdateStatusForMultiple(
         [FromForm] List<int>? ids,
@@ -1026,6 +1029,7 @@ public class OrderController : ControllerBase
             new BatchUpdateOrderStatusRequest(orderIds, orderStatus, reason, null),
             OrderStatusActor.FromPrincipal(User),
             ct);
+        await RecordStatusUpdateBatchAsync(orderIds, orderStatus, reason, ct);
         return Ok(new { success = true, updatedCount = count });
     }
 

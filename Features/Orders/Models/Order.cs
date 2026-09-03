@@ -101,6 +101,39 @@ public class OrderStatusHistoryDeliveryCompanySnapshot
     public DateTime CapturedAt { get; set; }
 }
 
+public class StatusUpdateBatchLog
+{
+    public int Id { get; set; }
+    public Guid BatchKey { get; set; }
+    public string? EmployeeUserId { get; set; }
+    public string? EmployeeName { get; set; }
+    public string? EmployeeImageUrl { get; set; }
+    public string? CountryName { get; set; }
+    public int? StoreId { get; set; }
+    public string? StoreName { get; set; }
+    public int FinalStatusValue { get; set; }
+    public string FinalStatusName { get; set; } = string.Empty;
+    public int OrderCount { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public List<StatusUpdateBatchLogItem> Items { get; set; } = [];
+}
+
+public class StatusUpdateBatchLogItem
+{
+    public int Id { get; set; }
+    public int BatchLogId { get; set; }
+    public StatusUpdateBatchLog? BatchLog { get; set; }
+    public int OrderId { get; set; }
+    public string OrderCode { get; set; } = string.Empty;
+    public int FinalStatusValue { get; set; }
+    public string FinalStatusName { get; set; } = string.Empty;
+    public string? FailureReason { get; set; }
+    public string? DeliveryCompanyName { get; set; }
+    public string? CountryName { get; set; }
+    public string? StoreName { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
 public class OrderEditHistory
 {
     public int Id { get; set; }
@@ -195,6 +228,37 @@ public class OrderPostImage
     public DateTime? MigratedToS3At { get; set; }
     public int SortOrder { get; set; }
     public long? PHash { get; set; }
+}
+
+public class OrderPostDeletedHistory
+{
+    public int Id { get; set; }
+    public int OrderPostId { get; set; }
+    public int OrderId { get; set; }
+    public int Type { get; set; }
+    public string? Body { get; set; }
+    public string? AuthorUserId { get; set; }
+    public string? AuthorName { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
+}
+
+public class OrderPostEmployeeDeduction
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public int EmployeeId { get; set; }
+    public string? EmployeeName { get; set; }
+    public decimal Amount { get; set; }
+    public decimal OrderTotal { get; set; }
+    public string? Reason { get; set; }
+    public string? ProblemText { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+    public int? EmployeeTransactionId { get; set; }
 }
 
 public class OrderMetaActionClick

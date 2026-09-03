@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Luxira.Api.Features.Auth.Models;
 using Luxira.Api.Features.DeliveryCompanies.Models;
 using Luxira.Api.Features.Orders.Models;
+using Luxira.Api.Features.Operations.Models;
 using Luxira.Api.Features.Employees.Models;
 using Luxira.Api.Features.Expenses.Models;
 using Luxira.Api.Features.Warehouses.Models;
@@ -38,6 +39,10 @@ public class ApplicationDbContext : DbContext
     // Orders & Operations
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+    public DbSet<StatusUpdateBatchLog> StatusUpdateBatchLogs => Set<StatusUpdateBatchLog>();
+    public DbSet<StatusUpdateBatchLogItem> StatusUpdateBatchLogItems => Set<StatusUpdateBatchLogItem>();
+    public DbSet<AppLog> AppLogs => Set<AppLog>();
+    public DbSet<AppMetric> AppMetrics => Set<AppMetric>();
     public DbSet<OrderStatusHistoryDeliveryCompanySnapshot> OrderStatusHistoryDeliveryCompanySnapshots => Set<OrderStatusHistoryDeliveryCompanySnapshot>();
     public DbSet<OrderEditHistory> OrderEditHistories => Set<OrderEditHistory>();
     public DbSet<OrderWarehouse> OrderWarehouses => Set<OrderWarehouse>();
@@ -46,6 +51,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<OrderBonusConfiguration> OrderBonusConfigurations => Set<OrderBonusConfiguration>();
     public DbSet<OrderPost> OrderPosts => Set<OrderPost>();
     public DbSet<OrderPostImage> OrderPostImages => Set<OrderPostImage>();
+    public DbSet<OrderPostDeletedHistory> OrderPostDeletedHistories => Set<OrderPostDeletedHistory>();
+    public DbSet<OrderPostEmployeeDeduction> OrderPostEmployeeDeductions => Set<OrderPostEmployeeDeduction>();
     public DbSet<OrderMetaActionClick> OrderMetaActionClicks => Set<OrderMetaActionClick>();
     public DbSet<OrderFollowUpRequest> OrderFollowUpRequests => Set<OrderFollowUpRequest>();
     public DbSet<PotentialOrder> PotentialOrders => Set<PotentialOrder>();
@@ -130,6 +137,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<HelpCenterChatKeyword> HelpCenterChatKeywords => Set<HelpCenterChatKeyword>();
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
     public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
+    public DbSet<AdminNotificationReplyState> AdminNotificationReplyStates => Set<AdminNotificationReplyState>();
     public DbSet<SystemEmailLog> SystemEmailLogs => Set<SystemEmailLog>();
     public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();
     public DbSet<PasswordEmail> PasswordEmails => Set<PasswordEmail>();

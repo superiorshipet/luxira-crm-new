@@ -1,4 +1,5 @@
 using Luxira.Api.Infrastructure.Pdf;
+using Luxira.Api.Features.Orders.Controllers;
 using Luxira.Api.Utils.Binding;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,24 @@ namespace Luxira.Tests;
 
 public sealed class CompatibilityRegressionTests
 {
+    [Theory]
+    [InlineData(nameof(OrderController.GetBankTransferApprovals), "GET", "/Order/GetBankTransferApprovals")]
+    [InlineData(nameof(OrderController.ConfirmBankTransfer), "POST", "/Order/ConfirmBankTransfer/{id:int}")]
+    [InlineData(nameof(OrderController.FlagBankTransferNotReceived), "POST", "/Order/FlagBankTransferNotReceived/{id:int}")]
+    [InlineData(nameof(OrderController.RejectBankTransfer), "POST", "/Order/RejectBankTransfer/{id:int}")]
+    [InlineData(nameof(OrderController.ApproveBankTransfer), "POST", "/Order/ApproveBankTransfer/{id:int}")]
+    [InlineData(nameof(OrderController.ValidateBankTransferChange), "GET", "/Order/ValidateBankTransferChange/{id:int}")]
+    [InlineData(nameof(OrderController.SetIsPaid), "POST", "/Order/SetIsPaid/{id:int}")]
+    public void Bank_transfer_legacy_routes_are_preserved(string methodName, string verb, string route)
+    {
+        var method = typeof(OrderController).GetMethod(methodName)!;
+        var templates = verb == "GET"
+            ? method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: true).Cast<HttpGetAttribute>().Select(attribute => attribute.Template)
+            : method.GetCustomAttributes(typeof(HttpPostAttribute), inherit: true).Cast<HttpPostAttribute>().Select(attribute => attribute.Template);
+
+        Assert.Contains(route, templates);
+    }
+
     [Fact]
     public void Shipment_price_offer_is_a_real_pdf()
     {

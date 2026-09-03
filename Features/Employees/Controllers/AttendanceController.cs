@@ -16,7 +16,7 @@ namespace Luxira.Api.Features.Employees.Controllers;
 [Route("api/v1/attendance")]
 [Route("EmployeeAttendance")]
 [Route("api/[controller]")]
-public class AttendanceController : ControllerBase
+public partial class AttendanceController : ControllerBase
 {
     private readonly EmployeeService _service;
     private readonly ApplicationDbContext _context;
