@@ -18,6 +18,7 @@ public class Warehouse
     public int? MainWarehouseId { get; set; }
     public MainWarehouse? MainWarehouse { get; set; }
     public int? SubWarehouseId { get; set; }
+    public SubWarehouse? SubWarehouse { get; set; }
 
     // API compatibility aliases backed by the legacy database columns.
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
@@ -52,6 +53,7 @@ public class SubWarehouse
     public string Name { get; set; } = string.Empty;
     public int? MainWarehouseId { get; set; }
     public MainWarehouse? MainWarehouse { get; set; }
+    public string? ProductCode { get; set; }
 }
 
 public class ManufacturingCompanyMainWarehouse

@@ -1,5 +1,10 @@
 using Luxira.Api.Features.Warehouses.DTOs;
 using Luxira.Api.Features.Warehouses.Services;
+using Luxira.Api.Data;
+using Luxira.Api.Features.Warehouses.Models;
+using Luxira.Api.Infrastructure.Pdf;
+using Luxira.Api.Utils.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,13 +17,19 @@ namespace Luxira.Api.Features.Warehouses.Controllers;
 public class WarehouseController : ControllerBase
 {
     private readonly WarehouseService _service;
+    private readonly ApplicationDbContext _context;
+    private readonly LuxiraPdfService _pdf;
 
-    public WarehouseController(WarehouseService service)
+    public WarehouseController(WarehouseService service, ApplicationDbContext context, LuxiraPdfService pdf)
     {
         _service = service;
+        _context = context;
+        _pdf = pdf;
     }
 
     [HttpGet]
+    [HttpGet("/Warehouse/Index")]
+    [HttpPost("/Warehouse/Index")]
     [HttpGet("/Warehouse/GetWarehouses")]
     public async Task<ActionResult<List<WarehouseDto>>> GetWarehouses([FromQuery] int? countryId, [FromQuery] bool? isActive, CancellationToken ct)
     {
@@ -42,4 +53,89 @@ public class WarehouseController : ControllerBase
         return CreatedAtAction(nameof(GetWarehouseById), new { id = result.Id }, result);
     }
 
+    [HttpGet("/Warehouse/Create")]
+    public async Task<IActionResult> Create(CancellationToken ct) => Ok(new
+    {
+        subWarehouses = await _context.SubWarehouses.AsNoTracking().OrderBy(item => item.Name).ToListAsync(ct),
+        deliveryCompanies = await _context.DeliveryCompanies.AsNoTracking().Where(item => item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct),
+        manufacturingCompanies = await _context.ManufacturingCompanies.AsNoTracking().Where(item => item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct)
+    });
+
+    [HttpGet("/Warehouse/Edit")]
+    public async Task<IActionResult> Edit([FromQuery] int id, CancellationToken ct)
+    {
+        var item = await WarehouseDetailsQuery().FirstOrDefaultAsync(row => row.Id == id, ct);
+        return item is null ? NotFound() : Ok(item);
+    }
+
+    [HttpPost("/Warehouse/Edit")]
+    public async Task<IActionResult> Edit([FromQuery] int id, [FromBody] LegacyWarehouseRequest request, CancellationToken ct)
+    {
+        if (request.Id != 0 && request.Id != id) return NotFound();
+        var item = await _context.Warehouses.Include(row => row.SubWarehouse).FirstOrDefaultAsync(row => row.Id == id, ct);
+        if (item is null) return NotFound();
+        var added = request.Amount - item.Amount;
+        if (added > 0) item.UnchangingAmount += added;
+        item.Price = request.Price;
+        item.Amount = request.Amount;
+        item.ManufacturingCompanyId = request.ManufacturingCompanyId;
+        item.MainWarehouseId = request.MainWarehouseId;
+        item.SubWarehouseId = request.SubWarehouseId;
+        if (request.SubWarehouseId.HasValue)
+            item.Name = await _context.SubWarehouses.Where(row => row.Id == request.SubWarehouseId).Select(row => row.Name).FirstOrDefaultAsync(ct) ?? item.Name;
+        item.DateUpdated = DateTime.UtcNow;
+        if (added != 0)
+            _context.WarehouseEditHistories.Add(new WarehouseEditHistory { WarehouseId = id, AddedAmount = added, EditDate = DateTime.UtcNow, ApplicationUserId = User.GetUserId() ?? "system" });
+        await _context.SaveChangesAsync(ct);
+        return Ok(item);
+    }
+
+    [HttpGet("/Warehouse/Details")]
+    [HttpPost("/Warehouse/Details")]
+    public async Task<IActionResult> Details([FromQuery] int? id, CancellationToken ct)
+    {
+        if (!id.HasValue) return NotFound();
+        var item = await WarehouseDetailsQuery().FirstOrDefaultAsync(row => row.Id == id, ct);
+        if (item is null) return NotFound();
+        var statusTotals = await (
+            from orderItem in _context.OrderWarehouses.AsNoTracking()
+            join order in _context.Orders.AsNoTracking() on orderItem.OrderId equals order.Id
+            where orderItem.WarehouseId == id
+            group orderItem by order.OrderStatus into status
+            select new { Status = status.Key, Amount = status.Sum(row => row.Amount) }).ToListAsync(ct);
+        int[] delivered = [6, 13, 14];
+        int[] failed = [7, 8, 9, 10, 15];
+        return Ok(new { item, totalDeliveredItemsFromSpecificOrders = statusTotals.Where(row => delivered.Contains(row.Status)).Sum(row => row.Amount), totalFailedDeliveredItemsFromSpecificOrders = statusTotals.Where(row => failed.Contains(row.Status)).Sum(row => row.Amount) });
+    }
+
+    [HttpPost("/Warehouse/SetIsShown")]
+    public async Task<IActionResult> SetIsShown([FromForm] int WareHouseId, [FromForm] bool isShown, CancellationToken ct)
+    {
+        var changed = await _context.Warehouses.Where(item => item.Id == WareHouseId).ExecuteUpdateAsync(update => update.SetProperty(item => item.IsShown, isShown), ct);
+        return changed == 0 ? NotFound() : Ok(new { success = true });
+    }
+
+    [HttpGet("/Warehouse/GetSubWarehouses")]
+    [HttpPost("/Warehouse/GetSubWarehouses")]
+    public async Task<IActionResult> GetSubWarehouses([FromQuery] int? mainWarehouseId, CancellationToken ct)
+    {
+        var query = _context.SubWarehouses.AsNoTracking();
+        if (mainWarehouseId.HasValue) query = query.Where(item => item.MainWarehouseId == mainWarehouseId);
+        return Ok(await query.OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct));
+    }
+
+    [HttpPost("/Warehouse/AllWarehousesPdf")]
+    public async Task<IActionResult> AllWarehousesPdf([FromForm] int deliveryCompanyId, CancellationToken ct)
+    {
+        var company = await _context.DeliveryCompanies.AsNoTracking().FirstOrDefaultAsync(item => item.Id == deliveryCompanyId, ct);
+        if (company is null) return NotFound();
+        var warehouses = await _context.Warehouses.AsNoTracking().Where(item => item.DeliveryCompanyId == deliveryCompanyId).OrderBy(item => item.Name).ToListAsync(ct);
+        if (warehouses.Count == 0) return NotFound();
+        return File(_pdf.GenerateWarehouseInventoryPdf(company.Name, warehouses), "application/pdf", $"warehouses-{deliveryCompanyId}.pdf");
+    }
+
+    private IQueryable<Warehouse> WarehouseDetailsQuery() => _context.Warehouses.AsNoTracking().Include(item => item.MainWarehouse).Include(item => item.SubWarehouse);
+
 }
+
+public sealed record LegacyWarehouseRequest(int Id, decimal Price, int Amount, int? ManufacturingCompanyId, int? MainWarehouseId, int? SubWarehouseId);

@@ -1,4 +1,5 @@
 using Luxira.Api.Features.Orders.Models;
+using Luxira.Api.Features.Warehouses.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -130,5 +131,43 @@ public class LuxiraPdfService
         });
 
         return document.GeneratePdf();
+    }
+
+    public byte[] GenerateWarehouseInventoryPdf(string companyName, IReadOnlyList<Warehouse> warehouses)
+    {
+        return Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1, Unit.Centimetre);
+            page.Header().Text($"كشف مخزون - {companyName}").Bold().FontSize(16).AlignCenter();
+            page.Content().PaddingVertical(10).Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.RelativeColumn(3);
+                    columns.RelativeColumn();
+                    columns.RelativeColumn();
+                    columns.RelativeColumn();
+                    columns.RelativeColumn();
+                });
+                table.Header(header =>
+                {
+                    header.Cell().Text("المنتج").Bold();
+                    header.Cell().Text("السعر").Bold();
+                    header.Cell().Text("المتوفر").Bold();
+                    header.Cell().Text("الأصلي").Bold();
+                    header.Cell().Text("المباع").Bold();
+                });
+                foreach (var item in warehouses)
+                {
+                    table.Cell().Text(item.Name ?? string.Empty);
+                    table.Cell().Text(item.Price.ToString("N2"));
+                    table.Cell().Text(item.Amount.ToString());
+                    table.Cell().Text(item.UnchangingAmount.ToString());
+                    table.Cell().Text((item.UnchangingAmount - item.Amount).ToString());
+                }
+            });
+            page.Footer().AlignCenter().Text($"{DateTime.UtcNow:yyyy-MM-dd HH:mm}");
+        })).GeneratePdf();
     }
 }

@@ -19,6 +19,7 @@ public class WarehouseDbConfig : IDbConfig<Warehouse>
             .WithMany(m => m.SubWarehouses)
             .HasForeignKey(w => w.MainWarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(w => w.SubWarehouse).WithMany().HasForeignKey(w => w.SubWarehouseId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -40,6 +41,8 @@ public class SubWarehouseDbConfig : IDbConfig<SubWarehouse>
         builder.ToTable("SubWarehouses");
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Name).HasMaxLength(100).IsRequired();
+        builder.Property(s => s.ProductCode);
+        builder.HasOne(s => s.MainWarehouse).WithMany().HasForeignKey(s => s.MainWarehouseId);
     }
 }
 
