@@ -203,7 +203,6 @@ public class FinancialController : ControllerBase
         CancellationToken ct)
     {
         var employeesQuery = _context.Employees
-            .Include(e => e.ApplicationUser)
             .Where(e => e.IsActive)
             .AsNoTracking()
             .AsQueryable();
@@ -218,39 +217,46 @@ public class FinancialController : ControllerBase
         var sDate = startDay ?? new DateTime(now.Year, now.Month, 1);
         var eDate = endDay ?? sDate.AddMonths(1).AddDays(-1);
 
-        var employeeSummaries = new List<object>();
-
-        foreach (var emp in employees)
-        {
-            var transactions = await _context.EmployeeTransactions
-                .Where(t => t.EmployeeId == emp.Id && t.Date >= sDate && t.Date <= eDate)
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            var deductions = transactions.Where(t => t.TransactionType == EmployeeTransactionType.Deduction).Sum(t => t.Amount);
-            var rewards = transactions.Where(t => t.TransactionType == EmployeeTransactionType.Bonus).Sum(t => t.Amount);
-            var advances = transactions.Where(t => t.TransactionType == EmployeeTransactionType.Advance).Sum(t => t.Amount);
-
-            var bonuses = await _context.EmployeeBonusPayments
-                .Where(b => b.EmployeeId == emp.ApplicationUserId && b.DatePaid >= sDate && b.DatePaid <= eDate)
-                .SumAsync(b => (decimal?)b.AmountPaid, ct) ?? 0m;
-
-            var salary = emp.Salary;
-            var netPayable = salary - deductions + rewards - advances + bonuses;
-
-            employeeSummaries.Add(new
+        var employeeIds = employees.Select(employee => employee.Id).ToList();
+        var applicationUserIds = employees.Select(employee => employee.ApplicationUserId)
+            .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        var transactionTotals = await _context.EmployeeTransactions.AsNoTracking()
+            .Where(transaction => employeeIds.Contains(transaction.EmployeeId) && transaction.Date >= sDate && transaction.Date <= eDate)
+            .GroupBy(transaction => transaction.EmployeeId)
+            .Select(group => new
             {
-                EmployeeId = emp.Id,
-                EmployeeName = emp.Name,
-                emp.JobTitle,
-                BaseSalary = salary,
+                EmployeeId = group.Key,
+                Deductions = group.Sum(item => item.TransactionType == EmployeeTransactionType.Deduction ? item.Amount : 0),
+                Rewards = group.Sum(item => item.TransactionType == EmployeeTransactionType.Bonus ? item.Amount : 0),
+                Advances = group.Sum(item => item.TransactionType == EmployeeTransactionType.Advance ? item.Amount : 0)
+            }).ToDictionaryAsync(item => item.EmployeeId, ct);
+        var bonusTotals = await _context.EmployeeBonusPayments.AsNoTracking()
+            .Where(payment => applicationUserIds.Contains(payment.EmployeeId) && payment.DatePaid >= sDate && payment.DatePaid <= eDate)
+            .GroupBy(payment => payment.EmployeeId)
+            .Select(group => new { EmployeeId = group.Key, Amount = group.Sum(item => item.AmountPaid) })
+            .ToDictionaryAsync(item => item.EmployeeId, item => item.Amount, ct);
+
+        var employeeSummaries = employees.Select(employee =>
+        {
+            transactionTotals.TryGetValue(employee.Id, out var totals);
+            var bonuses = !string.IsNullOrWhiteSpace(employee.ApplicationUserId)
+                ? bonusTotals.GetValueOrDefault(employee.ApplicationUserId) : 0m;
+            var deductions = totals?.Deductions ?? 0m;
+            var rewards = totals?.Rewards ?? 0m;
+            var advances = totals?.Advances ?? 0m;
+            return new
+            {
+                EmployeeId = employee.Id,
+                EmployeeName = employee.Name,
+                employee.JobTitle,
+                BaseSalary = employee.Salary,
                 TotalDeductions = deductions,
                 TotalRewards = rewards,
                 TotalAdvances = advances,
                 TotalBonuses = bonuses,
-                NetPayable = netPayable
-            });
-        }
+                NetPayable = employee.Salary - deductions + rewards - advances + bonuses
+            };
+        }).ToList();
 
         return Ok(employeeSummaries);
     }
