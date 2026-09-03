@@ -81,7 +81,7 @@ public class WebsiteDomainsController(ApplicationDbContext context) : Controller
     }
 
     [HttpPost("/WebsiteDomains/Create")]
-    public async Task<IActionResult> Create([FromBody] WebsiteDomainInput input, CancellationToken ct)
+    public async Task<IActionResult> Create([FromForm] WebsiteDomainInput input, CancellationToken ct)
     {
         var domain = NormalizeDomain(input.Domain);
         if (domain.Length == 0) return Fail("اكتب الدومين.");
@@ -100,7 +100,7 @@ public class WebsiteDomainsController(ApplicationDbContext context) : Controller
     }
 
     [HttpPost("/WebsiteDomains/Edit")]
-    public async Task<IActionResult> Edit([FromBody] WebsiteDomainEditInput input, CancellationToken ct)
+    public async Task<IActionResult> Edit([FromForm] WebsiteDomainEditInput input, CancellationToken ct)
     {
         var domain = NormalizeDomain(input.Domain);
         if (input.Id <= 0) return Fail("الموقع غير صحيح.");

@@ -483,6 +483,7 @@ public class EmployeeController : ControllerBase
         if (!validRole)
             return BadRequest(new { success = false, message = "الموظف المختار يجب أن تكون صلاحيته مطور برمجيات أو قسم التسويق." });
         var userActive = await _context.Users.AsNoTracking().AnyAsync(user => user.Id == employee.ApplicationUserId
+            && user.EmailConfirmed
             && (!user.LockoutEnd.HasValue || user.LockoutEnd <= DateTimeOffset.UtcNow), ct);
         if (employee.IsDeleted || !employee.IsActive || !userActive)
             return BadRequest(new { success = false, message = "حساب الموظف المختار غير نشط." });
@@ -502,6 +503,7 @@ public class EmployeeController : ControllerBase
         rule.UpdatedByUserId = userId;
         rule.UpdatedByName = userName;
         rule.UpdatedAt = now;
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         await _context.SaveChangesAsync(ct);
 
         var affectedTasks = await _context.Database.ExecuteSqlInterpolatedAsync($@"
@@ -511,6 +513,7 @@ ON target.TaskId = source.TaskId
 WHEN MATCHED THEN UPDATE SET EmployeeId = {employeeId}, EmployeeName = {employeeName}, AssignedAt = {now}, AssignedByUserId = {userId}, AssignedByName = {userName}, DeveloperStatus = 0, StartedAt = NULL, TimerStartedManually = 0, CompletedAt = NULL
 WHEN NOT MATCHED THEN INSERT (TaskId, EmployeeId, EmployeeName, AssignedAt, AssignedByUserId, AssignedByName, DeveloperStatus, StartedAt, TimerStartedManually, CompletedAt)
 VALUES (source.TaskId, {employeeId}, {employeeName}, {now}, {userId}, {userName}, 0, NULL, 0, NULL);", ct);
+        await transaction.CommitAsync(ct);
         return Ok(new { success = true, category, employeeId, employeeName, affectedTasks, message = "تم إلزام التصنيف بالموظف المختار وتحديث المهام الحالية." });
     }
 

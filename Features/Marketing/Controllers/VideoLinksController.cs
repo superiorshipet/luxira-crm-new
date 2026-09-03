@@ -1,8 +1,10 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Marketing.Models;
+using Luxira.Api.Features.ManufacturingCompanies.Models;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -32,8 +34,15 @@ public class VideoLinksController : ControllerBase
             query = query.Where(v => v.ManufacturingCompanyId == manufacturingCompanyId.Value);
         query = query.Where(link => !link.IsDeleted);
 
-        var links = await query.OrderByDescending(v => v.CreatedAt).ToListAsync(ct);
-        return Ok(links);
+        var rows = await query.Include(v => v.ManufacturingCompany).OrderByDescending(v => v.Id).ToListAsync(ct);
+        var stores = await GetStores(ct);
+        var usedStoreIds = rows.Select(item => item.ManufacturingCompanyId).ToHashSet();
+        return Ok(new
+        {
+            stores,
+            cardStores = stores.Where(item => usedStoreIds.Contains(GetStoreId(item))).ToList(),
+            links = rows.Select(ToItem).ToList()
+        });
     }
 
     [HttpPost("Create")]
@@ -59,7 +68,7 @@ public class VideoLinksController : ControllerBase
         await _context.SaveChangesAsync(ct);
         _context.VideoLinkChangeHistories.Add(NewHistory(link.Id, "Create", null, store.Id, null, store.Name, null, link.Url, now));
         await _context.SaveChangesAsync(ct);
-        return Ok(link);
+        return Ok(new { success = true, message = "تم إضافة الرابط بنجاح.", item = ToItem(link, store) });
     }
 
     [HttpPost("Edit")]
@@ -88,7 +97,7 @@ public class VideoLinksController : ControllerBase
         link.UpdatedByName = User.Identity?.Name;
         _context.VideoLinkChangeHistories.Add(NewHistory(link.Id, "Edit", oldStoreId, store.Id, oldStoreName, store.Name, oldUrl, normalizedUrl, now));
         await _context.SaveChangesAsync(ct);
-        return Ok(link);
+        return Ok(new { success = true, message = "تم تعديل الرابط بنجاح.", item = ToItem(link, store) });
     }
 
     [HttpPost("/VideoLinks/Delete")]
@@ -138,7 +147,7 @@ public class VideoLinksController : ControllerBase
         _context.VideoLinkChangeHistories.Add(NewHistory(link.Id, "Restore", null, link.ManufacturingCompanyId,
             null, link.ManufacturingCompany?.Name, null, link.Url, now));
         await _context.SaveChangesAsync(ct);
-        return Ok(new { success = true, message = "تم استرداد الرابط بنجاح.", item = link });
+        return Ok(new { success = true, message = "تم استرداد الرابط بنجاح.", item = ToItem(link) });
     }
 
     [HttpGet("/VideoLinks/TrashData")]
@@ -176,7 +185,7 @@ public class VideoLinksController : ControllerBase
             StoreName = item.ManufacturingCompany != null ? item.ManufacturingCompany.Name : string.Empty,
             StoreImageUrl = item.ManufacturingCompany != null ? item.ManufacturingCompany.ImageUrl : null,
             item.Url,
-            item.DeletedAt,
+            DeletedAt = FormatArabicDate(item.DeletedAt),
             item.DeletedByName
         }).ToListAsync(ct);
         return rows.Select(item => (object)new
@@ -191,12 +200,26 @@ public class VideoLinksController : ControllerBase
         }).ToList();
     }
 
-    private async Task<List<VideoLinkChangeHistory>> GetHistory(int? storeId, int? take, CancellationToken ct)
+    private async Task<List<object>> GetHistory(int? storeId, int? take, CancellationToken ct)
     {
         var query = _context.VideoLinkChangeHistories.AsNoTracking();
         if (storeId.HasValue) query = query.Where(item => item.OldManufacturingCompanyId == storeId || item.NewManufacturingCompanyId == storeId);
         var ordered = query.OrderByDescending(item => item.ChangedAt);
-        return await (take.HasValue ? ordered.Take(take.Value) : ordered).ToListAsync(ct);
+        var rows = await (take.HasValue ? ordered.Take(take.Value) : ordered).ToListAsync(ct);
+        return rows.Select(item => (object)new
+        {
+            item.Id,
+            item.VideoLinkId,
+            item.Action,
+            item.OldManufacturingCompanyId,
+            item.NewManufacturingCompanyId,
+            OldStoreName = item.OldStoreName ?? string.Empty,
+            NewStoreName = item.NewStoreName ?? string.Empty,
+            OldUrl = item.OldUrl ?? string.Empty,
+            NewUrl = item.NewUrl ?? string.Empty,
+            ChangedAt = FormatArabicDate(item.ChangedAt),
+            ChangedByName = item.ChangedByName ?? string.Empty
+        }).ToList();
     }
 
     private VideoLinkChangeHistory NewHistory(int linkId, string action, int? oldStoreId, int? newStoreId,
@@ -238,6 +261,29 @@ public class VideoLinksController : ControllerBase
         if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || value.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) || value.StartsWith('/')) return value;
         return "/" + value.TrimStart('/');
+    }
+
+    private static object ToItem(VideoLink link, ManufacturingCompany? store = null)
+    {
+        var company = store ?? link.ManufacturingCompany;
+        return new
+        {
+            link.Id,
+            link.ManufacturingCompanyId,
+            StoreName = string.IsNullOrWhiteSpace(company?.Name) ? $"متجر رقم {link.ManufacturingCompanyId}" : company.Name.Trim(),
+            StoreImageUrl = NormalizeImage(company?.ImageUrl),
+            link.Url,
+            CreatedAt = FormatArabicDate(link.CreatedAt)
+        };
+    }
+
+    private static int GetStoreId(object item) => (int)(item.GetType().GetProperty("Id")?.GetValue(item) ?? 0);
+
+    private static string FormatArabicDate(DateTime? value)
+    {
+        if (!value.HasValue) return string.Empty;
+        var suffix = value.Value.Hour < 12 ? "ص" : "م";
+        return value.Value.ToString("yyyy/MM/dd hh:mm", CultureInfo.InvariantCulture) + " " + suffix;
     }
 }
 

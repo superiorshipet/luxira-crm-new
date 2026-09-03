@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Luxira.Api.Data;
 using Luxira.Api.Features.Communication.Models;
+using Luxira.Api.Features.ManufacturingCompanies.Models;
+using Luxira.Api.Features.Media.Models;
 using Luxira.Api.Infrastructure.S3;
 using Luxira.Api.Utils.Time;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +17,8 @@ namespace Luxira.Api.Features.Communication.Controllers;
 public class PasswordPagesController(ApplicationDbContext context, S3StorageService storage) : ControllerBase
 {
     private static readonly string[] Statuses = ["نشطه", "مراجعه", "محظوره", "تحتاج تحقق"];
+    private const long MaxImageBytes = 5 * 1024 * 1024;
+    private const string EmailStoreImage = "/static/gmail.svg";
 
     [HttpGet("Create")]
     public async Task<IActionResult> Create(CancellationToken ct) => Ok(await Lookups(ct));
@@ -23,17 +27,18 @@ public class PasswordPagesController(ApplicationDbContext context, S3StorageServ
     [RequestSizeLimit(6 * 1024 * 1024)]
     public async Task<IActionResult> Create([FromForm] PasswordPageRequest request, CancellationToken ct)
     {
-        var error = await Validate(request, ct);
+        var companyId = await ResolveCompanyId(request.PasswordPageTypeId, request.ManufacturingCompanyId, request.PageName, ct);
+        var error = await Validate(request, companyId, ct);
         if (error is not null) return BadRequest(new { success = false, message = error });
-        var stored = request.PageImage is { Length: > 0 }
-            ? await storage.UploadAsync(request.PageImage, "password-pages", CurrentUserId(), ct)
-            : null;
+        S3StoredObject? stored;
+        try { stored = await UploadImage(request.PageImage, request.PageImageDataUrl, ct); }
+        catch (InvalidOperationException ex) { return BadRequest(new { success = false, message = ex.Message }); }
         var page = new StorePasswordPage
         {
             PageName = request.PageName.Trim(), PasswordPageTypeId = request.PasswordPageTypeId,
             PageImageUrl = stored?.PublicUrl, PageImageS3Key = stored?.S3Key, Email = Clean(request.Email),
             Password = request.Password.Trim(), PhoneNumber = Clean(request.PhoneNumber),
-            ManufacturingCompanyId = request.ManufacturingCompanyId, PageStatus = NormalizeStatus(request.PageStatus),
+            ManufacturingCompanyId = companyId, PageStatus = NormalizeStatus(request.PageStatus),
             PageStatusName = Clean(request.PageStatusName), Tasks = Clean(request.Tasks), CreatedAt = IstanbulTimeHelper.Now,
             CreatedByUserId = CurrentUserId()
         };
@@ -90,23 +95,27 @@ public class PasswordPagesController(ApplicationDbContext context, S3StorageServ
     {
         var page = await context.StorePasswordPages.FirstOrDefaultAsync(x => x.Id == request.Id && !x.IsDeleted, ct);
         if (page is null) return NotFound(new { success = false, message = "الصفحة غير موجودة" });
-        var error = await Validate(request, ct);
+        var companyId = await ResolveCompanyId(request.PasswordPageTypeId, request.ManufacturingCompanyId, request.PageName, ct);
+        var error = await Validate(request, companyId, ct);
         if (error is not null) return BadRequest(new { success = false, message = error });
         var oldImageKey = page.PageImageS3Key;
-        var newImage = request.PageImage is { Length: > 0 }
-            ? await storage.UploadAsync(request.PageImage, "password-pages", CurrentUserId(), ct)
-            : null;
+        S3StoredObject? newImage;
+        try { newImage = await UploadImage(request.PageImage, request.PageImageDataUrl, ct); }
+        catch (InvalidOperationException ex) { return BadRequest(new { success = false, message = ex.Message }); }
         Track(page, "اسم الصفحة", page.PageName, request.PageName.Trim());
         Track(page, "نوع الصفحة", page.PasswordPageTypeId.ToString(), request.PasswordPageTypeId.ToString());
         Track(page, "حالة الصفحة", page.PageStatus, NormalizeStatus(request.PageStatus));
+        Track(page, "اسم حالة الصفحة", page.PageStatusName, Clean(request.PageStatusName));
         Track(page, "البريد الإلكتروني", page.Email, Clean(request.Email));
         Track(page, "كلمة السر", page.Password, request.Password.Trim());
         Track(page, "رقم الهاتف", page.PhoneNumber, Clean(request.PhoneNumber));
-        Track(page, "المتجر", page.ManufacturingCompanyId.ToString(), request.ManufacturingCompanyId.ToString());
+        Track(page, "المتجر", page.ManufacturingCompanyId.ToString(), companyId.ToString());
         Track(page, "المهام", page.Tasks, Clean(request.Tasks));
+        if (request.RemovePageImage) Track(page, "صورة الصفحة", page.PageImageUrl, null);
+        else if (newImage is not null) Track(page, "صورة الصفحة", page.PageImageUrl, newImage.PublicUrl);
         page.PageName = request.PageName.Trim(); page.PasswordPageTypeId = request.PasswordPageTypeId;
         page.Email = Clean(request.Email); page.Password = request.Password.Trim(); page.PhoneNumber = Clean(request.PhoneNumber);
-        page.ManufacturingCompanyId = request.ManufacturingCompanyId; page.PageStatus = NormalizeStatus(request.PageStatus);
+        page.ManufacturingCompanyId = companyId; page.PageStatus = NormalizeStatus(request.PageStatus);
         page.PageStatusName = Clean(request.PageStatusName); page.Tasks = Clean(request.Tasks);
         if (request.RemovePageImage) { page.PageImageUrl = null; page.PageImageS3Key = null; }
         if (newImage is not null) { page.PageImageUrl = newImage.PublicUrl; page.PageImageS3Key = newImage.S3Key; }
@@ -163,19 +172,113 @@ public class PasswordPagesController(ApplicationDbContext context, S3StorageServ
 
     private async Task<object> Lookups(CancellationToken ct) => new
     {
+        pageTypesInitialized = await EnsureDefaultPageTypes(ct),
         pageTypes = await context.PasswordPageTypes.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct),
         statuses = Statuses,
         stores = await context.ManufacturingCompanies.AsNoTracking().Where(x => x.IsShown && !x.IsPasswordEmailStore).OrderBy(x => x.Name)
             .Select(x => new { x.Id, x.Name, x.ImageUrl }).ToListAsync(ct)
     };
 
-    private async Task<string?> Validate(PasswordPageRequest request, CancellationToken ct)
+    private async Task<string?> Validate(PasswordPageRequest request, int companyId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.PageName) || string.IsNullOrWhiteSpace(request.Password)) return "اسم الصفحة وكلمة السر مطلوبين";
         if (!await context.PasswordPageTypes.AnyAsync(x => x.Id == request.PasswordPageTypeId && x.IsActive, ct)) return "نوع الصفحة غير صحيح";
-        if (!await context.ManufacturingCompanies.AnyAsync(x => x.Id == request.ManufacturingCompanyId && x.IsShown, ct)) return "المتجر غير صحيح";
-        if (request.PageImage is { Length: > 5 * 1024 * 1024 }) return "حجم الصورة لا يزيد عن 5 ميجابايت";
+        if (!await context.ManufacturingCompanies.AnyAsync(x => x.Id == companyId && x.IsShown, ct)) return "المتجر غير صحيح";
+        if (request.PageImage is { Length: > MaxImageBytes }) return "حجم الصورة لا يزيد عن 5 ميجابايت";
         return null;
+    }
+
+    private async Task<bool> EnsureDefaultPageTypes(CancellationToken ct)
+    {
+        var defaults = new (string Name, string Icon)[]
+        {
+            ("فيسبوك", "facebook"), ("انستجرام", "instagram"), ("تيك توك", "tiktok"),
+            ("واتساب", "whatsapp"), ("سناب شات", "snapchat"), ("البريد الإلكتروني", "gmail"),
+            ("موقع إلكتروني", "website"), ("أخرى", "link")
+        };
+        var existing = await context.PasswordPageTypes.ToListAsync(ct);
+        var changed = false;
+        foreach (var item in defaults)
+        {
+            var row = existing.FirstOrDefault(x => x.Name == item.Name);
+            if (row is null)
+            {
+                context.PasswordPageTypes.Add(new PasswordPageType { Name = item.Name, IconClass = item.Icon, IsActive = true });
+                changed = true;
+            }
+            else
+            {
+                if (!row.IsActive) { row.IsActive = true; changed = true; }
+                if (string.IsNullOrWhiteSpace(row.IconClass)) { row.IconClass = item.Icon; changed = true; }
+            }
+        }
+        if (changed) await context.SaveChangesAsync(ct);
+        return true;
+    }
+
+    private async Task<int> ResolveCompanyId(int pageTypeId, int requestedId, string pageName, CancellationToken ct)
+    {
+        await EnsureDefaultPageTypes(ct);
+        var type = await context.PasswordPageTypes.AsNoTracking().Where(x => x.Id == pageTypeId && x.IsActive)
+            .Select(x => new { x.Name, x.IconClass }).FirstOrDefaultAsync(ct);
+        if (type is null || !IsEmailType(type.Name, type.IconClass)) return requestedId;
+        var emailStore = await context.ManufacturingCompanies.FirstOrDefaultAsync(x => x.IsPasswordEmailStore && x.IsShown, ct);
+        if (emailStore is not null) return emailStore.Id;
+        emailStore = new ManufacturingCompany
+        {
+            Name = Clean(pageName) ?? "البريد الإلكتروني", ImageUrl = EmailStoreImage,
+            ImageUrl2 = EmailStoreImage, IsShown = true, IsPasswordEmailStore = true
+        };
+        context.ManufacturingCompanies.Add(emailStore);
+        await context.SaveChangesAsync(ct);
+        return emailStore.Id;
+    }
+
+    private static bool IsEmailType(string? name, string? icon)
+    {
+        var n = (name ?? string.Empty).Trim().ToLowerInvariant();
+        var i = (icon ?? string.Empty).Trim().ToLowerInvariant();
+        return i.Contains("gmail") || i.Contains("email") || n.Contains("gmail") || n.Contains("email")
+            || n.Contains("mail") || n.Contains("بريد") || n.Contains("ايميل") || n.Contains("إيميل")
+            || n.Contains("الايميل") || n.Contains("الإيميل");
+    }
+
+    private async Task<S3StoredObject?> UploadImage(IFormFile? file, string? dataUrl, CancellationToken ct)
+    {
+        if (file is { Length: > 0 })
+        {
+            var extension = ResolveImageExtension(file.FileName, file.ContentType);
+            if (extension is null) throw new InvalidOperationException("الصورة يجب أن تكون JPG أو PNG أو WEBP أو GIF");
+            if (file.Length > MaxImageBytes) throw new InvalidOperationException("حجم الصورة لا يزيد عن 5 ميجابايت");
+            return await storage.UploadAsync(file, "password-pages", CurrentUserId(), ct);
+        }
+        var value = dataUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var comma = value.IndexOf(',');
+        if (!value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) || comma <= 0
+            || !value[..comma].Contains(";base64", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("بيانات صورة الصفحة غير صحيحة");
+        var contentType = value[5..comma].Split(';')[0].Trim();
+        var dataExtension = ResolveImageExtension(null, contentType);
+        if (dataExtension is null) throw new InvalidOperationException("الصورة يجب أن تكون JPG أو PNG أو WEBP أو GIF");
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(value[(comma + 1)..]); }
+        catch (FormatException) { throw new InvalidOperationException("تعذر قراءة صورة الصفحة الملصقة"); }
+        if (bytes.Length == 0) return null;
+        if (bytes.LongLength > MaxImageBytes) throw new InvalidOperationException("حجم الصورة لا يزيد عن 5 ميجابايت");
+        await using var stream = new MemoryStream(bytes, writable: false);
+        return await storage.UploadStreamAsync(stream, bytes.LongLength, "password-pages", $"image{dataExtension}", contentType, CurrentUserId(), ct);
+    }
+
+    private static string? ResolveImageExtension(string? fileName, string? contentType)
+    {
+        var extension = Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant();
+        if (extension is ".jpg" or ".jpeg" or ".png" or ".webp" or ".gif") return extension == ".jpeg" ? ".jpg" : extension;
+        return contentType?.Split(';')[0].Trim().ToLowerInvariant() switch
+        {
+            "image/jpeg" or "image/jpg" => ".jpg", "image/png" => ".png",
+            "image/webp" => ".webp", "image/gif" => ".gif", _ => null
+        };
     }
 
     private async Task<IActionResult> SetDeleted(int id, bool deleted, CancellationToken ct)
@@ -205,11 +308,12 @@ public class PasswordPagesController(ApplicationDbContext context, S3StorageServ
     private static string NormalizeStatus(string? value) => Statuses.Contains(value?.Trim()) ? value!.Trim() : "نشطه";
 
     public record PasswordPageRequest(string PageName, int PasswordPageTypeId, string Password, int ManufacturingCompanyId,
-        string? PageStatus, string? PageStatusName, string? Email, string? PhoneNumber, string? Tasks, IFormFile? PageImage);
+        string? PageStatus, string? PageStatusName, string? Email, string? PhoneNumber, string? Tasks, IFormFile? PageImage,
+        string? PageImageDataUrl);
     public sealed record PasswordPageEditRequest(int Id, string PageName, int PasswordPageTypeId, string Password,
         int ManufacturingCompanyId, string? PageStatus, string? PageStatusName, string? Email, string? PhoneNumber,
-        string? Tasks, IFormFile? PageImage, bool RemovePageImage)
-        : PasswordPageRequest(PageName, PasswordPageTypeId, Password, ManufacturingCompanyId, PageStatus, PageStatusName, Email, PhoneNumber, Tasks, PageImage);
+        string? Tasks, IFormFile? PageImage, string? PageImageDataUrl, bool RemovePageImage)
+        : PasswordPageRequest(PageName, PasswordPageTypeId, Password, ManufacturingCompanyId, PageStatus, PageStatusName, Email, PhoneNumber, Tasks, PageImage, PageImageDataUrl);
     private sealed record PasswordPageRow(int Id, string PageName, string? PageImageUrl, int PasswordPageTypeId,
         string PageTypeName, string PageStatus, string? PageStatusName, string? Email, string Password, string? PhoneNumber,
         int ManufacturingCompanyId, string StoreName, string? Tasks, DateTime CreatedAt, DateTime? UpdatedAt, bool IsDeleted, DateTime? DeletedAt);

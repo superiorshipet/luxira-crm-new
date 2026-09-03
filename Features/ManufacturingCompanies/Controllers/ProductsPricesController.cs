@@ -3,6 +3,7 @@ using Luxira.Api.Features.ManufacturingCompanies.Models;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
+using Luxira.Api.Infrastructure.S3;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,16 +12,18 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.ManufacturingCompanies.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant,ManufacturingCompany")]
+[Authorize]
 [Route("api/v1/manufacturing/products-prices")]
 [Route("ProductsPrices")]
 public class ProductsPricesController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly S3StorageService _storage;
 
-    public ProductsPricesController(ApplicationDbContext context)
+    public ProductsPricesController(ApplicationDbContext context, S3StorageService storage)
     {
         _context = context;
+        _storage = storage;
     }
 
     [HttpGet]
@@ -69,13 +72,41 @@ public class ProductsPricesController : ControllerBase
             .Where(history => productIds.Contains(history.MainProductId))
             .OrderByDescending(history => history.EditedAt).ThenByDescending(history => history.Id)
             .ToListAsync(ct);
+        var companyIds = productRows.Select(product => product.ManufacturingCompanyId).Distinct().ToList();
+        var companyNames = await _context.ManufacturingCompanies.AsNoTracking().Where(company => companyIds.Contains(company.Id))
+            .ToDictionaryAsync(company => company.Id, company => company.Name, ct);
         var products = productRows.Select(product => new
         {
-            product = ToResponse(product),
+            product.Id,
+            product.Country,
+            productName = product.Name,
+            productImage = product.ImageUrl,
+            productPrice = product.Price,
+            minimumSellingPrice = product.MinimumSellingPrice > 0 ? product.MinimumSellingPrice : product.Price,
+            maximumSellingPrice = product.MaximumSellingPrice > 0 ? product.MaximumSellingPrice : product.Price,
+            product.DeliveryPrice,
+            currencyCode = GetCurrency(product.Country),
+            product.Quantity,
+            product.SaleType,
+            manufacturingCompanyName = companyNames.GetValueOrDefault(product.ManufacturingCompanyId, string.Empty),
+            selectedManufacturingCompanyId = product.ManufacturingCompanyId,
+            product.IsDeleted,
+            product.DeletedAt,
+            product.DeletedByUserId,
+            product.DeletedByName,
             editHistories = histories.Where(history => history.MainProductId == product.Id).Take(80)
         }).ToList();
 
-        return Ok(new { total, page, pageSize, items = products, country, manufacturingCompanyId, productName, saleType, showTrash });
+        return Ok(new
+        {
+            total, page, pageSize, items = products, country, manufacturingCompanyId, productName, saleType, showTrash,
+            productFilterOptions = await _context.MainProducts.AsNoTracking().Where(product => product.IsDeleted == showTrash && product.Name != string.Empty)
+                .GroupBy(product => new { product.Name, product.ImageUrl }).Select(group => new { group.Key.Name, group.Key.ImageUrl }).OrderBy(item => item.Name).ToListAsync(ct),
+            manufacturingCompanyOptions = await _context.ManufacturingCompanies.AsNoTracking().OrderBy(company => company.Name)
+                .Select(company => new { company.Id, company.Name, Logo = company.ImageUrl }).ToListAsync(ct),
+            countryOptions = CountryOptions(),
+            saleTypeOptions = new[] { "بيع فردي", "بيع مدمج" }
+        });
     }
 
     [HttpGet("/ProductsPrices/Create")]
@@ -87,11 +118,12 @@ public class ProductsPricesController : ControllerBase
         productOptions = await _context.MainWarehouses.AsNoTracking().OrderBy(product => product.Name)
             .Select(product => new { product.Id, product.Name, product.ImageUrl }).ToListAsync(ct),
         manufacturingCompanies = await _context.ManufacturingCompanies.AsNoTracking().OrderBy(company => company.Name)
-            .Select(company => new { company.Id, company.Name, Logo = company.ImageUrl }).ToListAsync(ct)
+            .Select(company => new { company.Id, company.Name, Logo = company.ImageUrl }).ToListAsync(ct),
+        countryOptions = CountryOptions()
     });
 
-    [HttpPost("Create")]
-    [HttpPost("/ProductsPrices/Create")]
+    [HttpPost("/api/v1/manufacturing/products-prices/Create")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
     public async Task<IActionResult> Create([FromBody] CreateProductPriceRequest request, CancellationToken ct)
     {
         var error = await ValidateRequestAsync(request, null, ct);
@@ -119,8 +151,29 @@ public class ProductsPricesController : ControllerBase
         return Ok(ToResponse(product));
     }
 
-    [HttpPost("CreateBulk")]
-    [HttpPost("/ProductsPrices/CreateBulk")]
+    [HttpPost("/ProductsPrices/Create")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    public async Task<IActionResult> CreateLegacy([FromForm] LegacyProductPriceRequest request, IFormFile? productImage, CancellationToken ct)
+    {
+        var imageUrl = request.ProductImage;
+        if (productImage is { Length: > 0 })
+            imageUrl = (await _storage.UploadAsync(productImage, "products", User.GetUserId(), ct)).PublicUrl;
+        var countries = ExpandCountry(request.Country);
+        foreach (var targetCountry in countries)
+        {
+            var mapped = request.ToRequest(targetCountry, imageUrl);
+            var error = await ValidateRequestAsync(mapped, null, ct);
+            if (error is not null) return BadRequest(new { success = false, message = error });
+        }
+        var products = countries.Select(targetCountry => NewProduct(request.ToRequest(targetCountry, imageUrl))).ToList();
+        _context.MainProducts.AddRange(products);
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, message = "تم إنشاء المنتج بنجاح.", items = products.Select(ToResponse) });
+    }
+
+    [HttpPost("/api/v1/manufacturing/products-prices/CreateBulk")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
     public async Task<IActionResult> CreateBulk([FromBody] List<CreateProductPriceRequest> items, CancellationToken ct)
     {
         if (items.Count == 0)
@@ -157,6 +210,38 @@ public class ProductsPricesController : ControllerBase
         return Ok(new { success = true, createdCount = products.Count });
     }
 
+    [HttpPost("/ProductsPrices/CreateBulk")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> CreateBulkLegacy([FromBody] List<LegacyBulkProductPriceRequest> items, CancellationToken ct)
+    {
+        if (items is null || items.Count == 0) return Ok(new { success = false, message = "لا توجد منتجات للحفظ." });
+        var cleaned = items.Where(item => item.SelectedMainProductId > 0 && item.Country is > 0
+                && item.MinimumSellingPrice >= 0 && item.MaximumSellingPrice >= item.MinimumSellingPrice
+                && item.SelectedManufacturingCompanyId > 0)
+            .SelectMany(item => ExpandCountry(item.Country!.Value).Select(country => item with { Country = country })).ToList();
+        if (cleaned.Count == 0) return Ok(new { success = false, message = "تأكد من اختيار المنتج والدولة والمتجر وحدود السعر." });
+        var duplicate = cleaned.GroupBy(item => new { item.SelectedMainProductId, item.Country, item.SelectedManufacturingCompanyId, SaleType = NormalizeSaleType(item.SaleType) })
+            .Any(group => group.Count() > 1);
+        if (duplicate) return Ok(new { success = false, message = "لا يمكن إضافة نفس المنتج لنفس الدولة ونفس المتجر ونفس نوع البيع أكثر من مرة داخل الجدول." });
+        var sourceIds = cleaned.Select(item => item.SelectedMainProductId).Distinct().ToList();
+        var sources = await _context.MainWarehouses.AsNoTracking().Where(item => sourceIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.Name, item.ImageUrl }).ToDictionaryAsync(item => item.Id, ct);
+        if (sources.Count != sourceIds.Count) return Ok(new { success = false, message = "يوجد منتج رئيسي غير موجود." });
+        var requests = cleaned.Select(item => new CreateProductPriceRequest(sources[item.SelectedMainProductId].Name,
+            item.MinimumSellingPrice, item.SelectedManufacturingCompanyId, item.Country!.Value, item.MinimumSellingPrice,
+            item.MaximumSellingPrice, Math.Max(0, item.DeliveryPrice), Math.Max(1, item.Quantity), item.SaleType,
+            sources[item.SelectedMainProductId].ImageUrl)).ToList();
+        foreach (var request in requests)
+        {
+            var error = await ValidateRequestAsync(request, null, ct);
+            if (error is not null) return Ok(new { success = false, message = error });
+        }
+        var products = requests.Select(NewProduct).ToList();
+        _context.MainProducts.AddRange(products);
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, message = "تم إنشاء كل المنتجات بنجاح.", redirectUrl = "/ProductsPrices/Index", createdCount = products.Count });
+    }
+
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateProductPriceRequest request, CancellationToken ct)
@@ -179,19 +264,22 @@ public class ProductsPricesController : ControllerBase
     }
 
     [HttpPost("/ProductsPrices/Edit")]
-    public async Task<IActionResult> EditLegacy([FromQuery] int id, [FromBody] CreateProductPriceRequest request, CancellationToken ct)
+    public async Task<IActionResult> EditLegacy([FromForm] LegacyProductPriceEditRequest request, IFormFile? productImage, CancellationToken ct)
     {
-        var product = await _context.MainProducts.FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, ct);
+        var product = await _context.MainProducts.FirstOrDefaultAsync(item => item.Id == request.Id && !item.IsDeleted, ct);
         if (product is null) return NotFound();
-        var error = await ValidateRequestAsync(request, id, ct);
+        var imageUrl = request.ProductImage;
+        if (productImage is { Length: > 0 }) imageUrl = (await _storage.UploadAsync(productImage, "products", User.GetUserId(), ct)).PublicUrl;
+        var mapped = request.ToRequest(request.Country, imageUrl);
+        var error = await ValidateRequestAsync(mapped, request.Id, ct);
         if (error is not null) return BadRequest(new { success = false, message = error });
-        await ApplyEdit(product, request, ct);
+        await ApplyEdit(product, mapped, ct);
         return Ok(new { success = true, message = "تم التعديل بنجاح.", item = ToResponse(product) });
     }
 
     [HttpPost("/ProductsPrices/EditPopup")]
-    public Task<IActionResult> EditPopup([FromBody] ProductPriceEditRequest request, CancellationToken ct) =>
-        EditLegacy(request.Id, request, ct);
+    public Task<IActionResult> EditPopup([FromForm] LegacyProductPriceEditRequest request, IFormFile? productImage, CancellationToken ct) =>
+        EditLegacy(request, productImage, ct);
 
     [HttpPost("Delete/{id:int}")]
     [HttpDelete("{id:int}")]
@@ -393,6 +481,36 @@ public class ProductsPricesController : ControllerBase
     private static string NormalizeSaleType(string? saleType) =>
         string.IsNullOrWhiteSpace(saleType) ? "بيع فردي" : saleType.Trim();
 
+    private static MainProduct NewProduct(CreateProductPriceRequest request)
+    {
+        var minimum = request.MinimumSellingPrice ?? request.Price;
+        return new MainProduct
+        {
+            Name = request.Name.Trim(), Country = request.Country, Price = minimum, MinimumSellingPrice = minimum,
+            MaximumSellingPrice = request.MaximumSellingPrice ?? minimum, DeliveryPrice = Math.Max(0, request.DeliveryPrice),
+            Quantity = Math.Max(1, request.Quantity), SaleType = NormalizeSaleType(request.SaleType),
+            ManufacturingCompanyId = request.ManufacturingCompanyId, ImageUrl = request.ImageUrl, IsDeleted = false
+        };
+    }
+
+    private static int[] ExpandCountry(int country) => country is 5 or 9 or 10 ? [5, 9, 10] : [country];
+    private static object[] CountryOptions() =>
+    [
+        new { Id = 1, Name = "العراق", CurrencyCode = "IQD" }, new { Id = 2, Name = "الإمارات", CurrencyCode = "AED" },
+        new { Id = 3, Name = "قطر", CurrencyCode = "QAR" }, new { Id = 4, Name = "ليبيا", CurrencyCode = "LYD" },
+        new { Id = 5, Name = "سلطنة عمان", CurrencyCode = "OMR" }, new { Id = 6, Name = "فلسطين", CurrencyCode = "ILS" },
+        new { Id = 7, Name = "تركيا", CurrencyCode = "TRY" }, new { Id = 8, Name = "الأردن", CurrencyCode = "JOD" },
+        new { Id = 9, Name = "الكويت", CurrencyCode = "KWD" }, new { Id = 10, Name = "البحرين", CurrencyCode = "BHD" },
+        new { Id = 11, Name = "السعودية", CurrencyCode = "SAR" }, new { Id = 12, Name = "تونس", CurrencyCode = "TND" },
+        new { Id = 13, Name = "المغرب", CurrencyCode = "MAD" }, new { Id = 14, Name = "الجزائر", CurrencyCode = "DZD" },
+        new { Id = 15, Name = "لبنان", CurrencyCode = "LBP" }, new { Id = 16, Name = "مصر", CurrencyCode = "EGP" }
+    ];
+    private static string GetCurrency(int country) => country switch
+    {
+        1 => "IQD", 2 => "AED", 3 => "QAR", 4 => "LYD", 5 => "OMR", 6 => "ILS", 7 => "TRY", 8 => "JOD",
+        9 => "KWD", 10 => "BHD", 11 => "SAR", 12 => "TND", 13 => "MAD", 14 => "DZD", 15 => "LBP", 16 => "EGP", _ => string.Empty
+    };
+
     private static object ToResponse(MainProduct product) => new
     {
         product.Id,
@@ -436,3 +554,50 @@ public sealed record ProductPriceEditRequest(
     string? ImageUrl = null)
     : CreateProductPriceRequest(Name, Price, ManufacturingCompanyId, Country, MinimumSellingPrice,
         MaximumSellingPrice, DeliveryPrice, Quantity, SaleType, ImageUrl);
+
+public record LegacyProductPriceRequest(
+    string ProductName,
+    decimal ProductPrice,
+    int SelectedManufacturingCompanyId,
+    int Country,
+    decimal MinimumSellingPrice = 0,
+    decimal MaximumSellingPrice = 0,
+    decimal DeliveryPrice = 0,
+    int Quantity = 1,
+    string? SaleType = null,
+    string? ProductImage = null)
+{
+    public CreateProductPriceRequest ToRequest(int country, string? imageUrl = null)
+    {
+        var minimum = MinimumSellingPrice > 0 ? MinimumSellingPrice : ProductPrice;
+        var maximum = MaximumSellingPrice > 0 ? MaximumSellingPrice : minimum;
+        return new CreateProductPriceRequest(ProductName, minimum, SelectedManufacturingCompanyId, country,
+            minimum, maximum, DeliveryPrice, Quantity, SaleType, imageUrl ?? ProductImage);
+    }
+}
+
+public sealed record LegacyProductPriceEditRequest(
+    int Id,
+    string ProductName,
+    decimal ProductPrice,
+    int SelectedManufacturingCompanyId,
+    int Country,
+    decimal MinimumSellingPrice = 0,
+    decimal MaximumSellingPrice = 0,
+    decimal DeliveryPrice = 0,
+    int Quantity = 1,
+    string? SaleType = null,
+    string? ProductImage = null)
+    : LegacyProductPriceRequest(ProductName, ProductPrice, SelectedManufacturingCompanyId, Country,
+        MinimumSellingPrice, MaximumSellingPrice, DeliveryPrice, Quantity, SaleType, ProductImage);
+
+public sealed record LegacyBulkProductPriceRequest(
+    int SelectedMainProductId,
+    int? Country,
+    decimal MinimumSellingPrice,
+    decimal MaximumSellingPrice,
+    decimal DeliveryPrice,
+    decimal ProductPrice,
+    int Quantity,
+    string? SaleType,
+    int SelectedManufacturingCompanyId);

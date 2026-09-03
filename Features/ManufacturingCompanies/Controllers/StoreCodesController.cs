@@ -234,7 +234,14 @@ public class StoreCodesController(ApplicationDbContext context) : ControllerBase
         folder.PageType = type;
         Stamp(folder);
         await context.SaveChangesAsync(ct);
-        return Ok(new { success = true, message = "تم تعديل المجلد." });
+        return Ok(new
+        {
+            success = true,
+            message = "تم تعديل المجلد.",
+            storeGroups = await GetStoreGroups(ct: ct),
+            folders = await GetFolderRows(ct: ct),
+            trashFolders = await GetFolderRows(true, ct: ct)
+        });
     }
 
     [HttpPost("/StoreCodes/DeleteFolderAjax")]
@@ -249,7 +256,14 @@ public class StoreCodesController(ApplicationDbContext context) : ControllerBase
         folder.DeletedByName = User.Identity?.Name;
         Stamp(folder);
         await context.SaveChangesAsync(ct);
-        return Ok(new { success = true, message = "تم نقل المجلد إلى سلة المهملات." });
+        return Ok(new
+        {
+            success = true,
+            message = "تم نقل المجلد إلى سلة المهملات.",
+            storeGroups = await GetStoreGroups(ct: ct),
+            folders = await GetFolderRows(ct: ct),
+            trashFolders = await GetFolderRows(true, ct: ct)
+        });
     }
 
     [HttpPost("/StoreCodes/RestoreFolderAjax")]
@@ -268,7 +282,14 @@ public class StoreCodesController(ApplicationDbContext context) : ControllerBase
         folder.DeletedByName = null;
         Stamp(folder);
         await context.SaveChangesAsync(ct);
-        return Ok(new { success = true, message = "تم استرداد المجلد." });
+        return Ok(new
+        {
+            success = true,
+            message = "تم استرداد المجلد.",
+            storeGroups = await GetStoreGroups(ct: ct),
+            folders = await GetFolderRows(ct: ct),
+            trashFolders = await GetFolderRows(true, ct: ct)
+        });
     }
 
     [HttpPost("/StoreCodes/PermanentDeleteFolderAjax")]
@@ -279,7 +300,14 @@ public class StoreCodesController(ApplicationDbContext context) : ControllerBase
         if (folder is null) return Fail("العنصر غير موجود في سلة المهملات.");
         context.StoreCodeFolders.Remove(folder);
         await context.SaveChangesAsync(ct);
-        return Ok(new { success = true, message = "تم الحذف النهائي." });
+        return Ok(new
+        {
+            success = true,
+            message = "تم الحذف النهائي.",
+            storeGroups = await GetStoreGroups(ct: ct),
+            folders = await GetFolderRows(ct: ct),
+            trashFolders = await GetFolderRows(true, ct: ct)
+        });
     }
 
     [HttpGet("/StoreCodes/File")]
