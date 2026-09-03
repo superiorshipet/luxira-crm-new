@@ -74,6 +74,16 @@ public class EmployeeBonusController : ControllerBase
         return Ok(details);
     }
 
+    [HttpGet("RowsPartial")]
+    public async Task<IActionResult> RowsPartial(CancellationToken ct) => Ok(await _context.EmployeeBonusPayments.AsNoTracking()
+        .OrderByDescending(item => item.DatePaid).Take(200).ToListAsync(ct));
+
+    [HttpGet("Create")]
+    public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
+    {
+        employees = await _context.Employees.AsNoTracking().Where(item => item.IsActive && item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, Name = item.DisplayName ?? item.Name }).ToListAsync(ct)
+    });
+
     [HttpPost("pay")]
     [HttpPost("/EmployeeBonus/Pay")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]

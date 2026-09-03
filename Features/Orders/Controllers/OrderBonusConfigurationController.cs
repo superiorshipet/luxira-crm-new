@@ -25,6 +25,7 @@ public class OrderBonusConfigurationController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/OrderBonusConfiguration/Index")]
+    [HttpPost("/OrderBonusConfiguration/Index")]
     public async Task<IActionResult> Index([FromQuery] int? country, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
     {
         var query = _context.OrderBonusConfigurations.AsNoTracking().AsQueryable();
@@ -34,6 +35,19 @@ public class OrderBonusConfigurationController : ControllerBase
         var configs = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
 
         return Ok(new { total, page, pageSize, items = configs });
+    }
+
+    [HttpGet("/OrderBonusConfiguration/Create")]
+    public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
+    {
+        employees = await _context.Employees.AsNoTracking().Where(item => item.IsActive && item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, Name = item.DisplayName ?? item.Name }).ToListAsync(ct)
+    });
+
+    [HttpGet("/OrderBonusConfiguration/Edit")]
+    public async Task<IActionResult> EditForm([FromQuery] int id, CancellationToken ct)
+    {
+        var config = await _context.OrderBonusConfigurations.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, ct);
+        return config is null ? NotFound() : Ok(config);
     }
 
     [HttpPost("Create")]

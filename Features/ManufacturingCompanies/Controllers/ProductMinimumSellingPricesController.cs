@@ -25,6 +25,7 @@ public class CountryMinimumPricesController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/CountryMinimumPrices/Index")]
+    [HttpPost("/CountryMinimumPrices/Index")]
     public async Task<IActionResult> Index(CancellationToken ct = default)
     {
         var prices = await _context.CountryMinimumPrices
@@ -43,6 +44,12 @@ public class CountryMinimumPricesController : ControllerBase
             .ToListAsync(ct);
         return Ok(prices);
     }
+
+    [HttpGet("/CountryMinimumPrices/Create")]
+    public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
+    {
+        stores = await _context.ManufacturingCompanies.AsNoTracking().Where(item => item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct)
+    });
 
     [HttpPost("Create")]
     [HttpPost("/CountryMinimumPrices/Create")]
@@ -115,10 +122,25 @@ public class ProductMinimumSellingPricesController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/ProductMinimumSellingPrices/Index")]
+    [HttpPost("/ProductMinimumSellingPrices/Index")]
     public async Task<IActionResult> Index(CancellationToken ct = default)
     {
         var prices = await _context.ProductMinimumSellingPrices.AsNoTracking().ToListAsync(ct);
         return Ok(prices);
+    }
+
+    [HttpGet("/ProductMinimumSellingPrices/Create")]
+    public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
+    {
+        products = await _context.MainWarehouses.AsNoTracking().OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct),
+        stores = await _context.ManufacturingCompanies.AsNoTracking().Where(item => item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct)
+    });
+
+    [HttpGet("/ProductMinimumSellingPrices/Edit")]
+    public async Task<IActionResult> EditForm([FromQuery] int id, CancellationToken ct)
+    {
+        var item = await _context.ProductMinimumSellingPrices.AsNoTracking().FirstOrDefaultAsync(row => row.Id == id, ct);
+        return item is null ? NotFound() : Ok(item);
     }
 
     [HttpPost("Create")]

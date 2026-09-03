@@ -21,6 +21,8 @@ public class LeadController : ControllerBase
     }
 
     [HttpGet]
+    [HttpGet("Index")]
+    [HttpPost("Index")]
     [HttpGet("GetLeads")]
     public async Task<ActionResult<List<MarketingLead>>> GetLeads(
         [FromQuery] int page = 1,
@@ -75,5 +77,43 @@ public class LeadController : ControllerBase
             .Take(pageSize)
             .ToListAsync(ct);
         return Ok(list);
+    }
+
+    [HttpGet("Panel")]
+    public async Task<IActionResult> Panel(CancellationToken ct)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isAdmin = User.IsInRole("Admin");
+        var query = _context.MarketingLeads.AsNoTracking();
+        if (User.IsInRole("CallCenter") && !isAdmin && !User.IsInRole("ExecutiveDirector") && !User.IsInRole("FollowUpDepartment"))
+            query = query.Where(item => item.ApplicationUserId == currentUserId);
+        var rows = await query.OrderByDescending(item => item.CreatedDate).Select(item => new
+        {
+            id = item.Id,
+            sourceName = item.SourceName,
+            orderSource = item.OrderSource,
+            phoneNumber = item.PhoneNumber,
+            chatUrl = item.ChatUrl,
+            createdAt = item.CreatedDate,
+            ownerId = item.ApplicationUserId
+        }).ToListAsync(ct);
+        var groups = rows.GroupBy(item => item.createdAt.Date).OrderByDescending(group => group.Key).Select(group => new
+        {
+            date = group.Key.ToString("yyyy-MM-dd"),
+            cards = group.Select(item => new { item.id, item.sourceName, item.orderSource, item.phoneNumber, item.chatUrl, item.createdAt, canDelete = item.ownerId == currentUserId || isAdmin }).ToList()
+        }).ToList();
+        return Ok(new { count = rows.Count, groups });
+    }
+
+    [HttpPost("Delete")]
+    public async Task<IActionResult> Delete([FromForm] int id, CancellationToken ct)
+    {
+        var lead = await _context.MarketingLeads.FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (lead is null) return NotFound();
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (lead.ApplicationUserId != currentUserId && !User.IsInRole("Admin")) return Forbid();
+        _context.MarketingLeads.Remove(lead);
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true });
     }
 }
