@@ -138,3 +138,15 @@ public class StoreCodeEditHistoryDbConfig : IDbConfig<StoreCodeEditHistory>
         builder.HasKey(h => h.Id);
     }
 }
+
+public class StoreCodeStoreGroupDbConfig : IDbConfig<StoreCodeStoreGroup>
+{
+    public void Configure(EntityTypeBuilder<StoreCodeStoreGroup> builder)
+    {
+        builder.ToTable("StoreCodeStoreGroups");
+        builder.HasKey(group => group.Id);
+        builder.Property(group => group.CreatedByUserId).HasMaxLength(450);
+        builder.Property(group => group.CreatedByName).HasMaxLength(250);
+        builder.HasOne(group => group.ManufacturingCompany).WithMany().HasForeignKey(group => group.ManufacturingCompanyId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

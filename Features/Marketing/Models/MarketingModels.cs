@@ -8,7 +8,9 @@ public class AdvertisingCampaign
     public string? Name { get; set; }
     public int Country { get; set; }
     public int? MainWarehouseId { get; set; }
+    public Luxira.Api.Features.Warehouses.Models.MainWarehouse? MainWarehouse { get; set; }
     public int? ManufacturingCompanyId { get; set; }
+    public Luxira.Api.Features.ManufacturingCompanies.Models.ManufacturingCompany? ManufacturingCompany { get; set; }
     public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
 }

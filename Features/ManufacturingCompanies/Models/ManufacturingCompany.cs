@@ -165,3 +165,13 @@ public class StoreCodeEditHistory
     public string? CreatedByUserId { get; set; }
     public string? CreatedByName { get; set; }
 }
+
+public class StoreCodeStoreGroup
+{
+    public int Id { get; set; }
+    public int ManufacturingCompanyId { get; set; }
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+}

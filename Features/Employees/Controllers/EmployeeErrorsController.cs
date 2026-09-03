@@ -1,5 +1,6 @@
 using Luxira.Api.Data;
 using Luxira.Api.Features.Employees.Models;
+using Luxira.Api.Features.Orders.Models;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Microsoft.AspNetCore.Authorization;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Luxira.Api.Infrastructure.S3;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Luxira.Api.Features.Employees.Controllers;
 
@@ -281,6 +283,55 @@ public class EmployeeErrorsController : ControllerBase
         return changed == 0 ? NotFound() : Ok(new { success = true });
     }
 
+    [HttpGet("/EmployeeErrors/ShareContext")]
+    public async Task<IActionResult> ShareContext([FromQuery] int id, CancellationToken ct)
+    {
+        var error = await VisibleErrors().FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, ct);
+        if (error is null) return NotFound(new { success = false, message = "لم يتم العثور على الخطأ أو لا تملك صلاحية مشاركته" });
+        var orderId = ResolveOrderId(error.PageUrl);
+        var employees = await _context.Employees.AsNoTracking().Where(employee => !employee.IsDeleted && employee.IsActive && employee.ApplicationUserId != null)
+            .OrderBy(employee => employee.DisplayName ?? employee.Name)
+            .Select(employee => new { employeeId = employee.Id, applicationUserId = employee.ApplicationUserId, name = employee.DisplayName ?? employee.Name, employee.ImageUrl })
+            .ToListAsync(ct);
+        return Ok(new { success = true, item = error, orderId, employees });
+    }
+
+    [HttpPost("/EmployeeErrors/Share")]
+    public async Task<IActionResult> Share(
+        [FromForm] int id,
+        [FromForm] string? destination,
+        [FromForm] string? targetApplicationUserId,
+        CancellationToken ct)
+    {
+        var normalizedDestination = destination?.Trim().ToLowerInvariant();
+        if (normalizedDestination is not ("help-center" or "edit" or "problem-report" or "all-three"))
+            return BadRequest(new { success = false, message = "اختيار الإرسال غير صحيح" });
+        var error = await VisibleErrors().FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, ct);
+        if (error is null) return NotFound(new { success = false, message = "لم يتم العثور على الخطأ" });
+        if (!string.IsNullOrWhiteSpace(targetApplicationUserId) && !await _context.Employees.AsNoTracking().AnyAsync(employee => employee.ApplicationUserId == targetApplicationUserId && employee.IsActive && !employee.IsDeleted, ct))
+            return BadRequest(new { success = false, message = "الموظف المستهدف غير صحيح" });
+        var orderId = ResolveOrderId(error.PageUrl);
+        var createdPosts = new List<OrderPost>();
+        if (orderId.HasValue && await _context.Orders.AsNoTracking().AnyAsync(order => order.Id == orderId.Value, ct))
+        {
+            if (normalizedDestination is "edit" or "all-three")
+                createdPosts.Add(CreateSharedPost(error, orderId.Value, OrderPostType.EditNote));
+            if (normalizedDestination is "problem-report" or "all-three")
+                createdPosts.Add(CreateSharedPost(error, orderId.Value, OrderPostType.Problem));
+        }
+        if (createdPosts.Count > 0)
+        {
+            _context.OrderPosts.AddRange(createdPosts);
+            await _context.SaveChangesAsync(ct);
+            error = await _context.EmployeeErrors.FirstAsync(item => item.Id == id, ct);
+            var existing = ParseIds(error.LinkedOrderPostIds);
+            existing.AddRange(createdPosts.Select(post => post.Id));
+            error.LinkedOrderPostIds = string.Join(',', existing.Distinct());
+            await _context.SaveChangesAsync(ct);
+        }
+        return Ok(new { success = true, orderId, createdPostIds = createdPosts.Select(post => post.Id), targetApplicationUserId });
+    }
+
     private IQueryable<EmployeeError> VisibleErrors()
     {
         var query = _context.EmployeeErrors.AsNoTracking().Include(error => error.Employee).AsQueryable();
@@ -317,6 +368,22 @@ public class EmployeeErrorsController : ControllerBase
         try { return JsonSerializer.Deserialize<List<string>>(value) ?? []; }
         catch (JsonException) { return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(); }
     }
+    private static int? ResolveOrderId(string? pageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(pageUrl)) return null;
+        var match = Regex.Match(pageUrl, @"(?:[?&](?:id|orderId)=|/Order/(?:Details/)?)(\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success && int.TryParse(match.Groups[1].Value, out var id) ? id : null;
+    }
+    private OrderPost CreateSharedPost(EmployeeError error, int orderId, OrderPostType type) => new()
+    {
+        OrderId = orderId,
+        Type = type,
+        AuthorUserId = User.GetUserId() ?? "system",
+        Body = $"{error.ErrorText}\n{error.PageUrl}".Trim(),
+        CreatedAt = DateTime.UtcNow
+    };
+    private static List<int> ParseIds(string? value) => (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(item => int.TryParse(item, out var id) ? id : 0).Where(id => id > 0).ToList();
 }
 
 public record EmployeeViolationDto(int Id, int EmployeeId, string? EmployeeName, string Title, string Description, decimal PenaltyAmount, DateTime OccurredAt, string IssuedByUserId);

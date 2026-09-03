@@ -13,6 +13,8 @@ public class AdvertisingCampaignDbConfig : IDbConfig<AdvertisingCampaign>
         builder.HasKey(c => c.Id);
         builder.Property(c => c.ImageUrl).HasMaxLength(500);
         builder.Property(c => c.ImageS3Key).HasMaxLength(450);
+        builder.HasOne(c => c.MainWarehouse).WithMany().HasForeignKey(c => c.MainWarehouseId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(c => c.ManufacturingCompany).WithMany().HasForeignKey(c => c.ManufacturingCompanyId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

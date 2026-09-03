@@ -91,6 +91,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProductMinimumSellingPrice> ProductMinimumSellingPrices => Set<ProductMinimumSellingPrice>();
     public DbSet<CountryMinimumPrice> CountryMinimumPrices => Set<CountryMinimumPrice>();
     public DbSet<StoreCodeFolder> StoreCodeFolders => Set<StoreCodeFolder>();
+    public DbSet<StoreCodeStoreGroup> StoreCodeStoreGroups => Set<StoreCodeStoreGroup>();
     public DbSet<StoreCodeEditHistory> StoreCodeEditHistories => Set<StoreCodeEditHistory>();
 
     // Search Keywords
