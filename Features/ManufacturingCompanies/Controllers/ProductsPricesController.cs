@@ -29,6 +29,7 @@ public class ProductsPricesController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/ProductsPrices/Index")]
+    [HttpPost("Index")]
     public async Task<IActionResult> Index(
         [FromQuery] int? manufacturingCompanyId,
         [FromQuery] int? country = null,

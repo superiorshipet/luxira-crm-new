@@ -68,7 +68,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeViolation> EmployeeViolations => Set<EmployeeViolation>();
     public DbSet<EmployeeRating> EmployeeRatings => Set<EmployeeRating>();
     public DbSet<PersonalNote> PersonalNotes => Set<PersonalNote>();
+    public DbSet<PersonalNoteHistory> PersonalNoteHistories => Set<PersonalNoteHistory>();
+    public DbSet<IdeaSuggestion> IdeaSuggestions => Set<IdeaSuggestion>();
     public DbSet<ManagementRequest> ManagementRequests => Set<ManagementRequest>();
+    public DbSet<ManagementRequestNotification> ManagementRequestNotifications => Set<ManagementRequestNotification>();
     public DbSet<ScreenRecord> ScreenRecords => Set<ScreenRecord>();
 
     // Finance & Expenses
@@ -127,6 +130,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<HelpCenterChatKeyword> HelpCenterChatKeywords => Set<HelpCenterChatKeyword>();
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
     public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
+    public DbSet<SystemEmailLog> SystemEmailLogs => Set<SystemEmailLog>();
     public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();
     public DbSet<PasswordEmail> PasswordEmails => Set<PasswordEmail>();
     public DbSet<PasswordEmailHistory> PasswordEmailHistories => Set<PasswordEmailHistory>();

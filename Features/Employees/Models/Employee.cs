@@ -336,6 +336,33 @@ public class PersonalNote
     public string? DeletedByUserId { get; set; }
 }
 
+public class PersonalNoteHistory
+{
+    public long Id { get; set; }
+    public long PersonalNoteId { get; set; }
+    public PersonalNote? PersonalNote { get; set; }
+    public string ApplicationUserId { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public string PreviousHtmlContent { get; set; } = string.Empty;
+    public string NewHtmlContent { get; set; } = string.Empty;
+    public string PreviousPlainText { get; set; } = string.Empty;
+    public string NewPlainText { get; set; } = string.Empty;
+    public DateTime ChangedAt { get; set; }
+    public string ChangedByUserId { get; set; } = string.Empty;
+    public string ChangedByName { get; set; } = string.Empty;
+}
+
+public class IdeaSuggestion
+{
+    public long Id { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public string EmployeeName { get; set; } = string.Empty;
+    public string? EmployeeImage { get; set; }
+    public string IdeaText { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? AdminAcknowledgedAtUtc { get; set; }
+}
+
 public class ManagementRequest
 {
     public long Id { get; set; }
@@ -349,6 +376,20 @@ public class ManagementRequest
     public DateTime? DecidedAt { get; set; }
     public string? DecidedByUserId { get; set; }
     public string? DecidedByName { get; set; }
+}
+
+public class ManagementRequestNotification
+{
+    public long Id { get; set; }
+    public long ManagementRequestId { get; set; }
+    public ManagementRequest? ManagementRequest { get; set; }
+    public string ApplicationUserId { get; set; } = string.Empty;
+    public string AlertType { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public bool IsRead { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ReadAt { get; set; }
 }
 
 public enum EmployeeTransactionType

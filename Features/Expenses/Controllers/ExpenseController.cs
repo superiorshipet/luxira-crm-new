@@ -62,6 +62,7 @@ public class ExpenseController : ControllerBase
     }
 
     [HttpPost("/Expense/DeleteConfirmed")]
+    [HttpPost("/Expense/Delete")]
     [Authorize(Roles = "Admin,Administrator,Accountant")]
     public async Task<IActionResult> DeleteConfirmed([FromForm] int id, CancellationToken ct)
     {

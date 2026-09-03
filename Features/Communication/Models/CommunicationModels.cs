@@ -160,6 +160,30 @@ public class AdminNotification
     public string IconUrl { get; set; } = string.Empty;
 }
 
+public class SystemEmailLog
+{
+    public const string DirectionOutgoing = "Outgoing";
+    public const string DirectionIncoming = "Incoming";
+
+    public long Id { get; set; }
+    public string ToEmail { get; set; } = string.Empty;
+    public string? FromEmail { get; set; }
+    public string? RecipientName { get; set; }
+    public string Subject { get; set; } = string.Empty;
+    public string EmailType { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? Direction { get; set; } = DirectionOutgoing;
+    public string? MessageId { get; set; }
+    public DateTime SentAt { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? RelatedEntityType { get; set; }
+    public string? RelatedEntityId { get; set; }
+    public string? AttachmentName { get; set; }
+    public string? BodyPreview { get; set; }
+    public string? TriggeredByUserId { get; set; }
+    public string? TriggeredByName { get; set; }
+}
+
 public class ConferenceMeeting
 {
     public int Id { get; set; }

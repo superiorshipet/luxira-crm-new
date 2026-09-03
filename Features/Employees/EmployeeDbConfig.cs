@@ -232,6 +232,38 @@ public class PersonalNoteDbConfig : IDbConfig<PersonalNote>
     {
         builder.ToTable("PersonalNotes");
         builder.HasKey(n => n.Id);
+        builder.HasIndex(n => n.ApplicationUserId).IsUnique();
+    }
+}
+
+public class PersonalNoteHistoryDbConfig : IDbConfig<PersonalNoteHistory>
+{
+    public void Configure(EntityTypeBuilder<PersonalNoteHistory> builder)
+    {
+        builder.ToTable("PersonalNoteHistories");
+        builder.HasKey(history => history.Id);
+        builder.Property(history => history.Action).HasMaxLength(20).IsRequired();
+        builder.Property(history => history.ChangedByName).HasMaxLength(300).IsRequired();
+        builder.HasOne(history => history.PersonalNote)
+            .WithMany()
+            .HasForeignKey(history => history.PersonalNoteId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(history => new { history.ApplicationUserId, history.ChangedAt });
+    }
+}
+
+public class IdeaSuggestionDbConfig : IDbConfig<IdeaSuggestion>
+{
+    public void Configure(EntityTypeBuilder<IdeaSuggestion> builder)
+    {
+        builder.ToTable("IdeaSuggestions");
+        builder.HasKey(idea => idea.Id);
+        builder.Property(idea => idea.UserId).HasMaxLength(450).IsRequired();
+        builder.Property(idea => idea.EmployeeName).HasMaxLength(255).IsRequired();
+        builder.Property(idea => idea.EmployeeImage).HasMaxLength(1000);
+        builder.Property(idea => idea.IdeaText).HasMaxLength(2000).IsRequired();
+        builder.HasIndex(idea => new { idea.CreatedAtUtc, idea.Id });
+        builder.HasIndex(idea => new { idea.AdminAcknowledgedAtUtc, idea.CreatedAtUtc });
     }
 }
 
@@ -241,9 +273,27 @@ public class ManagementRequestDbConfig : IDbConfig<ManagementRequest>
     {
         builder.ToTable("ManagementRequests");
         builder.HasKey(m => m.Id);
-        builder.Property(m => m.RequestType).HasMaxLength(100).IsRequired();
+        builder.Property(m => m.RequestType).HasMaxLength(80).IsRequired();
         builder.Property(m => m.Reason).HasMaxLength(2000).IsRequired();
-        builder.Property(m => m.Status).HasMaxLength(50).IsRequired();
+        builder.Property(m => m.Status).HasMaxLength(20).IsRequired();
+        builder.HasIndex(m => new { m.ApplicationUserId, m.CreatedAt });
+        builder.HasIndex(m => new { m.Status, m.CreatedAt });
+    }
+}
+
+public class ManagementRequestNotificationDbConfig : IDbConfig<ManagementRequestNotification>
+{
+    public void Configure(EntityTypeBuilder<ManagementRequestNotification> builder)
+    {
+        builder.ToTable("ManagementRequestNotifications");
+        builder.HasKey(notification => notification.Id);
+        builder.Property(notification => notification.ApplicationUserId).HasMaxLength(450).IsRequired();
+        builder.Property(notification => notification.AlertType).HasMaxLength(80).IsRequired();
+        builder.Property(notification => notification.Title).HasMaxLength(200).IsRequired();
+        builder.Property(notification => notification.Message).HasMaxLength(3000).IsRequired();
+        builder.HasOne(notification => notification.ManagementRequest).WithMany()
+            .HasForeignKey(notification => notification.ManagementRequestId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(notification => new { notification.ApplicationUserId, notification.IsRead, notification.CreatedAt });
     }
 }
 

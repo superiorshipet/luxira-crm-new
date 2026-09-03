@@ -210,6 +210,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/DeleteConfirmed")]
+    [HttpPost("/EmployeeTransactions/Delete")]
     public async Task<IActionResult> DeleteConfirmed([FromForm] int id, CancellationToken ct)
     {
         var changed = await _context.EmployeeTransactions.Where(item => item.Id == id && !item.IsDeleted)

@@ -186,6 +186,37 @@ public class AdminNotificationDbConfig : IDbConfig<AdminNotification>
     }
 }
 
+public class SystemEmailLogDbConfig : IDbConfig<SystemEmailLog>
+{
+    public void Configure(EntityTypeBuilder<SystemEmailLog> builder)
+    {
+        builder.ToTable("SystemEmailLogs");
+        builder.HasKey(log => log.Id);
+        builder.Property(log => log.ToEmail).HasMaxLength(450).IsRequired();
+        builder.Property(log => log.FromEmail).HasMaxLength(450);
+        builder.Property(log => log.RecipientName).HasMaxLength(250);
+        builder.Property(log => log.Subject).HasMaxLength(500).IsRequired();
+        builder.Property(log => log.EmailType).HasMaxLength(100).IsRequired();
+        builder.Property(log => log.Status).HasMaxLength(30).IsRequired();
+        builder.Property(log => log.Direction).HasMaxLength(20);
+        builder.Property(log => log.MessageId).HasMaxLength(450);
+        builder.Property(log => log.ErrorMessage).HasMaxLength(2000);
+        builder.Property(log => log.RelatedEntityType).HasMaxLength(100);
+        builder.Property(log => log.RelatedEntityId).HasMaxLength(100);
+        builder.Property(log => log.AttachmentName).HasMaxLength(500);
+        builder.Property(log => log.BodyPreview).HasMaxLength(2000);
+        builder.Property(log => log.TriggeredByUserId).HasMaxLength(450);
+        builder.Property(log => log.TriggeredByName).HasMaxLength(250);
+        builder.HasIndex(log => log.SentAt);
+        builder.HasIndex(log => log.RecipientName);
+        builder.HasIndex(log => log.EmailType);
+        builder.HasIndex(log => log.Status);
+        builder.HasIndex(log => log.Direction);
+        builder.HasIndex(log => log.FromEmail);
+        builder.HasIndex(log => log.MessageId);
+    }
+}
+
 public class ConferenceMeetingDbConfig : IDbConfig<ConferenceMeeting>
 {
     public void Configure(EntityTypeBuilder<ConferenceMeeting> builder)

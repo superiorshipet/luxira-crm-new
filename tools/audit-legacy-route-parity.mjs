@@ -3,10 +3,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 
-const [, , legacyRoot, openApiPath, outputMode] = process.argv;
+const [, , legacyRoot, openApiPath, ...options] = process.argv;
 if (!legacyRoot || !openApiPath) {
   console.error(
-    "Usage: node tools/audit-legacy-route-parity.mjs <legacy-root> <openapi.json>",
+    "Usage: node tools/audit-legacy-route-parity.mjs <legacy-root> <openapi.json> [--summary] [--include-couriers]",
   );
   process.exit(2);
 }
@@ -32,9 +32,12 @@ for (const [route, pathItem] of Object.entries(openApi.paths ?? {})) {
   }
 }
 
-const ignoredControllers = new Set(["CamexWebhook", "SandoogWebhook"]);
+const includeCouriers = options.includes("--include-couriers");
+const ignoredControllers = includeCouriers
+  ? new Set()
+  : new Set(["CamexWebhook", "SandoogWebhook"]);
 const actionPattern =
-  /((?:\s*\[[^\]]+\]\s*)*)public\s+(?:async\s+)?(?:Task\s*<[^;{]+?>|IActionResult|JsonResult|ActionResult(?:\s*<[^;{]+?>)?)\s+(\w+)\s*\(/g;
+  /((?:\s*\[[^\]]+\]\s*(?:\/\/[^\r\n]*)?\s*)*)public\s+(?:async\s+)?(?:Task\s*<[^;{]+?>|IActionResult|JsonResult|ActionResult(?:\s*<[^;{]+?>)?)\s+(\w+)\s*\(/g;
 const candidates = [];
 
 for (const fileName of readdirSync(controllersRoot).sort()) {
@@ -58,7 +61,7 @@ for (const fileName of readdirSync(controllersRoot).sort()) {
 
   for (const match of source.matchAll(actionPattern)) {
     const actionAttributes = match[1] ?? "";
-    const actionName = match[2];
+    const actionName = actionNameOverride(actionAttributes) ?? match[2];
     const declaredMethods = methodTemplates(actionAttributes);
     const actionRoutes = routeTemplates(actionAttributes);
 
@@ -127,8 +130,8 @@ const missing = uniqueCandidates.filter((item) =>
 console.log(`Legacy operation candidates: ${uniqueCandidates.length}`);
 console.log(`Exact current operation matches: ${covered.length}`);
 console.log(`Missing operation candidates: ${missing.length}`);
-console.log("CAMEX/Sandoog controllers: excluded");
-if (outputMode === "--summary") {
+console.log(`CAMEX/Sandoog controllers: ${includeCouriers ? "included" : "deferred"}`);
+if (options.includes("--summary")) {
   const grouped = new Map();
   for (const item of missing) {
     const items = grouped.get(item.controllerName) ?? [];
@@ -211,6 +214,10 @@ function methodTemplates(attributes) {
 function routeTemplates(attributes) {
   return [...attributes.matchAll(/\[Route\s*\(\s*"([^"]+)"[^)]*\)[^\]]*\]/gi)]
     .map((match) => match[1]);
+}
+
+function actionNameOverride(attributes) {
+  return attributes.match(/(?:\[|,)\s*ActionName\s*\(\s*"([^"]+)"\s*\)/i)?.[1] ?? null;
 }
 
 function operationKey(method, route) {
