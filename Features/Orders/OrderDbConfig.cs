@@ -136,6 +136,37 @@ public class OrderPostDbConfig : IDbConfig<OrderPost>
     }
 }
 
+public class OrderPostImageDbConfig : IDbConfig<OrderPostImage>
+{
+    public void Configure(EntityTypeBuilder<OrderPostImage> builder)
+    {
+        builder.ToTable("OrderPostImages");
+        builder.HasKey(image => image.Id);
+        builder.Property(image => image.Url).HasMaxLength(512).IsRequired();
+        builder.Property(image => image.S3Key).HasMaxLength(450);
+        builder.HasIndex(image => image.S3Key);
+        builder.HasOne(image => image.OrderPost)
+            .WithMany(post => post.Images)
+            .HasForeignKey(image => image.OrderPostId);
+    }
+}
+
+public class OrderMetaActionClickDbConfig : IDbConfig<OrderMetaActionClick>
+{
+    public void Configure(EntityTypeBuilder<OrderMetaActionClick> builder)
+    {
+        builder.ToTable("OrderMetaActionClicks");
+        builder.HasKey(click => click.Id);
+        builder.Property(click => click.UserId).HasMaxLength(450);
+        builder.Property(click => click.EmployeeName).HasMaxLength(300);
+        builder.Property(click => click.Reason).HasMaxLength(100).IsRequired();
+        builder.Property(click => click.OtherText).HasMaxLength(500);
+        builder.Property(click => click.MetaUrl).HasMaxLength(1000);
+        builder.Property(click => click.ContactType).HasMaxLength(40);
+        builder.HasIndex(click => new { click.OrderId, click.ClickedAt });
+    }
+}
+
 public class OrderFollowUpRequestDbConfig : IDbConfig<OrderFollowUpRequest>
 {
     public void Configure(EntityTypeBuilder<OrderFollowUpRequest> builder)
@@ -176,5 +207,6 @@ public class UrgentReportDbConfig : IDbConfig<UrgentReport>
         builder.Property(r => r.ReportType).HasMaxLength(100).IsRequired();
         builder.Property(r => r.Status).HasMaxLength(50);
         builder.Property(r => r.ScreenshotS3Key).HasMaxLength(450);
+        builder.HasOne(r => r.Employee).WithMany().HasForeignKey(r => r.EmployeeId).OnDelete(DeleteBehavior.Restrict);
     }
 }

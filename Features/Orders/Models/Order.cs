@@ -173,6 +173,32 @@ public class OrderPost
     public string AuthorUserId { get; set; } = string.Empty;
     public string? Body { get; set; }
     public DateTime CreatedAt { get; set; }
+    public List<OrderPostImage> Images { get; set; } = new();
+}
+
+public class OrderPostImage
+{
+    public int Id { get; set; }
+    public int OrderPostId { get; set; }
+    public OrderPost? OrderPost { get; set; }
+    public string Url { get; set; } = string.Empty;
+    public string? S3Key { get; set; }
+    public DateTime? MigratedToS3At { get; set; }
+    public int SortOrder { get; set; }
+    public long? PHash { get; set; }
+}
+
+public class OrderMetaActionClick
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public string? UserId { get; set; }
+    public string? EmployeeName { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string? OtherText { get; set; }
+    public string? MetaUrl { get; set; }
+    public string? ContactType { get; set; }
+    public DateTime ClickedAt { get; set; }
 }
 
 public class OrderFollowUpRequest

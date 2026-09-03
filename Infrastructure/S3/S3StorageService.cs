@@ -199,6 +199,16 @@ public class S3StorageService : IDisposable
         }
     }
 
+    public async Task<(byte[] Content, string ETag)> DownloadAsync(
+        string key,
+        CancellationToken ct = default)
+    {
+        using var response = await _s3Client.GetObjectAsync(_bucket, key, ct);
+        await using var buffer = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(buffer, ct);
+        return (buffer.ToArray(), response.ETag ?? string.Empty);
+    }
+
     public async Task<(long totalBytes, int objectCount)> GetBucketMetricsAsync(CancellationToken ct = default)
     {
         var totalBytes = await _db.S3StoredObjects.SumAsync(s => (long?)s.SizeBytes, ct) ?? 0;

@@ -75,6 +75,94 @@ public class UrgentReportController : ControllerBase
         await _context.SaveChangesAsync(ct);
         return Ok(new { message = "Report marked as resolved." });
     }
+
+    [HttpPost("MarkAsUnderReview")]
+    public async Task<IActionResult> MarkAsUnderReview([FromForm] int id, CancellationToken ct)
+    {
+        if (!await CanHandleAsync(ct)) return Forbid();
+        var report = await _context.UrgentReports.FindAsync([id], ct);
+        if (report is null) return NotFound();
+        report.Status = "UnderReview";
+        report.HandledByAdminName = await CurrentHandlerNameAsync(ct);
+        report.HandledAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("MarkAsResolved")]
+    public async Task<IActionResult> MarkAsResolved([FromForm] int id, CancellationToken ct)
+    {
+        if (!await CanHandleAsync(ct)) return Forbid();
+        var report = await _context.UrgentReports.FindAsync([id], ct);
+        if (report is null) return NotFound();
+        report.Status = "Resolved";
+        report.HandledByAdminName = await CurrentHandlerNameAsync(ct);
+        report.HandledAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true });
+    }
+
+    [HttpGet("GetPendingReports")]
+    public async Task<IActionResult> GetPendingReports(CancellationToken ct)
+    {
+        if (!await CanHandleAsync(ct)) return Forbid();
+        var reports = await _context.UrgentReports.AsNoTracking()
+            .Where(report => report.Status == "Pending" || report.Status == "UnderReview" || report.Status == "Open")
+            .OrderByDescending(report => report.CreatedAt)
+            .Select(report => new
+            {
+                report.Id,
+                ReportNumber = "#BR-" + report.Id,
+                report.ReportType,
+                report.Description,
+                report.Status,
+                report.CreatedAt,
+                EmployeeName = report.Employee != null ? report.Employee.Name : "غير معروف"
+            }).ToListAsync(ct);
+        return Ok(reports);
+    }
+
+    [HttpGet("GetAllReports")]
+    public async Task<IActionResult> GetAllReports([FromQuery] DateTime? date, CancellationToken ct)
+    {
+        if (!await CanHandleAsync(ct)) return Forbid();
+        var query = _context.UrgentReports.AsNoTracking().AsQueryable();
+        if (date.HasValue)
+        {
+            var start = date.Value.Date;
+            var end = start.AddDays(1);
+            query = query.Where(report => report.CreatedAt >= start && report.CreatedAt < end);
+        }
+        return Ok(await query.OrderByDescending(report => report.CreatedAt).Select(report => new
+        {
+            report.Id,
+            report.ReportType,
+            report.Description,
+            report.ScreenshotPath,
+            report.Status,
+            report.CreatedAt,
+            report.HandledAt,
+            report.HandledByAdminName,
+            EmployeeName = report.Employee != null ? report.Employee.Name : "غير معروف"
+        }).ToListAsync(ct));
+    }
+
+    private async Task<bool> CanHandleAsync(CancellationToken ct)
+    {
+        if (User.IsInRole("Admin") || User.IsInRole("Administrator") || User.IsInRole("ExecutiveDirector")) return true;
+        var userId = User.GetUserId();
+        return userId is not null && await _context.Employees.AsNoTracking()
+            .AnyAsync(employee => employee.ApplicationUserId == userId && employee.CanHandleUrgentReports, ct);
+    }
+
+    private async Task<string> CurrentHandlerNameAsync(CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        return userId is null ? User.Identity?.Name ?? "Admin" : await _context.Employees.AsNoTracking()
+            .Where(employee => employee.ApplicationUserId == userId)
+            .Select(employee => employee.DisplayName ?? employee.Name)
+            .FirstOrDefaultAsync(ct) ?? User.Identity?.Name ?? "Admin";
+    }
 }
 
 public sealed record CreateUrgentReportRequest(

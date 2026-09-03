@@ -23,6 +23,7 @@ public class UrgentReport
     public string? ScreenshotPath { get; set; }
     public string? ScreenshotS3Key { get; set; }
     public int EmployeeId { get; set; }
+    public Luxira.Api.Features.Employees.Models.Employee? Employee { get; set; }
     public string Status { get; set; } = "Open";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? HandledByAdminName { get; set; }

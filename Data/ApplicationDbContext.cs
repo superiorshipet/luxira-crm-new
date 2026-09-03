@@ -44,6 +44,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<OrderReportOrder> OrderReportOrders => Set<OrderReportOrder>();
     public DbSet<OrderBonusConfiguration> OrderBonusConfigurations => Set<OrderBonusConfiguration>();
     public DbSet<OrderPost> OrderPosts => Set<OrderPost>();
+    public DbSet<OrderPostImage> OrderPostImages => Set<OrderPostImage>();
+    public DbSet<OrderMetaActionClick> OrderMetaActionClicks => Set<OrderMetaActionClick>();
     public DbSet<OrderFollowUpRequest> OrderFollowUpRequests => Set<OrderFollowUpRequest>();
     public DbSet<PotentialOrder> PotentialOrders => Set<PotentialOrder>();
     public DbSet<UrgentReport> UrgentReports => Set<UrgentReport>();

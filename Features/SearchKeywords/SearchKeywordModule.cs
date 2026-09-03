@@ -10,5 +10,7 @@ public class SearchKeywordModule : IModule
     {
         services.AddScoped<SearchKeywordRepository>();
         services.AddScoped<SearchKeywordService>();
+        services.AddScoped<Services.ImageSearchService>();
+        services.AddScoped<Services.ImageVisionService>();
     }
 }
