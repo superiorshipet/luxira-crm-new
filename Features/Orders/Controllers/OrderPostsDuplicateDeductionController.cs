@@ -22,6 +22,7 @@ public class OrderPostsDuplicateDeductionController : ControllerBase
     }
 
     [HttpGet("ProblemDeductionInfoV2")]
+    [HttpGet("/ProblemDeductionInfoV2")]
     public async Task<IActionResult> ProblemDeductionInfoV2([FromQuery] int orderId, CancellationToken ct)
     {
         var order = await _context.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orderId, ct);
@@ -46,6 +47,7 @@ public class OrderPostsDuplicateDeductionController : ControllerBase
     }
 
     [HttpPost("CreateProblemDeductionV2")]
+    [HttpPost("/CreateProblemDeductionV2")]
     public async Task<IActionResult> CreateProblemDeductionV2([FromBody] CreateProblemDeductionRequest request, CancellationToken ct)
     {
         var violation = new EmployeeViolation
