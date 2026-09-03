@@ -48,6 +48,19 @@ public class MainProduct
     public ManufacturingCompany? ManufacturingCompany { get; set; }
 }
 
+public class ProductPriceEditHistory
+{
+    public int Id { get; set; }
+    public int MainProductId { get; set; }
+    public MainProduct? MainProduct { get; set; }
+    public string? EditedByUserId { get; set; }
+    public string? EditedByName { get; set; }
+    public DateTime EditedAt { get; set; }
+    public string? FieldName { get; set; }
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+}
+
 /// <summary>
 /// Legacy product-media catalogue. It is related to a store and product name,
 /// not to a MainProduct row.
@@ -164,6 +177,7 @@ public class StoreCodeEditHistory
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? CreatedByUserId { get; set; }
     public string? CreatedByName { get; set; }
+    public StoreCodeFolder? StoreCodeFolder { get; set; }
 }
 
 public class StoreCodeStoreGroup

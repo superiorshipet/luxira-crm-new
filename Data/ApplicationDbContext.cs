@@ -52,6 +52,7 @@ public class ApplicationDbContext : DbContext
 
     // Employees & HR
     public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<DevelopmentTaskCategoryAssignmentRule> DevelopmentTaskCategoryAssignmentRules => Set<DevelopmentTaskCategoryAssignmentRule>();
     public DbSet<EmployeeAttendanceLog> EmployeeAttendanceLogs => Set<EmployeeAttendanceLog>();
     public DbSet<EmployeeWorkShift> EmployeeWorkShifts => Set<EmployeeWorkShift>();
     public DbSet<EmployeeActivityLog> EmployeeActivityLogs => Set<EmployeeActivityLog>();
@@ -84,6 +85,7 @@ public class ApplicationDbContext : DbContext
     // Manufacturing & Products
     public DbSet<ManufacturingCompany> ManufacturingCompanies => Set<ManufacturingCompany>();
     public DbSet<MainProduct> MainProducts => Set<MainProduct>();
+    public DbSet<ProductPriceEditHistory> ProductPriceEditHistories => Set<ProductPriceEditHistory>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<ProductImageDraft> ProductImageDrafts => Set<ProductImageDraft>();
     public DbSet<ProductImageUserPin> ProductImageUserPins => Set<ProductImageUserPin>();
@@ -105,7 +107,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<MarketingLead> MarketingLeads => Set<MarketingLead>();
     public DbSet<StoreScript> StoreScripts => Set<StoreScript>();
     public DbSet<WebsiteDomain> WebsiteDomains => Set<WebsiteDomain>();
+    public DbSet<WebsiteDomainEditLog> WebsiteDomainEditLogs => Set<WebsiteDomainEditLog>();
     public DbSet<VideoLink> VideoLinks => Set<VideoLink>();
+    public DbSet<VideoLinkChangeHistory> VideoLinkChangeHistories => Set<VideoLinkChangeHistory>();
 
     // Communication & Messages
     public DbSet<HelpCenterChatMessage> HelpCenterChatMessages => Set<HelpCenterChatMessage>();
@@ -125,6 +129,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();
     public DbSet<PasswordEmail> PasswordEmails => Set<PasswordEmail>();
     public DbSet<PasswordEmailHistory> PasswordEmailHistories => Set<PasswordEmailHistory>();
+    public DbSet<PasswordPageType> PasswordPageTypes => Set<PasswordPageType>();
+    public DbSet<StorePasswordPage> StorePasswordPages => Set<StorePasswordPage>();
+    public DbSet<PasswordPageChangeLog> PasswordPageChangeLogs => Set<PasswordPageChangeLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

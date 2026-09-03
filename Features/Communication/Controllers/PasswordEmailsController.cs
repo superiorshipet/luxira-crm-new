@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Luxira.Api.Features.Communication.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,ExecutiveDirector,Administrator")]
+[Authorize(Roles = "Admin,ExecutiveDirector")]
 [Route("api/v1/communication/password-emails")]
 [Route("PasswordEmails")]
 public sealed class PasswordEmailsController(PasswordEmailService service) : ControllerBase
@@ -20,6 +20,10 @@ public sealed class PasswordEmailsController(PasswordEmailService service) : Con
         CancellationToken ct) =>
         Ok(await service.ListAsync(false, emailFilter, storeId, ct));
 
+    [HttpGet("/PasswordPages/PasswordEmails_Create")]
+    [HttpGet("/PasswordEmails/Create")]
+    public IActionResult CreateForm() => Ok(new { success = true });
+
     [HttpGet("{id:int}")]
     [HttpGet("/PasswordEmails/Get")]
     public async Task<ActionResult<PasswordEmailDto>> Get(
@@ -29,6 +33,7 @@ public sealed class PasswordEmailsController(PasswordEmailService service) : Con
 
     [HttpPost]
     [HttpPost("/PasswordPages/PasswordEmails_Create")]
+    [HttpPost("/PasswordEmails/Create")]
     public async Task<ActionResult<PasswordEmailDto>> Create(
         [FromBody] SavePasswordEmailRequest request,
         CancellationToken ct)

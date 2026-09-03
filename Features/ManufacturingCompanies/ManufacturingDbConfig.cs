@@ -38,6 +38,17 @@ public class MainProductDbConfig : IDbConfig<MainProduct>
     }
 }
 
+public class ProductPriceEditHistoryDbConfig : IDbConfig<ProductPriceEditHistory>
+{
+    public void Configure(EntityTypeBuilder<ProductPriceEditHistory> builder)
+    {
+        builder.ToTable("ProductPriceEditHistories");
+        builder.HasKey(history => history.Id);
+        builder.HasIndex(history => history.MainProductId);
+        builder.HasOne(history => history.MainProduct).WithMany().HasForeignKey(history => history.MainProductId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public class ProductImageDbConfig : IDbConfig<ProductImage>
 {
     public void Configure(EntityTypeBuilder<ProductImage> builder)
@@ -123,10 +134,13 @@ public class StoreCodeFolderDbConfig : IDbConfig<StoreCodeFolder>
         builder.ToTable("StoreCodeFolders");
         builder.HasKey(s => s.Id);
         builder.Property(s => s.FolderName).HasMaxLength(150).IsRequired();
-        builder.Property(s => s.PageType).HasMaxLength(100).IsRequired();
+        builder.Property(s => s.PageType).HasMaxLength(100).HasDefaultValue(string.Empty).IsRequired();
         builder.Property(s => s.CreatedByUserId).HasMaxLength(450);
         builder.Property(s => s.UpdatedByUserId).HasMaxLength(450);
         builder.Property(s => s.DeletedByUserId).HasMaxLength(450);
+        builder.HasIndex(s => s.IsDeleted).HasDatabaseName("IX_StoreCodeFolders_IsDeleted");
+        builder.HasIndex(s => s.ManufacturingCompanyId).HasDatabaseName("IX_StoreCodeFolders_ManufacturingCompanyId");
+        builder.HasOne(s => s.ManufacturingCompany).WithMany().HasForeignKey(s => s.ManufacturingCompanyId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -136,6 +150,9 @@ public class StoreCodeEditHistoryDbConfig : IDbConfig<StoreCodeEditHistory>
     {
         builder.ToTable("StoreCodeEditHistories");
         builder.HasKey(h => h.Id);
+        builder.HasIndex(h => new { h.ManufacturingCompanyId, h.CreatedAt }).HasDatabaseName("IX_StoreCodeEditHistories_Company_CreatedAt");
+        builder.HasIndex(h => new { h.StoreCodeFolderId, h.CreatedAt }).HasDatabaseName("IX_StoreCodeEditHistories_Folder_CreatedAt");
+        builder.HasOne(h => h.StoreCodeFolder).WithMany(folder => folder.EditHistories).HasForeignKey(h => h.StoreCodeFolderId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -147,6 +164,7 @@ public class StoreCodeStoreGroupDbConfig : IDbConfig<StoreCodeStoreGroup>
         builder.HasKey(group => group.Id);
         builder.Property(group => group.CreatedByUserId).HasMaxLength(450);
         builder.Property(group => group.CreatedByName).HasMaxLength(250);
+        builder.HasIndex(group => group.ManufacturingCompanyId).IsUnique().HasDatabaseName("IX_StoreCodeStoreGroups_ManufacturingCompanyId");
         builder.HasOne(group => group.ManufacturingCompany).WithMany().HasForeignKey(group => group.ManufacturingCompanyId).OnDelete(DeleteBehavior.Restrict);
     }
 }

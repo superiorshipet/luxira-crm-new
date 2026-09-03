@@ -28,6 +28,25 @@ public class InvoiceController : ControllerBase
     [HttpGet("GetInvoices")]
     public IActionResult GetInvoiceTemplates() => Ok(Templates);
 
+    [HttpGet("/Invoice/FlareInvoice")]
+    public IActionResult FlareInvoice() => Template("Flare");
+    [HttpGet("/Invoice/LoxxKingInvoice")]
+    public IActionResult LoxxKingInvoice() => Template("LoxxKing");
+    [HttpGet("/Invoice/LotusBlueInvoice")]
+    public IActionResult LotusBlueInvoice() => Template("LotusBlue");
+    [HttpGet("/Invoice/HayatMakeupInvoice")]
+    public IActionResult HayatMakeupInvoice() => Template("HayatMakeup");
+    [HttpGet("/Invoice/AirobicsInvoice")]
+    public IActionResult AirobicsInvoice() => Template("Airobics");
+    [HttpGet("/Invoice/LavaInvoice")]
+    public IActionResult LavaInvoice() => Template("Lava");
+    [HttpGet("/Invoice/LioraInvoice")]
+    public IActionResult LioraInvoice() => Template("Liora");
+    [HttpGet("/Invoice/FlareInvoiceClean")]
+    public IActionResult FlareInvoiceClean() => Template("FlareClean");
+
+    private OkObjectResult Template(string name) => Ok(new { template = name });
+
     [HttpPost]
     [HttpPost("Create")]
     public async Task<ActionResult<InvoicePreviewDto>> CreatePreview(

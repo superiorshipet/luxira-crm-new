@@ -225,3 +225,53 @@ public class PasswordEmailHistoryDbConfig : IDbConfig<PasswordEmailHistory>
         builder.Property(history => history.ActionType).HasMaxLength(30).IsRequired();
     }
 }
+
+public class PasswordPageTypeDbConfig : IDbConfig<PasswordPageType>
+{
+    public void Configure(EntityTypeBuilder<PasswordPageType> builder)
+    {
+        builder.ToTable("PasswordPageTypes");
+        builder.HasKey(type => type.Id);
+        builder.Property(type => type.Name).HasMaxLength(100).IsRequired();
+        builder.Property(type => type.IconClass).HasMaxLength(150);
+    }
+}
+
+public class StorePasswordPageDbConfig : IDbConfig<StorePasswordPage>
+{
+    public void Configure(EntityTypeBuilder<StorePasswordPage> builder)
+    {
+        builder.ToTable("StorePasswordPages");
+        builder.HasKey(page => page.Id);
+        builder.Property(page => page.PageName).HasMaxLength(200).IsRequired();
+        builder.Property(page => page.PageImageS3Key).HasMaxLength(450);
+        builder.Property(page => page.Email).HasMaxLength(250);
+        builder.Property(page => page.Password).HasMaxLength(500).IsRequired();
+        builder.Property(page => page.PhoneNumber).HasMaxLength(50);
+        builder.Property(page => page.PageStatus).HasMaxLength(50).IsRequired();
+        builder.Property(page => page.Tasks).HasMaxLength(2000);
+        builder.Property(page => page.PageStatusName).HasMaxLength(250);
+        builder.Property(page => page.CreatedByUserId).HasMaxLength(450);
+        builder.Property(page => page.UpdatedByUserId).HasMaxLength(450);
+        builder.Property(page => page.DeletedByUserId).HasMaxLength(450);
+        builder.HasOne(page => page.PasswordPageType).WithMany(type => type.StorePasswordPages).HasForeignKey(page => page.PasswordPageTypeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(page => page.ManufacturingCompany).WithMany().HasForeignKey(page => page.ManufacturingCompanyId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class PasswordPageChangeLogDbConfig : IDbConfig<PasswordPageChangeLog>
+{
+    public void Configure(EntityTypeBuilder<PasswordPageChangeLog> builder)
+    {
+        builder.ToTable("PasswordPageChangeLogs");
+        builder.HasKey(log => log.Id);
+        builder.Property(log => log.PageName).HasMaxLength(200).IsRequired();
+        builder.Property(log => log.ActionType).HasMaxLength(100).IsRequired();
+        builder.Property(log => log.FieldName).HasMaxLength(100).IsRequired();
+        builder.Property(log => log.OldValue).HasMaxLength(2000);
+        builder.Property(log => log.NewValue).HasMaxLength(2000);
+        builder.Property(log => log.ChangedByUserId).HasMaxLength(450);
+        builder.Property(log => log.ChangedByName).HasMaxLength(250);
+        builder.HasOne(log => log.StorePasswordPage).WithMany(page => page.ChangeLogs).HasForeignKey(log => log.StorePasswordPageId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

@@ -53,6 +53,7 @@ public class WebsiteDomain
     public int Id { get; set; }
     public string Domain { get; set; } = string.Empty;
     public int ManufacturingCompanyId { get; set; }
+    public Luxira.Api.Features.ManufacturingCompanies.Models.ManufacturingCompany? ManufacturingCompany { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
@@ -62,11 +63,29 @@ public class WebsiteDomain
     public bool IsPinned { get; set; }
 }
 
+public class WebsiteDomainEditLog
+{
+    public int Id { get; set; }
+    public int WebsiteDomainId { get; set; }
+    public string OldDomain { get; set; } = string.Empty;
+    public string NewDomain { get; set; } = string.Empty;
+    public int OldManufacturingCompanyId { get; set; }
+    public int NewManufacturingCompanyId { get; set; }
+    public bool OldIsActive { get; set; }
+    public bool NewIsActive { get; set; }
+    public DateTime EditedAt { get; set; }
+    public string EditedByUserId { get; set; } = string.Empty;
+    public bool IsRestored { get; set; }
+    public DateTime? RestoredAt { get; set; }
+    public string RestoredByUserId { get; set; } = string.Empty;
+}
+
 public class VideoLink
 {
     public int Id { get; set; }
     public string Url { get; set; } = string.Empty;
     public int ManufacturingCompanyId { get; set; }
+    public Luxira.Api.Features.ManufacturingCompanies.Models.ManufacturingCompany? ManufacturingCompany { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? CreatedByUserId { get; set; }
     public string? CreatedByName { get; set; }
@@ -77,4 +96,20 @@ public class VideoLink
     public DateTime? DeletedAt { get; set; }
     public string? DeletedByUserId { get; set; }
     public string? DeletedByName { get; set; }
+}
+
+public class VideoLinkChangeHistory
+{
+    public int Id { get; set; }
+    public int VideoLinkId { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public int? OldManufacturingCompanyId { get; set; }
+    public int? NewManufacturingCompanyId { get; set; }
+    public string? OldStoreName { get; set; }
+    public string? NewStoreName { get; set; }
+    public string? OldUrl { get; set; }
+    public string? NewUrl { get; set; }
+    public DateTime ChangedAt { get; set; }
+    public string? ChangedByUserId { get; set; }
+    public string? ChangedByName { get; set; }
 }

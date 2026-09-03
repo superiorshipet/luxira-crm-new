@@ -44,6 +44,9 @@ public class ProductShipmentInvoiceController : ControllerBase
 
         return Content(html, "text/html");
     }
+
+    [HttpGet("/ProductShipmentInvoice/CreatePriceOffer")]
+    public IActionResult CreatePriceOfferForm() => Ok(new { products = Array.Empty<object>() });
 }
 
 public record CreatePriceOfferRequest(string DeliveryCompanyName, List<PriceOfferItem> Products);

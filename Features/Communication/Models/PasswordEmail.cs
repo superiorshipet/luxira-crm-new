@@ -42,3 +42,53 @@ public class PasswordEmailHistory
     public string? ChangedByUserId { get; set; }
     public string? ChangedByName { get; set; }
 }
+
+public class PasswordPageType
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? IconClass { get; set; }
+    public bool IsActive { get; set; } = true;
+    public ICollection<StorePasswordPage> StorePasswordPages { get; set; } = [];
+}
+
+public class StorePasswordPage
+{
+    public int Id { get; set; }
+    public string PageName { get; set; } = string.Empty;
+    public int PasswordPageTypeId { get; set; }
+    public PasswordPageType? PasswordPageType { get; set; }
+    public string? PageImageUrl { get; set; }
+    public string? PageImageS3Key { get; set; }
+    public string? Email { get; set; }
+    public string Password { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
+    public int ManufacturingCompanyId { get; set; }
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
+    public string PageStatus { get; set; } = "نشطه";
+    public string? Tasks { get; set; }
+    public string? PageStatusName { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedByUserId { get; set; }
+    public ICollection<PasswordPageChangeLog> ChangeLogs { get; set; } = [];
+}
+
+public class PasswordPageChangeLog
+{
+    public int Id { get; set; }
+    public int StorePasswordPageId { get; set; }
+    public StorePasswordPage? StorePasswordPage { get; set; }
+    public string PageName { get; set; } = string.Empty;
+    public string ActionType { get; set; } = string.Empty;
+    public string FieldName { get; set; } = string.Empty;
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public DateTime ChangedAt { get; set; }
+    public string? ChangedByUserId { get; set; }
+    public string? ChangedByName { get; set; }
+}

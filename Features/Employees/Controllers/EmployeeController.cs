@@ -7,6 +7,7 @@ using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Utils.Time;
 using Luxira.Api.Infrastructure.S3;
+using Luxira.Api.Features.Auth.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -445,6 +446,73 @@ public class EmployeeController : ControllerBase
         success = true,
         items = await _context.EmployeeTaskAssignments.AsNoTracking().OrderByDescending(item => item.AssignedAt).ToListAsync(ct)
     });
+
+    [HttpGet("/Employee/GetDevelopmentTaskCategoryAssignmentRules")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> GetDevelopmentTaskCategoryAssignmentRules(CancellationToken ct) => Ok(new
+    {
+        success = true,
+        rules = await _context.DevelopmentTaskCategoryAssignmentRules.AsNoTracking()
+            .OrderBy(rule => rule.Category)
+            .Select(rule => new { category = rule.Category, employeeId = rule.EmployeeId, employeeName = rule.EmployeeName, updatedAt = rule.UpdatedAt })
+            .ToListAsync(ct)
+    });
+
+    [HttpPost("/Employee/SetDevelopmentTaskCategoryAssignmentRule")]
+    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    public async Task<IActionResult> SetDevelopmentTaskCategoryAssignmentRule([FromForm] int category, [FromForm] int employeeId, CancellationToken ct)
+    {
+        if (category is not (1 or 2 or 3 or 6))
+            return BadRequest(new { success = false, message = "اختاري تصنيف مهام صحيح." });
+        if (employeeId <= 0)
+        {
+            await _context.DevelopmentTaskCategoryAssignmentRules.Where(rule => rule.Category == category).ExecuteDeleteAsync(ct);
+            return Ok(new { success = true, category, employeeId = 0, employeeName = string.Empty, affectedTasks = 0, message = "تم إلغاء إلزام التصنيف بأي موظف." });
+        }
+
+        var employee = await _context.Employees.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == employeeId, ct);
+        if (employee is null || string.IsNullOrWhiteSpace(employee.ApplicationUserId))
+            return NotFound(new { success = false, message = "لم يتم العثور على الموظف المختار." });
+        var validRole = await (from userRole in _context.UserRoles.AsNoTracking()
+                               join role in _context.Roles.AsNoTracking() on userRole.RoleId equals role.Id
+                               where userRole.UserId == employee.ApplicationUserId
+                                   && (role.Name == "SoftwareDeveloper" || role.Name == "MarketingDepartment")
+                               select userRole.UserId).AnyAsync(ct);
+        if (!validRole)
+            return BadRequest(new { success = false, message = "الموظف المختار يجب أن تكون صلاحيته مطور برمجيات أو قسم التسويق." });
+        var userActive = await _context.Users.AsNoTracking().AnyAsync(user => user.Id == employee.ApplicationUserId
+            && (!user.LockoutEnd.HasValue || user.LockoutEnd <= DateTimeOffset.UtcNow), ct);
+        if (employee.IsDeleted || !employee.IsActive || !userActive)
+            return BadRequest(new { success = false, message = "حساب الموظف المختار غير نشط." });
+
+        var employeeName = string.IsNullOrWhiteSpace(employee.DisplayName) ? employee.Name.Trim() : employee.DisplayName.Trim();
+        var now = DateTimeOffset.UtcNow;
+        var userId = User.GetUserId();
+        var userName = User.Identity?.Name;
+        var rule = await _context.DevelopmentTaskCategoryAssignmentRules.FirstOrDefaultAsync(item => item.Category == category, ct);
+        if (rule is null)
+        {
+            rule = new DevelopmentTaskCategoryAssignmentRule { Category = category };
+            _context.DevelopmentTaskCategoryAssignmentRules.Add(rule);
+        }
+        rule.EmployeeId = employeeId;
+        rule.EmployeeName = employeeName;
+        rule.UpdatedByUserId = userId;
+        rule.UpdatedByName = userName;
+        rule.UpdatedAt = now;
+        await _context.SaveChangesAsync(ct);
+
+        var affectedTasks = await _context.Database.ExecuteSqlInterpolatedAsync($@"
+MERGE dbo.DevelopmentTaskAssignments AS target
+USING (SELECT Id AS TaskId FROM dbo.SystemDevelopmentTasks WHERE Category = {category} AND IsDeleted = 0 AND IsCompleted = 0) AS source
+ON target.TaskId = source.TaskId
+WHEN MATCHED THEN UPDATE SET EmployeeId = {employeeId}, EmployeeName = {employeeName}, AssignedAt = {now}, AssignedByUserId = {userId}, AssignedByName = {userName}, DeveloperStatus = 0, StartedAt = NULL, TimerStartedManually = 0, CompletedAt = NULL
+WHEN NOT MATCHED THEN INSERT (TaskId, EmployeeId, EmployeeName, AssignedAt, AssignedByUserId, AssignedByName, DeveloperStatus, StartedAt, TimerStartedManually, CompletedAt)
+VALUES (source.TaskId, {employeeId}, {employeeName}, {now}, {userId}, {userName}, 0, NULL, 0, NULL);", ct);
+        return Ok(new { success = true, category, employeeId, employeeName, affectedTasks, message = "تم إلزام التصنيف بالموظف المختار وتحديث المهام الحالية." });
+    }
 
     private static List<int> ParseIds(string? value) => (value ?? string.Empty)
         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

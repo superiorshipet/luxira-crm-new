@@ -258,3 +258,15 @@ public class ScreenRecordDbConfig : IDbConfig<ScreenRecord>
         builder.Property(s => s.VideoS3Key).HasMaxLength(450);
     }
 }
+
+public class DevelopmentTaskCategoryAssignmentRuleDbConfig : IDbConfig<DevelopmentTaskCategoryAssignmentRule>
+{
+    public void Configure(EntityTypeBuilder<DevelopmentTaskCategoryAssignmentRule> builder)
+    {
+        builder.ToTable("DevelopmentTaskCategoryAssignmentRules");
+        builder.HasKey(rule => rule.Category);
+        builder.Property(rule => rule.EmployeeName).HasMaxLength(250).IsRequired();
+        builder.Property(rule => rule.UpdatedByUserId).HasMaxLength(450);
+        builder.Property(rule => rule.UpdatedByName).HasMaxLength(250);
+    }
+}

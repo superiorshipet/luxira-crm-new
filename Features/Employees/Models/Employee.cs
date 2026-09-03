@@ -359,6 +359,16 @@ public enum EmployeeTransactionType
     Overtime = 3,
 }
 
+public class DevelopmentTaskCategoryAssignmentRule
+{
+    public int Category { get; set; }
+    public int EmployeeId { get; set; }
+    public string EmployeeName { get; set; } = string.Empty;
+    public string? UpdatedByUserId { get; set; }
+    public string? UpdatedByName { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 public class ScreenRecord
 {
     public int Id { get; set; }
