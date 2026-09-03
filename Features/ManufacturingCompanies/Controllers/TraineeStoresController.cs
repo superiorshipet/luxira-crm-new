@@ -66,7 +66,7 @@ public class TraineeStoresController : ControllerBase
     [HttpPost("Delete/{id:int}")]
     [HttpDelete("{id:int}")]
     [HttpPost("/TraineeStores/Delete")]
-    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken ct = default)
+    public async Task<IActionResult> Delete([RouteOrRequest] int id, CancellationToken ct = default)
     {
         var folder = await _context.StoreCodeFolders.FirstOrDefaultAsync(f => f.Id == id, ct);
         if (folder == null) return NotFound("Store folder not found.");

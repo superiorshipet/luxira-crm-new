@@ -111,7 +111,7 @@ public sealed class DeveloperTasksController(ApplicationDbContext context) : Con
     [HttpPost("{id:int}/complete")]
     [HttpPost("CompleteTask/{id:int}")]
     public async Task<IActionResult> CompleteTask(
-        [FromRoute] int id,
+        [RouteOrRequest] int id,
         [FromBody] CompleteEmployeeTaskRequest? request,
         CancellationToken ct)
     {
@@ -138,7 +138,7 @@ public sealed class DeveloperTasksController(ApplicationDbContext context) : Con
 
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteTask([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> DeleteTask([RouteOrRequest] int id, CancellationToken ct)
     {
         var task = await context.EmployeeTasks.FirstOrDefaultAsync(item => item.Id == id, ct);
         if (task is null) throw new NotFoundException("Task was not found.");

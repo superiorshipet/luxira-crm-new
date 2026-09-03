@@ -105,7 +105,7 @@ public class VideoLinksController : ControllerBase
 
     [HttpPost("Delete/{id:int}")]
     [HttpDelete("{id:int}")]
-    public Task<IActionResult> DeleteById([FromRoute] int id, CancellationToken ct = default) => DeleteCore(id, ct);
+    public Task<IActionResult> DeleteById([RouteOrRequest] int id, CancellationToken ct = default) => DeleteCore(id, ct);
 
     private async Task<IActionResult> DeleteCore(int id, CancellationToken ct)
     {

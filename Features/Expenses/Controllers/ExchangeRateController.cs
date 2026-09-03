@@ -40,7 +40,7 @@ public class ExchangeRateController : ControllerBase
 
     [HttpGet("{id:int}")]
     [HttpGet("/ExchangeRate/Edit/{id:int}")]
-    public async Task<IActionResult> GetById([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> GetById([RouteOrRequest] int id, CancellationToken ct)
     {
         var rate = await _context.ExchangeRates.FirstOrDefaultAsync(r => r.Id == id, ct);
         if (rate == null) return NotFound("Exchange rate not found.");
@@ -68,7 +68,7 @@ public class ExchangeRateController : ControllerBase
     [HttpPut("{id:int}")]
     [HttpPost("Edit/{id:int}")]
     [HttpPost("/ExchangeRate/Edit")]
-    public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateExchangeRateRequest request, CancellationToken ct)
+    public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateExchangeRateRequest request, CancellationToken ct)
     {
         var rate = await _context.ExchangeRates.FirstOrDefaultAsync(r => r.Id == id, ct);
         if (rate == null) return NotFound("Exchange rate not found.");

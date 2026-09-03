@@ -83,7 +83,7 @@ public class EmployeeController : ControllerBase
 
     [HttpGet("{id:int}/basic-modal")]
     [HttpGet("/Employee/GetEmployeeBasicModalData")]
-    public async Task<IActionResult> GetEmployeeBasicModalData([FromRoute] int id, [FromQuery] int? employeeId, CancellationToken ct)
+    public async Task<IActionResult> GetEmployeeBasicModalData([RouteOrRequest] int id, [FromQuery] int? employeeId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (employeeId ?? 0);
         var employee = await _context.Employees.FirstOrDefaultAsync(e => e.Id == targetId, ct);
@@ -119,7 +119,7 @@ public class EmployeeController : ControllerBase
 
     [HttpGet("{id:int}/permissions-modal")]
     [HttpGet("/Employee/GetEmployeePermissionsModalData")]
-    public async Task<IActionResult> GetEmployeePermissionsModalData([FromRoute] int id, [FromQuery] int? employeeId, CancellationToken ct)
+    public async Task<IActionResult> GetEmployeePermissionsModalData([RouteOrRequest] int id, [FromQuery] int? employeeId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (employeeId ?? 0);
         var employee = await _context.Employees

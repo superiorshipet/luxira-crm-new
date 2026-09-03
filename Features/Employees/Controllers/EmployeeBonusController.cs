@@ -111,7 +111,7 @@ public class EmployeeBonusController : ControllerBase
     [HttpPost("undo-pay/{paymentId:int}")]
     [HttpPost("/EmployeeBonus/UndoPay")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
-    public async Task<IActionResult> UndoPay([FromRoute] int paymentId, [FromQuery] int? id, CancellationToken ct)
+    public async Task<IActionResult> UndoPay([RouteOrRequest] int paymentId, [FromQuery] int? id, CancellationToken ct)
     {
         var targetId = paymentId > 0 ? paymentId : (id ?? 0);
         var payment = await _context.EmployeeBonusPayments.FirstOrDefaultAsync(p => p.Id == targetId, ct);

@@ -89,7 +89,7 @@ public class SalaryController : ControllerBase
     [HttpPost("delete-payment/{paymentId:int}")]
     [HttpDelete("delete-payment/{paymentId:int}")]
     [HttpPost("/EmployeeSalaries/DeleteSalaryPayment")]
-    public async Task<IActionResult> DeleteSalaryPayment([FromRoute] int paymentId, [FromQuery] int? id, CancellationToken ct)
+    public async Task<IActionResult> DeleteSalaryPayment([RouteOrRequest] int paymentId, [FromQuery] int? id, CancellationToken ct)
     {
         var targetId = paymentId > 0 ? paymentId : (id ?? 0);
         var payment = await _context.EmployeeSalaryPayments.FirstOrDefaultAsync(p => p.Id == targetId, ct);
@@ -133,7 +133,7 @@ public class SalaryController : ControllerBase
     [HttpPost("permanent-delete/{id:int}")]
     [HttpDelete("permanent-delete/{id:int}")]
     [HttpPost("/EmployeeSalaries/PermanentDeleteSalaryPayment")]
-    public async Task<IActionResult> PermanentDeleteSalaryPayment([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> PermanentDeleteSalaryPayment([RouteOrRequest] int id, CancellationToken ct)
     {
         var payment = await _context.EmployeeSalaryPayments
             .FirstOrDefaultAsync(p => p.Id == id && p.IsDeleted && !p.IsPermanentlyDeleted, ct);
@@ -169,7 +169,7 @@ public class SalaryController : ControllerBase
     }
 
     [HttpPost("restore/{id:int}")]
-    public async Task<IActionResult> Restore([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> Restore([RouteOrRequest] int id, CancellationToken ct)
     {
         var payment = await _context.EmployeeSalaryPayments
             .FirstOrDefaultAsync(item => item.Id == id && item.IsDeleted && !item.IsPermanentlyDeleted, ct);

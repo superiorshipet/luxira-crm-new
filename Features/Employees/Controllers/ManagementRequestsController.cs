@@ -63,7 +63,7 @@ public class ManagementRequestsController : ControllerBase
     [HttpPost("ReviewRequest/{id:int}")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
     public async Task<IActionResult> ReviewRequest(
-        [FromRoute] int id,
+        [RouteOrRequest] int id,
         [FromBody] ReviewManagementRequest request,
         CancellationToken ct)
     {

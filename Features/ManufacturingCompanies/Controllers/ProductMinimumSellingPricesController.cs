@@ -71,7 +71,7 @@ public class CountryMinimumPricesController : ControllerBase
     [HttpGet("Edit/{id:int}")]
     [HttpGet("/CountryMinimumPrices/Edit")]
     public async Task<IActionResult> Edit(
-        [FromRoute] int? id,
+        [RouteOrRequest] int? id,
         [FromQuery(Name = "id")] int? queryId,
         CancellationToken ct)
     {
@@ -87,7 +87,7 @@ public class CountryMinimumPricesController : ControllerBase
     [HttpPost("Edit/{id:int}")]
     [HttpPost("/CountryMinimumPrices/Edit")]
     public async Task<IActionResult> Edit(
-        [FromRoute] int? id,
+        [RouteOrRequest] int? id,
         [FromQuery(Name = "id")] int? queryId,
         [FromBody] CountryMinimumPriceRequest request,
         CancellationToken ct)
@@ -164,7 +164,7 @@ public class ProductMinimumSellingPricesController : ControllerBase
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
     [HttpPost("/ProductMinimumSellingPrices/Edit")]
-    public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateMinimumPriceRequest request, CancellationToken ct)
+    public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateMinimumPriceRequest request, CancellationToken ct)
     {
         var minPrice = await _context.ProductMinimumSellingPrices.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (minPrice == null) return NotFound("Minimum price configuration not found.");
@@ -182,7 +182,7 @@ public class ProductMinimumSellingPricesController : ControllerBase
     [HttpPost("Delete/{id:int}")]
     [HttpDelete("{id:int}")]
     [HttpPost("/ProductMinimumSellingPrices/Delete")]
-    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> Delete([RouteOrRequest] int id, CancellationToken ct)
     {
         var minPrice = await _context.ProductMinimumSellingPrices.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (minPrice == null) return NotFound("Minimum price configuration not found.");

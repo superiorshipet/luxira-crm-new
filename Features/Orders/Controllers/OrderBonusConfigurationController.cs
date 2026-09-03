@@ -71,7 +71,7 @@ public class OrderBonusConfigurationController : ControllerBase
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
     [HttpPost("/OrderBonusConfiguration/Edit")]
-    public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateOrderBonusConfigRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateOrderBonusConfigRequest request, CancellationToken ct = default)
     {
         var config = await _context.OrderBonusConfigurations.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (config == null) return NotFound("Bonus configuration not found.");

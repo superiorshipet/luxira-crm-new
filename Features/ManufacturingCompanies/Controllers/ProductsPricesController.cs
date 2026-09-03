@@ -244,7 +244,7 @@ public class ProductsPricesController : ControllerBase
 
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateProductPriceRequest request, CancellationToken ct)
+    public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateProductPriceRequest request, CancellationToken ct)
     {
         var product = await _context.MainProducts.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product == null) return NotFound("Product not found.");
@@ -283,7 +283,7 @@ public class ProductsPricesController : ControllerBase
 
     [HttpPost("Delete/{id:int}")]
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> Delete([RouteOrRequest] int id, CancellationToken ct)
     {
         var product = await _context.MainProducts.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product == null) return NotFound("Product not found.");
@@ -306,7 +306,7 @@ public class ProductsPricesController : ControllerBase
     }
 
     [HttpPost("Restore/{id:int}")]
-    public async Task<IActionResult> Restore([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> Restore([RouteOrRequest] int id, CancellationToken ct)
     {
         var product = await _context.MainProducts.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product == null) return NotFound("Product not found.");

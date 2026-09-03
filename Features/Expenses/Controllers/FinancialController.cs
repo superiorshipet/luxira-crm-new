@@ -471,7 +471,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("DownloadOrderReport/{orderReportId:int}")]
     [HttpGet("/Financial/DownloadOrderReport")]
-    public async Task<IActionResult> DownloadOrderReport([FromRoute] int orderReportId, [FromQuery] int? id, CancellationToken ct)
+    public async Task<IActionResult> DownloadOrderReport([RouteOrRequest] int orderReportId, [FromQuery] int? id, CancellationToken ct)
     {
         var reportId = orderReportId > 0 ? orderReportId : (id ?? 0);
         var report = await _context.OrderReports

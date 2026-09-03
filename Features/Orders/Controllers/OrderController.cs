@@ -79,7 +79,7 @@ public class OrderController : ControllerBase
     [HttpPut("{id:int}")]
     [HttpPost("Edit/{id:int}")]
     [HttpPost("/Order/Edit/{id:int}")]
-    public async Task<IActionResult> EditOrder([FromRoute] int id, [FromBody] CreateOrderRequest request, CancellationToken ct)
+    public async Task<IActionResult> EditOrder([RouteOrRequest] int id, [FromBody] CreateOrderRequest request, CancellationToken ct)
     {
         var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == id, ct);
         if (order == null) return NotFound("Order not found.");
@@ -106,7 +106,7 @@ public class OrderController : ControllerBase
     [HttpPut("{id:int}/status")]
     [HttpPost("/Order/UpdateStatus/{id:int}")]
     public async Task<ActionResult<OrderDto>> UpdateStatus(
-        [FromRoute] int id,
+        [RouteOrRequest] int id,
         [FromBody] UpdateOrderStatusRequest request,
         CancellationToken ct)
     {
@@ -319,7 +319,7 @@ public class OrderController : ControllerBase
 
     [HttpGet("pricing-selection/{id:int}")]
     [HttpGet("/Order/GetOrderPricingSelection")]
-    public async Task<IActionResult> GetOrderPricingSelection([FromRoute] int id, [FromQuery] int? orderId, CancellationToken ct)
+    public async Task<IActionResult> GetOrderPricingSelection([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
         var order = await _context.Orders
@@ -447,7 +447,7 @@ public class OrderController : ControllerBase
 
     [HttpPost("status-selection/clear/{orderId:int}")]
     [HttpPost("/Order/ClearStatusUpdateSelection")]
-    public async Task<IActionResult> ClearStatusUpdateSelection([FromRoute] int orderId, CancellationToken ct)
+    public async Task<IActionResult> ClearStatusUpdateSelection([RouteOrRequest] int orderId, CancellationToken ct)
     {
         var key = StatusSelectionKey();
         var selections = await _cache.GetOrCreateAsync(
@@ -507,7 +507,7 @@ public class OrderController : ControllerBase
 
     [HttpPost("{id:int}/move-to-yesterday-ratings")]
     [HttpPost("/Order/MoveOrderToYesterdayRatings")]
-    public async Task<IActionResult> MoveOrderToYesterdayRatings([FromRoute] int id, [FromQuery] int? orderId, CancellationToken ct)
+    public async Task<IActionResult> MoveOrderToYesterdayRatings([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
         var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == targetId, ct);
@@ -520,7 +520,7 @@ public class OrderController : ControllerBase
 
     [HttpPost("{id:int}/block-duplicate")]
     [HttpPost("/Order/BlockDuplicateOrder")]
-    public async Task<IActionResult> BlockDuplicateOrder([FromRoute] int id, [FromQuery] int? orderId, CancellationToken ct)
+    public async Task<IActionResult> BlockDuplicateOrder([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
         var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == targetId, ct);
@@ -554,7 +554,7 @@ public class OrderController : ControllerBase
 
     [HttpPost("{id:int}/delivered")]
     [HttpPost("/Order/UpdateDelivered")]
-    public async Task<IActionResult> UpdateDelivered([FromRoute] int id, [FromQuery] int? orderId, CancellationToken ct)
+    public async Task<IActionResult> UpdateDelivered([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
         var result = await _orderService.UpdateOrderStatusAsync(
@@ -570,7 +570,7 @@ public class OrderController : ControllerBase
 
     [HttpPost("{id:int}/failed-delivery")]
     [HttpPost("/Order/UpdateFailedDelivery")]
-    public async Task<IActionResult> UpdateFailedDelivery([FromRoute] int id, [FromQuery] int? orderId, [FromBody] FailedDeliveryRequest request, CancellationToken ct)
+    public async Task<IActionResult> UpdateFailedDelivery([RouteOrRequest] int id, [FromQuery] int? orderId, [FromBody] FailedDeliveryRequest request, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
         if (string.IsNullOrWhiteSpace(request.Reason))
@@ -602,7 +602,7 @@ public class OrderController : ControllerBase
 
     [HttpGet("{orderId:int}/inline-options")]
     [HttpGet("/Order/GetOrderInlineEditOptions")]
-    public async Task<IActionResult> GetOrderInlineEditOptions([FromRoute] int orderId, [FromQuery] string field, CancellationToken ct)
+    public async Task<IActionResult> GetOrderInlineEditOptions([RouteOrRequest] int orderId, [FromQuery] string field, CancellationToken ct)
     {
         if (field.Equals("state", StringComparison.OrdinalIgnoreCase))
         {

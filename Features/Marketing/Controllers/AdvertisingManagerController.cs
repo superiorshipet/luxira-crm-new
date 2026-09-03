@@ -55,7 +55,7 @@ public class AdvertisingManagerController : ControllerBase
 
     [HttpGet("roi")]
     [HttpGet("GetCampaignRoi/{campaignId:int}")]
-    public async Task<ActionResult<CampaignRoiDto>> GetCampaignRoi([FromRoute] int campaignId, CancellationToken ct)
+    public async Task<ActionResult<CampaignRoiDto>> GetCampaignRoi([RouteOrRequest] int campaignId, CancellationToken ct)
     {
         var campaign = await _context.Set<AdvertisingCampaign>().FindAsync([campaignId], ct);
         if (campaign == null)

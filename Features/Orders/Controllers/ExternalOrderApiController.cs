@@ -77,7 +77,7 @@ public sealed class ExternalOrderApiController : ControllerBase
     }
 
     [HttpGet("/Api/Order/ShipmentTracking/{orderId:int}")]
-    public async Task<IActionResult> ShipmentTracking([FromRoute] int orderId, CancellationToken ct)
+    public async Task<IActionResult> ShipmentTracking([RouteOrRequest] int orderId, CancellationToken ct)
     {
         var order = await _db.Orders.AsNoTracking()
             .Where(item => item.Id == orderId)

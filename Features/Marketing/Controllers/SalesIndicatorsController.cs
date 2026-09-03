@@ -79,7 +79,7 @@ public class SalesIndicatorsController : ControllerBase
     [HttpPost("Delete/{id:int}")]
     [HttpDelete("{id:int}")]
     [HttpPost("/SalesIndicators/Delete")]
-    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken ct = default)
+    public async Task<IActionResult> Delete([RouteOrRequest] int id, CancellationToken ct = default)
     {
         var indicator = await _context.SalesIndicators.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (indicator == null) return NotFound("Sales indicator not found.");

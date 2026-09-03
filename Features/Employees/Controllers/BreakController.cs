@@ -57,7 +57,7 @@ public class BreakController : ControllerBase
     [HttpPost("{id:int}/end")]
     [HttpPost("EndBreak")]
     public async Task<ActionResult<EmployeeBreakDto>> EndBreak(
-        [FromRoute] int? id,
+        [RouteOrRequest] int? id,
         CancellationToken ct)
     {
         var (_, attendance) = await GetCurrentAttendanceAsync(ct);

@@ -35,7 +35,7 @@ public class OrderMetaActionsController : ControllerBase
 
     [HttpPost("pin")]
     [HttpPost("/Order/PinOrder/{id:int}")]
-    public async Task<IActionResult> TogglePin([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> TogglePin([RouteOrRequest] int id, CancellationToken ct)
     {
         var order = await _context.Orders.FindAsync([id], ct);
         if (order == null)
@@ -53,7 +53,7 @@ public class OrderMetaActionsController : ControllerBase
 
     [HttpPost("delayed")]
     [HttpPost("/Order/SetDelayed/{id:int}")]
-    public async Task<IActionResult> ToggleDelayed([FromRoute] int id, [FromBody] SetDelayedRequest? request, CancellationToken ct)
+    public async Task<IActionResult> ToggleDelayed([RouteOrRequest] int id, [FromBody] SetDelayedRequest? request, CancellationToken ct)
     {
         var order = await _context.Orders.FindAsync([id], ct);
         if (order == null)
@@ -71,7 +71,7 @@ public class OrderMetaActionsController : ControllerBase
 
     [HttpPost("special-client")]
     [HttpPost("/Order/SetSpecialClient/{id:int}")]
-    public async Task<IActionResult> ToggleSpecialClient([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> ToggleSpecialClient([RouteOrRequest] int id, CancellationToken ct)
     {
         var order = await _context.Orders.FindAsync([id], ct);
         if (order == null)

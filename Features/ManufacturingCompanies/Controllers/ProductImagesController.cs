@@ -29,7 +29,7 @@ public class ProductImagesController : ControllerBase
     [HttpGet("by-product/{productId:int}")]
     [HttpGet("/ProductImages/GetImages/{productId:int}")]
     public async Task<ActionResult<List<ProductImage>>> GetProductImages(
-        [FromRoute] int productId,
+        [RouteOrRequest] int productId,
         CancellationToken ct)
     {
         var product = await _context.MainProducts.AsNoTracking()

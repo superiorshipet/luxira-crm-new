@@ -74,7 +74,7 @@ public class DeliveryCompanyPriceController : ControllerBase
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
     [HttpPost("/DeliveryCompanyPrice/Edit")]
-    public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateDeliveryPriceItemRequest request, CancellationToken ct = default)
+    public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateDeliveryPriceItemRequest request, CancellationToken ct = default)
     {
         var price = await _context.DeliveryCompanyPrices.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (price == null) return NotFound("Delivery price entry not found.");

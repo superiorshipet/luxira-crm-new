@@ -85,7 +85,7 @@ public class DeliveryRepresentativeController : ControllerBase
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
     [HttpPost("/DeliveryRepresentative/Edit")]
-    public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateDeliveryRepresentativeRequest request, CancellationToken ct)
+    public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateDeliveryRepresentativeRequest request, CancellationToken ct)
     {
         var rep = await _context.DeliveryCompanies.FirstOrDefaultAsync(d => d.Id == id && d.IsRepresentative, ct);
         if (rep == null) return NotFound("Delivery representative not found.");
@@ -102,7 +102,7 @@ public class DeliveryRepresentativeController : ControllerBase
 
     [HttpGet("Details/{id:int}")]
     [HttpGet("/DeliveryRepresentative/Details/{id:int}")]
-    public async Task<IActionResult> Details([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> Details([RouteOrRequest] int id, CancellationToken ct)
     {
         var rep = await _context.DeliveryCompanies.FirstOrDefaultAsync(d => d.Id == id && d.IsRepresentative, ct);
         if (rep == null) return NotFound("Delivery representative not found.");

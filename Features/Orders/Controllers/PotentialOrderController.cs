@@ -67,7 +67,7 @@ public class PotentialOrderController : ControllerBase
 
     [HttpPost("{id:int}/convert")]
     [HttpPost("ConvertToOrder/{id:int}")]
-    public async Task<ActionResult<OrderDto>> ConvertToOrder([FromRoute] int id, [FromBody] ConvertPotentialOrderRequest request, CancellationToken ct)
+    public async Task<ActionResult<OrderDto>> ConvertToOrder([RouteOrRequest] int id, [FromBody] ConvertPotentialOrderRequest request, CancellationToken ct)
     {
         var pot = await _context.PotentialOrders.FindAsync([id], ct);
         if (pot == null)

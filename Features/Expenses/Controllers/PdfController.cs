@@ -121,7 +121,7 @@ public class PdfController : ControllerBase
     [HttpGet("delivery-manifest/{companyId:int}")]
     [HttpGet("/Pdf/PrintOrdersForDelivery")]
     public async Task<IActionResult> PrintDeliveryManifest(
-        [FromRoute] int? companyId,
+        [RouteOrRequest] int? companyId,
         [FromQuery] int? id,
         [FromQuery] bool downloadPdf = false,
         CancellationToken ct = default)

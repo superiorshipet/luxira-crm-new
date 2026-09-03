@@ -102,7 +102,7 @@ public class DeliveryCompanyController : ControllerBase
     [HttpPut("{id:int}")]
     [HttpPost("Edit/{id:int}")]
     [HttpPost("/DeliveryCompany/Edit")]
-    public async Task<IActionResult> Edit([FromRoute] int id, [FromBody] CreateDeliveryCompanyRequest request, CancellationToken ct)
+    public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateDeliveryCompanyRequest request, CancellationToken ct)
     {
         var company = await _context.DeliveryCompanies.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (company == null) return NotFound("Delivery company not found.");
@@ -122,7 +122,7 @@ public class DeliveryCompanyController : ControllerBase
     [HttpDelete("{id:int}")]
     [HttpPost("Delete/{id:int}")]
     [HttpPost("/DeliveryCompany/Delete")]
-    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> Delete([RouteOrRequest] int id, CancellationToken ct)
     {
         var company = await _context.DeliveryCompanies.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (company == null) return NotFound("Delivery company not found.");
@@ -135,7 +135,7 @@ public class DeliveryCompanyController : ControllerBase
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     [HttpPost("ToggleActive/{id:int}")]
     [HttpPost("/DeliveryCompany/ToggleActive")]
-    public async Task<IActionResult> ToggleActive([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> ToggleActive([RouteOrRequest] int id, CancellationToken ct)
     {
         var company = await _context.DeliveryCompanies.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (company == null) return NotFound("Delivery company not found.");

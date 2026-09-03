@@ -39,7 +39,7 @@ public class EditHistoryController : ControllerBase
 
     [HttpGet("OrderChanges/{id:int}")]
     [HttpGet("/EditHistory/OrderChanges")]
-    public async Task<IActionResult> OrderChanges([FromRoute] int id, [FromQuery] int? orderId, CancellationToken ct = default)
+    public async Task<IActionResult> OrderChanges([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct = default)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
         var changes = await _context.OrderEditHistories

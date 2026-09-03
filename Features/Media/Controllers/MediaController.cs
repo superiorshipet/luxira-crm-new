@@ -33,7 +33,7 @@ public class MediaController : ControllerBase
 
     [HttpGet("{*s3Key}")]
     [HttpGet("/Media/GetByKey")]
-    public async Task<ActionResult<MediaObjectDto>> GetByKey([FromRoute] string? s3Key, [FromQuery] string? key, CancellationToken ct)
+    public async Task<ActionResult<MediaObjectDto>> GetByKey([RouteOrRequest] string? s3Key, [FromQuery] string? key, CancellationToken ct)
     {
         var targetKey = !string.IsNullOrWhiteSpace(s3Key) ? s3Key : (key ?? string.Empty);
         var result = await _service.GetMediaByKeyAsync(targetKey, ct);

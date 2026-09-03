@@ -48,6 +48,22 @@ internal static class OpenApiExtensions
                 options.AddOperationTransformer(
                     (operation, context, _) =>
                     {
+                        var relativePath = context.Description.RelativePath ?? string.Empty;
+                        foreach (var parameter in operation.Parameters ?? [])
+                        {
+                            if (parameter is not OpenApiParameter mutableParameter) continue;
+                            var appearsInRoute = relativePath.Contains("{" + parameter.Name, StringComparison.OrdinalIgnoreCase);
+                            if (appearsInRoute)
+                            {
+                                mutableParameter.In = ParameterLocation.Path;
+                                mutableParameter.Required = true;
+                            }
+                            else if (parameter.In == ParameterLocation.Path)
+                            {
+                                mutableParameter.In = ParameterLocation.Query;
+                                mutableParameter.Required = false;
+                            }
+                        }
                         var metadata = context.Description
                             .ActionDescriptor
                             .EndpointMetadata;

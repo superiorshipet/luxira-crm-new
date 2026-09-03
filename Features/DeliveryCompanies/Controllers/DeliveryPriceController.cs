@@ -20,7 +20,7 @@ public class DeliveryPriceController : ControllerBase
     [HttpGet]
     [HttpGet("/DataList/GetDeliveryPrice")]
     public async Task<ActionResult<DeliveryPriceResult>> GetPrice(
-        [FromRoute] int deliveryCompanyId,
+        [RouteOrRequest] int deliveryCompanyId,
         [FromQuery(Name = "countryId")] int countryId,
         [FromQuery(Name = "cityId")] string? cityId,
         CancellationToken ct)

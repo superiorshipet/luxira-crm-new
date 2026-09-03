@@ -63,7 +63,7 @@ public class UrgentReportController : ControllerBase
     [HttpPost("{id:int}/resolve")]
     [HttpPost("Resolve/{id:int}")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
-    public async Task<IActionResult> ResolveReport([FromRoute] int id, CancellationToken ct)
+    public async Task<IActionResult> ResolveReport([RouteOrRequest] int id, CancellationToken ct)
     {
         var report = await _context.UrgentReports.FindAsync([id], ct);
         if (report is null)
