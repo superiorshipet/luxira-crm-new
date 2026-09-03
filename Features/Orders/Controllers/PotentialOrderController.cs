@@ -26,6 +26,8 @@ public class PotentialOrderController : ControllerBase
     }
 
     [HttpGet]
+    [HttpGet("Index")]
+    [HttpPost("Index")]
     [HttpGet("GetOrders")]
     public async Task<ActionResult<List<PotentialOrder>>> GetPotentialOrders([FromQuery] int? country, CancellationToken ct)
     {
@@ -99,6 +101,51 @@ public class PotentialOrderController : ControllerBase
         await _context.SaveChangesAsync(ct);
 
         return Ok(order);
+    }
+
+    [HttpGet("FilterOptions")]
+    [Authorize(Roles = "Admin,Administrator")]
+    public async Task<IActionResult> FilterOptions(CancellationToken ct)
+    {
+        var countries = await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.Country)
+            .Select(group => new { id = group.Key, name = group.Key.ToString(), count = group.Count() }).OrderByDescending(item => item.count).ToListAsync(ct);
+        var statuses = await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.Status)
+            .Select(group => new { id = group.Key, name = group.Key.ToString(), count = group.Count() }).OrderBy(item => item.id).ToListAsync(ct);
+        var stores = await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.StoreName)
+            .Select(group => new { id = group.Key, name = group.Key, count = group.Count() }).OrderByDescending(item => item.count).ToListAsync(ct);
+        var orderSources = await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.OrderSource)
+            .Select(group => new { id = group.Key, name = group.Key.ToString(), count = group.Count() }).OrderByDescending(item => item.count).ToListAsync(ct);
+        var employees = await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.ApplicationUserId)
+            .Select(group => new { id = group.Key, name = group.Key, count = group.Count() }).OrderByDescending(item => item.count).ToListAsync(ct);
+        return Ok(new { countries, statuses, stores, orderSources, employees });
+    }
+
+    [HttpGet("FilterCounts")]
+    [Authorize(Roles = "Admin,Administrator")]
+    public async Task<IActionResult> FilterCounts([FromQuery] string dimension, CancellationToken ct)
+    {
+        if (dimension.Equals("country", StringComparison.OrdinalIgnoreCase))
+            return Ok(await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.Country).Select(group => new { id = group.Key.ToString(), count = group.Count() }).ToListAsync(ct));
+        if (dimension.Equals("status", StringComparison.OrdinalIgnoreCase))
+            return Ok(await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.Status).Select(group => new { id = group.Key.ToString(), count = group.Count() }).ToListAsync(ct));
+        if (dimension.Equals("orderSource", StringComparison.OrdinalIgnoreCase))
+            return Ok(await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.OrderSource).Select(group => new { id = group.Key.ToString(), count = group.Count() }).ToListAsync(ct));
+        if (dimension.Equals("employee", StringComparison.OrdinalIgnoreCase))
+            return Ok(await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.ApplicationUserId).Select(group => new { id = group.Key, count = group.Count() }).ToListAsync(ct));
+        return Ok(await _context.PotentialOrders.AsNoTracking().GroupBy(item => item.StoreName).Select(group => new { id = group.Key, count = group.Count() }).ToListAsync(ct));
+    }
+
+    [HttpPost("UpdateStatusForMultiple")]
+    [Authorize(Roles = "Admin,Administrator")]
+    public async Task<IActionResult> UpdateStatusForMultiple([FromBody] List<string>? ids, CancellationToken ct)
+    {
+        var parsed = (ids ?? []).Select(value => int.TryParse(value, out var id) ? id : 0).Where(id => id > 0).Distinct().ToArray();
+        if (parsed.Length == 0) return Ok(new { success = false, message = "لم يتم تحديد أي طلبات" });
+        var updated = await _context.PotentialOrders.Where(item => parsed.Contains(item.Id) && item.Status != 6)
+            .ExecuteUpdateAsync(update => update.SetProperty(item => item.Status, item => item.Status + 1).SetProperty(item => item.LastEditedDate, DateTime.UtcNow), ct);
+        return updated == 0
+            ? Ok(new { success = false, message = "لا توجد طلبات قابلة للترقية" })
+            : Ok(new { success = true, message = "تم تحديث حالة الطلبات بنجاح" });
     }
 }
 

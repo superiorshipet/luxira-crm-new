@@ -25,6 +25,7 @@ public class DeliveryCompanyPriceController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/DeliveryCompanyPrice/Index")]
+    [HttpPost("/DeliveryCompanyPrice/Index")]
     public async Task<IActionResult> Index([FromQuery] int? deliveryCompanyId, [FromQuery] int? country, CancellationToken ct = default)
     {
         var query = _context.DeliveryCompanyPrices
@@ -38,6 +39,19 @@ public class DeliveryCompanyPriceController : ControllerBase
 
         var prices = await query.ToListAsync(ct);
         return Ok(prices);
+    }
+
+    [HttpGet("/DeliveryCompanyPrice/Create")]
+    public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
+    {
+        deliveryCompanies = await _context.DeliveryCompanies.AsNoTracking().Where(item => !item.IsRepresentative && item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name, item.Country }).ToListAsync(ct)
+    });
+
+    [HttpGet("/DeliveryCompanyPrice/Edit")]
+    public async Task<IActionResult> EditForm([FromQuery] int id, CancellationToken ct)
+    {
+        var price = await _context.DeliveryCompanyPrices.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, ct);
+        return price is null ? NotFound() : Ok(price);
     }
 
     [HttpPost("Create")]
@@ -98,6 +112,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/DeliveryRepresentativePrice/Index")]
+    [HttpPost("/DeliveryRepresentativePrice/Index")]
     public async Task<IActionResult> Index([FromQuery] int? deliveryRepresentativeId, [FromQuery] int? country, CancellationToken ct = default)
     {
         var query = _context.DeliveryCompanyPrices
@@ -112,6 +127,12 @@ public class DeliveryRepresentativePriceController : ControllerBase
         var prices = await query.ToListAsync(ct);
         return Ok(prices);
     }
+
+    [HttpGet("/DeliveryRepresentativePrice/Create")]
+    public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
+    {
+        representatives = await _context.DeliveryCompanies.AsNoTracking().Where(item => item.IsRepresentative && item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name, item.Country }).ToListAsync(ct)
+    });
 
     [HttpPost("Create")]
     [HttpPost("/DeliveryRepresentativePrice/Create")]
@@ -128,6 +149,37 @@ public class DeliveryRepresentativePriceController : ControllerBase
         await _context.DeliveryCompanyPrices.AddAsync(price, ct);
         await _context.SaveChangesAsync(ct);
         return Ok(price);
+    }
+
+    [HttpGet("/DeliveryRepresentativePrice/Edit")]
+    public async Task<IActionResult> EditForm([FromQuery] int id, CancellationToken ct)
+    {
+        var price = await _context.DeliveryCompanyPrices.AsNoTracking().Include(item => item.DeliveryCompany)
+            .FirstOrDefaultAsync(item => item.Id == id && item.DeliveryCompany != null && item.DeliveryCompany.IsRepresentative, ct);
+        return price is null ? NotFound() : Ok(price);
+    }
+
+    [HttpPost("/DeliveryRepresentativePrice/Edit")]
+    public async Task<IActionResult> Edit([FromQuery] int id, [FromBody] CreateDeliveryPriceItemRequest request, CancellationToken ct)
+    {
+        var price = await _context.DeliveryCompanyPrices.Include(item => item.DeliveryCompany)
+            .FirstOrDefaultAsync(item => item.Id == id && item.DeliveryCompany != null && item.DeliveryCompany.IsRepresentative, ct);
+        if (price is null) return NotFound();
+        price.Price = request.Price;
+        price.Country = request.Country;
+        price.City = request.City;
+        price.DeliveryCompanyId = request.DeliveryCompanyId;
+        await _context.SaveChangesAsync(ct);
+        return Ok(price);
+    }
+
+    [HttpGet("/DeliveryRepresentativePrice/GetAvailableDeliveryRepresentatives")]
+    public async Task<IActionResult> GetAvailableDeliveryRepresentatives([FromQuery] int country, [FromQuery] string? city, CancellationToken ct)
+    {
+        var assigned = _context.DeliveryCompanyPrices.AsNoTracking().Where(price => price.Country == country && price.City == city).Select(price => price.DeliveryCompanyId);
+        return Ok(await _context.DeliveryCompanies.AsNoTracking()
+            .Where(item => item.IsRepresentative && item.IsShown && item.Country == country && !assigned.Contains(item.Id))
+            .OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct));
     }
 }
 

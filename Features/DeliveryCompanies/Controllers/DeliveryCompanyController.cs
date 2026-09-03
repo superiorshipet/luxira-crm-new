@@ -30,6 +30,7 @@ public class DeliveryCompanyController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/DeliveryCompany/Index")]
+    [HttpPost("/DeliveryCompany/Index")]
     [HttpGet("/DataList/GetDeliveryCompanies")]
     public async Task<ActionResult<DeliveryCompanyResult>> GetCompanies([FromQuery] int? countryId, CancellationToken ct)
     {
@@ -46,6 +47,55 @@ public class DeliveryCompanyController : ControllerBase
         var userId = User.GetUserId() ?? "system";
         var result = await _service.CreateCompanyAsync(request, userId, ct);
         return CreatedAtAction(nameof(GetCompanies), new { id = result.Id }, result);
+    }
+
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [HttpGet("/DeliveryCompany/Create")]
+    public IActionResult Create() => Ok(new { isRepresentative = false });
+
+    [HttpGet("/DeliveryCompany/Edit")]
+    public async Task<IActionResult> Edit([FromQuery] int? id, CancellationToken ct)
+    {
+        if (!id.HasValue) return NotFound();
+        var company = await _context.DeliveryCompanies.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, ct);
+        return company is null ? NotFound() : Ok(company);
+    }
+
+    [HttpGet("/DeliveryCompany/Details")]
+    [HttpPost("/DeliveryCompany/Details")]
+    public async Task<IActionResult> Details([FromQuery] int? id, CancellationToken ct)
+    {
+        if (!id.HasValue) return NotFound();
+        var company = await _context.DeliveryCompanies.AsNoTracking()
+            .Include(item => item.Prices)
+            .FirstOrDefaultAsync(item => item.Id == id, ct);
+        if (company is null) return NotFound();
+        var warehouseCount = await _context.Warehouses.AsNoTracking().CountAsync(item => item.DeliveryCompanyId == id, ct);
+        return Ok(new { company, warehouseCount });
+    }
+
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [HttpPost("/DeliveryCompany/SetIsActive")]
+    public async Task<IActionResult> SetIsActive([FromForm] int Id, [FromForm] bool isActive, CancellationToken ct)
+    {
+        var changed = await _context.DeliveryCompanies.Where(item => item.Id == Id).ExecuteUpdateAsync(update => update.SetProperty(item => item.IsActive, isActive), ct);
+        return changed == 0 ? NotFound() : Ok(new { success = true });
+    }
+
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [HttpPost("/DeliveryCompany/SetIsShown")]
+    public async Task<IActionResult> SetIsShown([FromForm] int Id, [FromForm] bool isShown, CancellationToken ct)
+    {
+        var changed = await _context.DeliveryCompanies.Where(item => item.Id == Id).ExecuteUpdateAsync(update => update.SetProperty(item => item.IsShown, isShown), ct);
+        return changed == 0 ? NotFound() : Ok(new { success = true });
+    }
+
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [HttpPost("/DeliveryCompany/HideNewOrders")]
+    public async Task<IActionResult> HideNewOrders([FromForm] int Id, [FromForm] bool hideOrders, CancellationToken ct)
+    {
+        var changed = await _context.DeliveryCompanies.Where(item => item.Id == Id).ExecuteUpdateAsync(update => update.SetProperty(item => item.IsAllOrdersHidden, hideOrders), ct);
+        return changed == 0 ? NotFound() : Ok(new { success = true, hideOrders });
     }
 
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]

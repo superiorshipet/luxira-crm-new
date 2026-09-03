@@ -29,11 +29,32 @@ public class DeliveryRepresentativeController : ControllerBase
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/DeliveryRepresentative/Index")]
+    [HttpPost("/DeliveryRepresentative/Index")]
     [HttpGet("/DataList/GetDeliveryRepresentatives")]
     public async Task<ActionResult<DeliveryRepresentativeResult>> GetRepresentatives([FromQuery] int? countryId, CancellationToken ct)
     {
         var result = await _service.ListRepresentativesAsync(countryId, ct);
         return Ok(result);
+    }
+
+    [HttpGet("/DeliveryRepresentative/Create")]
+    public IActionResult CreateForm() => Ok(new { isRepresentative = true });
+
+    [HttpGet("/DeliveryRepresentative/Edit")]
+    public async Task<IActionResult> EditForm([FromQuery] int? id, CancellationToken ct)
+    {
+        if (!id.HasValue) return NotFound();
+        var rep = await _context.DeliveryCompanies.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id && item.IsRepresentative, ct);
+        return rep is null ? NotFound() : Ok(rep);
+    }
+
+    [HttpGet("/DeliveryRepresentative/Details")]
+    [HttpPost("/DeliveryRepresentative/Details")]
+    public async Task<IActionResult> DetailsLegacy([FromQuery] int? id, CancellationToken ct)
+    {
+        if (!id.HasValue) return NotFound();
+        var rep = await _context.DeliveryCompanies.AsNoTracking().Include(item => item.Prices).FirstOrDefaultAsync(item => item.Id == id && item.IsRepresentative, ct);
+        return rep is null ? NotFound() : Ok(rep);
     }
 
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
