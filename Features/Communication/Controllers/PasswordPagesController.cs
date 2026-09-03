@@ -170,14 +170,17 @@ public class PasswordPagesController(ApplicationDbContext context, S3StorageServ
         return query.OrderByDescending(x => x.ChangedAt);
     }
 
-    private async Task<object> Lookups(CancellationToken ct) => new
+    private async Task<object> Lookups(CancellationToken ct)
     {
-        pageTypesInitialized = await EnsureDefaultPageTypes(ct),
-        pageTypes = await context.PasswordPageTypes.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct),
-        statuses = Statuses,
-        stores = await context.ManufacturingCompanies.AsNoTracking().Where(x => x.IsShown && !x.IsPasswordEmailStore).OrderBy(x => x.Name)
-            .Select(x => new { x.Id, x.Name, x.ImageUrl }).ToListAsync(ct)
-    };
+        await EnsureDefaultPageTypes(ct);
+        return new
+        {
+            pageTypes = await context.PasswordPageTypes.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).ToListAsync(ct),
+            statuses = Statuses,
+            stores = await context.ManufacturingCompanies.AsNoTracking().Where(x => x.IsShown && !x.IsPasswordEmailStore).OrderBy(x => x.Name)
+                .Select(x => new { x.Id, x.Name, x.ImageUrl }).ToListAsync(ct)
+        };
+    }
 
     private async Task<string?> Validate(PasswordPageRequest request, int companyId, CancellationToken ct)
     {

@@ -70,8 +70,9 @@ public class OrderController : ControllerBase
         var result = await _orderService.CreateOrderAsync(request, userId, ct);
         if (User.IsInRole("CallCenter"))
         {
-            HttpContext.Session.SetString(HomeController.ActivityKey(userId, "LastOrderCreatedUnix"),
-                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var activityUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+            HttpContext.Session.SetString(HomeController.ActivityKey(userId, "LastOrderCreatedUnix"), activityUnix);
+            HttpContext.Session.SetString(HomeController.ActivityKey(userId, "LastCreateOrderOpenedUnix"), activityUnix);
         }
         return CreatedAtAction(nameof(GetOrderById), new { id = result.Id }, result);
     }

@@ -66,6 +66,22 @@ function collectOpenApiOperations(document) {
   return { operations, routes };
 }
 
+function collectInvalidPathParameters(document) {
+  const invalid = [];
+  const httpMethods = new Set(["get", "post", "put", "patch", "delete", "head", "options", "trace"]);
+  for (const [route, pathItem] of Object.entries(document.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem ?? {})) {
+      if (!httpMethods.has(method.toLowerCase())) continue;
+      const placeholders = new Set([...route.matchAll(/\{([^}:?]+)(?::[^}?]+)?\??\}/g)].map(match => match[1].toLowerCase()));
+      for (const parameter of operation?.parameters ?? []) {
+        if (parameter?.in === "path" && !placeholders.has(String(parameter.name).toLowerCase()))
+          invalid.push(`${method.toUpperCase()} ${route}: ${parameter.name}`);
+      }
+    }
+  }
+  return invalid.sort();
+}
+
 function collectManifestOperations(manifest) {
   return (manifest.operations ?? []).map((entry) =>
     typeof entry === "string" ? entry.trim() : entry?.operationId?.trim(),
@@ -153,6 +169,7 @@ const { operations: postmanOperations, routes: postmanRoutes } =
   collectPostmanCoverage(collection.item);
 
 const failures = {
+  "OpenAPI path parameters missing from route templates": collectInvalidPathParameters(openApi),
   "Duplicate OpenAPI operationIds": duplicates(openApiOperations),
   "Duplicate manifest operationIds": duplicates(manifestOperations),
   "Duplicate primary Postman operation markers": duplicates(postmanOperations),
