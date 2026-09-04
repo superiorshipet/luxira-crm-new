@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Luxira.Api.Features.Auth.Services;
 
 namespace Luxira.Api.Features.Auth;
 
@@ -53,6 +54,7 @@ public static class AuthenticationExtensions
                 options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 options.ExpireTimeSpan = TimeSpan.FromDays(3650);
                 options.SlidingExpiration = true;
+                options.Events.OnValidatePrincipal = BrowserCookiePrincipalValidator.ValidateAsync;
                 options.Events.OnRedirectToLogin = context =>
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -173,7 +175,6 @@ public static class AuthenticationExtensions
                 {
                     if (!principal.IsInRole("Admin")) identity.AddClaim(new Claim(identity.RoleClaimType, "Admin"));
                     if (!principal.IsInRole("Administrator")) identity.AddClaim(new Claim(identity.RoleClaimType, "Administrator"));
-                    if (!principal.IsInRole("ExecutiveDirector")) identity.AddClaim(new Claim(identity.RoleClaimType, "ExecutiveDirector"));
                 }
                 if (principal.IsInRole("Team Leader") && !principal.IsInRole("TeamLeader"))
                 {

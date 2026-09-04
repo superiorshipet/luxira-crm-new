@@ -20,7 +20,7 @@ public sealed class AccountSwitchController : ControllerBase
     private const string OriginalAdminUserIdClaim = "OriginalAdminUserId";
     private const string OriginalAdminEmailClaim = "OriginalAdminEmail";
     private const string OriginalAdminNameClaim = "OriginalAdminName";
-    private const string IsAdminSwitchSessionClaim = "IsAdminSwitchSession";
+    private const string IsAdminSwitchSessionClaim = LuxiraClaimTypes.AdminSwitchSession;
     private const string IsSwitchedAccountClaim = "IsSwitchedAccount";
 
     private readonly ApplicationDbContext _context;
@@ -54,84 +54,53 @@ public sealed class AccountSwitchController : ControllerBase
             return Unauthorized(new { success = false, message = "غير مسموح باستخدام تبديل الحسابات." });
         }
 
-        var employeeAccounts = await (
-            from employee in _context.Employees.AsNoTracking()
-            join user in _context.Users.AsNoTracking()
-                on employee.ApplicationUserId equals user.Id
-            where employee.ApplicationUserId != null &&
-                  employee.ApplicationUserId != "" &&
-                  user.Email != null &&
-                  user.Email != ""
-            select new SwitchAccountRow(
-                user.Id,
-                employee.Id,
-                user.Email!,
-                user.UserName,
-                FirstNonEmpty(employee.DisplayName, employee.Name, user.Name, user.Email),
-                employee.IsActive))
-            .ToListAsync(ct);
-
-        var employeeUserIds = employeeAccounts
-            .Select(account => account.Id)
-            .ToHashSet(StringComparer.Ordinal);
-
-        var deliveryUserIds = await (
-            from userRole in _context.UserRoles.AsNoTracking()
-            join role in _context.Roles.AsNoTracking()
-                on userRole.RoleId equals role.Id
-            where role.Name == "DeliveryCompany" || role.Name == "DeliveryRepresentative"
-            select userRole.UserId)
-            .Distinct()
-            .ToListAsync(ct);
-
         var now = DateTimeOffset.UtcNow;
-        var deliveryAccounts = await _context.Users
-            .AsNoTracking()
-            .Where(user => deliveryUserIds.Contains(user.Id) &&
-                           !employeeUserIds.Contains(user.Id) &&
-                           user.Email != null &&
-                           user.Email != "")
-            .Select(user => new SwitchAccountRow(
-                user.Id,
-                0,
-                user.Email!,
-                user.UserName,
-                user.Name ?? user.Email!,
-                !user.LockoutEnd.HasValue || user.LockoutEnd <= now))
-            .ToListAsync(ct);
-
-        var accounts = employeeAccounts.Concat(deliveryAccounts).ToList();
-        var accountIds = accounts.Select(account => account.Id).ToList();
-        var roleRows = await (
-            from userRole in _context.UserRoles.AsNoTracking()
+        var rows = await (
+            from user in _context.Users.AsNoTracking()
+            join employee in _context.Employees.AsNoTracking()
+                on user.Id equals employee.ApplicationUserId into employeeGroup
+            from employee in employeeGroup.DefaultIfEmpty()
+            join userRole in _context.UserRoles.AsNoTracking()
+                on user.Id equals userRole.UserId into userRoleGroup
+            from userRole in userRoleGroup.DefaultIfEmpty()
             join role in _context.Roles.AsNoTracking()
-                on userRole.RoleId equals role.Id
-            where accountIds.Contains(userRole.UserId)
-            select new { userRole.UserId, role.Name })
+                on userRole.RoleId equals role.Id into roleGroup
+            from role in roleGroup.DefaultIfEmpty()
+            where (user.Email != null && user.Email != "") ||
+                  (user.UserName != null && user.UserName != "")
+            select new SwitchAccountJoinedRow(
+                user.Id,
+                employee == null ? 0 : employee.Id,
+                user.Email ?? string.Empty,
+                user.UserName,
+                (employee != null && employee.DisplayName != null && employee.DisplayName != "" ? employee.DisplayName :
+                    employee != null && employee.Name != "" ? employee.Name :
+                    user.Name != null && user.Name != "" ? user.Name :
+                    user.Email != null && user.Email != "" ? user.Email : user.UserName) ?? string.Empty,
+                (!user.LockoutEnd.HasValue || user.LockoutEnd <= now) && (employee == null || employee.IsActive),
+                role == null ? null : role.Name))
             .ToListAsync(ct);
-        var rolesByUser = roleRows
-            .GroupBy(row => row.UserId)
-            .ToDictionary(
-                group => group.Key,
-                group => string.Join("، ", group.Select(row => row.Name).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct()),
-                StringComparer.Ordinal);
 
-        var result = accounts
-            .GroupBy(account => account.Id, StringComparer.Ordinal)
-            .Select(group => group.First())
-            .OrderBy(account => account.DisplayName)
-            .ThenBy(account => account.Email)
-            .Select(account => new
+        var result = rows
+            .GroupBy(row => row.Id, StringComparer.Ordinal)
+            .Select(group =>
             {
-                id = account.Id,
-                employeeId = account.EmployeeId,
-                email = account.Email,
-                userName = account.UserName,
-                displayName = account.DisplayName,
-                roleName = rolesByUser.GetValueOrDefault(account.Id, string.Empty),
-                isActive = account.IsActive,
-                isCurrent = account.Id == currentUserId,
-            });
+                var account = group.First();
+                return new
+                {
+                    id = account.Id,
+                    employeeId = account.EmployeeId,
+                    email = account.Email,
+                    userName = account.UserName,
+                    displayName = account.DisplayName,
+                    roleName = string.Join("، ", group.Select(row => row.RoleName)
+                        .Where(role => !string.IsNullOrWhiteSpace(role)).Distinct()),
+                    isActive = account.IsActive,
+                    isCurrent = account.Id == currentUserId,
+                };
+            })
+            .OrderBy(account => account.displayName)
+            .ThenBy(account => account.email);
 
         return Ok(new
         {
@@ -253,20 +222,6 @@ public sealed class AccountSwitchController : ControllerBase
             return SwitchResult.Fail(NotFound(new { success = false, message = "الحساب غير موجود." }));
         }
 
-        var isEmployee = await _context.Employees
-            .AsNoTracking()
-            .AnyAsync(employee => employee.ApplicationUserId == targetUserId, ct);
-        var isDeliveryAccount = target.Roles.Any(role =>
-            role is "DeliveryCompany" or "DeliveryRepresentative");
-        if (!isEmployee && !isDeliveryAccount)
-        {
-            return SwitchResult.Fail(BadRequest(new
-            {
-                success = false,
-                message = "هذا الحساب غير مربوط بموظف أو شركة توصيل أو مندوب، لذلك لن يظهر كملف شخصي للسويتش.",
-            }));
-        }
-
         var originalAdmin = await ResolveOriginalAdminAsync(ct, currentUserId);
         if (originalAdmin is null)
         {
@@ -301,6 +256,7 @@ public sealed class AccountSwitchController : ControllerBase
     private bool CanUseAccountSwitch() =>
         User.IsInRole("Admin") ||
         User.IsInRole("Administrator") ||
+        User.IsInRole("ExecutiveDirector") ||
         User.FindFirstValue(IsAdminSwitchSessionClaim) == "true";
 
     private async Task<ApplicationUser?> ResolveOriginalAdminAsync(
@@ -309,7 +265,7 @@ public sealed class AccountSwitchController : ControllerBase
     {
         var originalAdminId = User.FindFirstValue(OriginalAdminUserIdClaim);
         if (string.IsNullOrWhiteSpace(originalAdminId) &&
-            (User.IsInRole("Admin") || User.IsInRole("Administrator")))
+            (User.IsInRole("Admin") || User.IsInRole("Administrator") || User.IsInRole("ExecutiveDirector")))
         {
             originalAdminId = currentUserId ?? User.GetUserId();
         }
@@ -317,7 +273,7 @@ public sealed class AccountSwitchController : ControllerBase
         if (string.IsNullOrWhiteSpace(originalAdminId)) return null;
 
         var user = await _users.GetByIdAsync(originalAdminId, ct);
-        return user?.Roles.Any(role => role is "Admin" or "Administrator") == true
+        return user?.Roles.Any(role => role is "Admin" or "Administrator" or "ExecutiveDirector") == true
             ? user
             : null;
     }
@@ -345,13 +301,14 @@ public sealed class AccountSwitchController : ControllerBase
     private static string FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
 
-    private sealed record SwitchAccountRow(
+    private sealed record SwitchAccountJoinedRow(
         string Id,
         int EmployeeId,
         string Email,
         string? UserName,
         string DisplayName,
-        bool IsActive);
+        bool IsActive,
+        string? RoleName);
 
     private sealed record SwitchResult(AuthResponse? Response, IActionResult? Error)
     {

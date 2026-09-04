@@ -1,16 +1,37 @@
 using Luxira.Api.Infrastructure.Pdf;
 using Luxira.Api.Features.Orders.Controllers;
+using Luxira.Api.Features.Marketing.Controllers;
 using Luxira.Api.Utils.Binding;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Routing;
+using System.Reflection;
 
 namespace Luxira.Tests;
 
 public sealed class CompatibilityRegressionTests
 {
+    [Theory]
+    [InlineData(nameof(StoreScriptController.GlobalSettings), "GET", "GlobalSettings")]
+    [InlineData(nameof(StoreScriptController.SaveGlobalSettings), "POST", "SaveGlobalSettings")]
+    public void Store_script_global_settings_preserve_legacy_routes(string methodName, string verb, string route)
+    {
+        var method = typeof(StoreScriptController).GetMethod(methodName)!;
+        var attributes = method.GetCustomAttributes<HttpMethodAttribute>(true);
+        Assert.Contains(attributes, item => item.HttpMethods.Contains(verb) && item.Template == route);
+    }
+
+    [Fact]
+    public void Pending_verification_confirm_remains_post_only()
+    {
+        var method = typeof(PendingVerificationController).GetMethod(nameof(PendingVerificationController.Confirm))!;
+        Assert.Contains(method.GetCustomAttributes<HttpPostAttribute>(true), item => item.Template == "/PendingVerification/Confirm");
+        Assert.Empty(method.GetCustomAttributes<HttpGetAttribute>(true));
+    }
+
     [Theory]
     [InlineData(nameof(OrderController.GetBankTransferApprovals), "GET", "/Order/GetBankTransferApprovals")]
     [InlineData(nameof(OrderController.ConfirmBankTransfer), "POST", "/Order/ConfirmBankTransfer/{id:int}")]

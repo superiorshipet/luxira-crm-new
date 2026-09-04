@@ -107,8 +107,10 @@ var routeTimings = new List<(string Route, double Milliseconds)>();
 var totalWatch = Stopwatch.StartNew();
 foreach (var pathProperty in document.RootElement.GetProperty("paths").EnumerateObject())
 {
-    if (!pathProperty.Name.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase) ||
-        (routeFilter is not null && !pathProperty.Name.Contains(routeFilter, StringComparison.OrdinalIgnoreCase)) ||
+    var isCanonicalApi = pathProperty.Name.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase);
+    var explicitlySelected = routeFilter is not null && pathProperty.Name.Contains(routeFilter, StringComparison.OrdinalIgnoreCase);
+    if ((!isCanonicalApi && !explicitlySelected) ||
+        (routeFilter is not null && !explicitlySelected) ||
         !pathProperty.Value.TryGetProperty("get", out var operation))
     {
         continue;

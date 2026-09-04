@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Luxira.Api.Data;
 using Luxira.Api.Features.Marketing.Models;
 using Luxira.Api.Utils.Extensions;
@@ -19,6 +21,7 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
     private static readonly HashSet<string> Platforms = ["WhatsApp", "Meta"];
     private static readonly HashSet<string> IconKinds = ["emoji", "twemoji", "svg"];
     private static readonly HashSet<string> TargetKinds = ["AssetId", "PageId", "BusinessId"];
+    private static readonly Regex PlaceholderPattern = new(@"\{\{\s*([^{}]+?)\s*\}\}", RegexOptions.Compiled);
 
     [HttpGet("GetScripts")]
     public async Task<IActionResult> GetScripts(int? manufacturingCompanyId, string? platform, CancellationToken ct)
@@ -62,7 +65,81 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
         if (User.Identity?.IsAuthenticated != true) return Unauthorized();
         var script = await LoadTree(scriptId, liveOnly: true, ct); if (script is null) return NotFound();
         if (!await CanAccess(script.ManufacturingCompanyId, ct)) return StatusCode(403);
-        return Ok(Tree(script, liveOnly: true));
+        var globals = await context.ScriptGlobalSettings.AsNoTracking().ToDictionaryAsync(item => item.Key, item => item.Value, ct);
+        var store = await context.ManufacturingCompanies.AsNoTracking()
+            .Where(item => item.Id == script.ManufacturingCompanyId)
+            .Select(item => new { item.Id, item.Name, item.ImageUrl })
+            .FirstOrDefaultAsync(ct);
+        return Ok(RuntimeTree(script, globals, store?.Name, store?.ImageUrl));
+    }
+
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [HttpGet("GlobalSettings")]
+    public async Task<IActionResult> GlobalSettings(CancellationToken ct)
+    {
+        var stored = (await context.ScriptGlobalSettings.AsNoTracking().ToListAsync(ct))
+            .ToDictionary(item => item.Key, StringComparer.Ordinal);
+        var items = ScriptGlobalConfigCatalog.Items.Select(item =>
+        {
+            stored.TryGetValue(item.Key, out var row);
+            return new
+            {
+                key = item.Key, group = item.Group, label = item.Label, description = item.Description,
+                kind = item.Kind, unit = item.Unit, readOnly = item.ReadOnly, defaultValue = item.Default,
+                value = row?.Value ?? item.Default, isOverridden = row is not null,
+                updatedAt = row?.UpdatedAt, updatedBy = row?.UpdatedBy,
+            };
+        });
+        var groups = ScriptGlobalConfigCatalog.Groups.Select(group => new { id = group.Id, title = group.Title, blurb = group.Blurb });
+        return Ok(new { groups, items });
+    }
+
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [HttpPost("SaveGlobalSettings")]
+    public async Task<IActionResult> SaveGlobalSettings([FromBody] Dictionary<string, string>? values, CancellationToken ct)
+    {
+        if (values is null || values.Count == 0) return BadRequest(new { message = "لا توجد قيم للحفظ." });
+        var stored = (await context.ScriptGlobalSettings.ToListAsync(ct)).ToDictionary(item => item.Key, StringComparer.Ordinal);
+        var now = IstanbulTimeHelper.Now;
+        var changed = 0;
+        foreach (var pair in values)
+        {
+            var definition = ScriptGlobalConfigCatalog.Find(pair.Key);
+            if (definition is null || definition.ReadOnly) continue;
+            var value = (pair.Value ?? string.Empty).Trim();
+            if (value.Length > 256) return BadRequest(new { message = $"القيمة الخاصة بـ {definition.Label} أطول من المسموح." });
+            if (definition.Kind == "number" && !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                return BadRequest(new { message = $"القيمة الخاصة بـ {definition.Label} يجب أن تكون رقمًا." });
+            if (definition.Kind == "color" && !Regex.IsMatch(value, "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"))
+                return BadRequest(new { message = $"اللون الخاص بـ {definition.Label} يجب أن يكون بصيغة #RRGGBB." });
+
+            stored.TryGetValue(definition.Key, out var row);
+            if (value.Length == 0 || string.Equals(value, definition.Default, StringComparison.Ordinal))
+            {
+                if (row is not null) { context.ScriptGlobalSettings.Remove(row); changed++; }
+            }
+            else if (row is null)
+            {
+                context.ScriptGlobalSettings.Add(new ScriptGlobalSetting { Key = definition.Key, Value = value, UpdatedAt = now, UpdatedBy = User.Identity?.Name });
+                changed++;
+            }
+            else if (!string.Equals(row.Value, value, StringComparison.Ordinal))
+            {
+                row.Value = value; row.UpdatedAt = now; row.UpdatedBy = User.Identity?.Name; changed++;
+            }
+        }
+        if (changed > 0)
+        {
+            await context.SaveChangesAsync(ct);
+            var actorId = User.GetUserId();
+            var actorName = User.Identity?.Name;
+            await context.StoreScripts.ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.RevisionStamp, item => item.RevisionStamp + 1)
+                .SetProperty(item => item.UpdatedAt, now)
+                .SetProperty(item => item.UpdatedByUserId, actorId)
+                .SetProperty(item => item.UpdatedByName, actorName), ct);
+        }
+        return Ok(new { success = true, changed });
     }
 
     [AllowAnonymous]
@@ -309,6 +386,92 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
 
     private async Task<StoreScript?> LoadTree(int id, bool liveOnly, CancellationToken ct) => await context.StoreScripts.AsSplitQuery().Include(item => item.Targets).Include(item => item.ThemeTokens).Include(item => item.Settings).Include(item => item.Countries).ThenInclude(item => item.Values).Include(item => item.Categories).ThenInclude(item => item.Messages).Include(item => item.Categories).ThenInclude(item => item.SubCategories).ThenInclude(item => item.Messages).Include(item => item.Translations).FirstOrDefaultAsync(item => item.Id == id && (!liveOnly || item.IsActive && !item.IsDeleted), ct);
     private object Tree(StoreScript script, bool liveOnly) => new { script.Id, script.StoreCodeFolderId, script.ManufacturingCompanyId, script.Platform, script.EngineVersion, revision = script.RevisionStamp, script.IsActive, targets = script.Targets.Where(item => !liveOnly || !item.IsDeleted).OrderBy(item => item.SortOrder), theme = script.ThemeTokens.OrderBy(item => item.SortOrder), settings = script.Settings.OrderBy(item => item.SortOrder), countries = script.Countries.Where(item => !liveOnly || item.IsEnabled && !item.IsDeleted).OrderBy(item => item.SortOrder).Select(item => new { item.Id, item.Code, item.Label, item.FlagHex, item.IsEnabled, values = item.Values.ToDictionary(value => value.Key, value => value.Value) }), categories = script.Categories.Where(item => !liveOnly || item.IsEnabled && !item.IsDeleted).OrderBy(item => item.SortOrder).Select(item => new { item.Id, item.Key, item.Label, item.Icon, item.IconKind, item.SortOrder, item.IsEnabled, messages = item.Messages.OrderBy(message => message.Phase).ThenBy(message => message.StepOrder), subCategories = item.SubCategories.Where(node => !liveOnly || node.IsEnabled && !node.IsDeleted).OrderBy(node => node.SortOrder).Select(node => new { node.Id, node.ParentSubCategoryId, node.Key, node.Label, node.Icon, node.IconKind, node.ColorToken, node.IsCountryScoped, node.SortOrder, node.IsEnabled, messages = node.Messages.OrderBy(message => message.Phase).ThenBy(message => message.StepOrder) }) }), translations = script.Translations.Where(item => !liveOnly || !item.IsDeleted) };
+
+    private static object RuntimeTree(StoreScript script, Dictionary<string, string> globals, string? storeName, string? storeLogo)
+    {
+        var countries = script.Countries.Where(item => item.IsEnabled && !item.IsDeleted)
+            .OrderBy(item => item.SortOrder).ThenBy(item => item.Id).ToList();
+        var valueMaps = countries.ToDictionary(
+            country => country.Id,
+            country => country.Values.GroupBy(value => value.Key, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.OrderBy(value => value.Id).Last().Value, StringComparer.Ordinal));
+        var categories = new List<object>();
+        foreach (var category in script.Categories.Where(item => item.IsEnabled && !item.IsDeleted).OrderBy(item => item.SortOrder).ThenBy(item => item.Id))
+        {
+            var roots = category.SubCategories.Where(item => item.ParentSubCategoryId == null && item.IsEnabled && !item.IsDeleted)
+                .OrderBy(item => item.SortOrder).ThenBy(item => item.Id)
+                .Select(item => RuntimeNode(item, countries, valueMaps)).Where(item => item is not null).ToList();
+            if (roots.Count > 0)
+                categories.Add(new { key = category.Key, label = category.Label, icon = category.Icon, iconKind = category.IconKind, subCategories = roots });
+            else if (category.Messages.Count > 0)
+                categories.Add(new { key = category.Key, label = category.Label, icon = category.Icon, iconKind = category.IconKind, sequences = Sequences(category.Messages, countries, valueMaps) });
+        }
+
+        return new
+        {
+            scriptId = script.Id,
+            revision = script.RevisionStamp,
+            store = new { id = script.ManufacturingCompanyId, name = storeName ?? string.Empty, logoUrl = storeLogo ?? string.Empty },
+            platform = script.Platform,
+            engineVersion = script.EngineVersion,
+            theme = MergeGlobals(script.ThemeTokens.GroupBy(item => item.Key).ToDictionary(group => group.Key, group => group.OrderBy(item => item.SortOrder).ThenBy(item => item.Id).Last().Value), globals, "theme"),
+            settings = MergeGlobals(script.Settings.GroupBy(item => item.Key).ToDictionary(group => group.Key, group => group.OrderBy(item => item.SortOrder).ThenBy(item => item.Id).Last().Value), globals, "settings"),
+            chrome = MergeGlobals(null, globals, "chrome"),
+            flags = MergeGlobals(null, globals, "flags"),
+            countries = countries.Select(country => new { code = country.Code, label = country.Label, flagHex = country.FlagHex }),
+            categories,
+        };
+    }
+
+    private static object? RuntimeNode(ScriptSubCategory node, List<ScriptCountry> countries, Dictionary<int, Dictionary<string, string>> values)
+    {
+        var children = node.Children.Where(item => item.IsEnabled && !item.IsDeleted)
+            .OrderBy(item => item.SortOrder).ThenBy(item => item.Id)
+            .Select(item => RuntimeNode(item, countries, values)).Where(item => item is not null).ToList();
+        if (children.Count > 0)
+            return new { key = node.Key, label = node.Label, icon = node.Icon, iconKind = node.IconKind, colorToken = node.ColorToken, subCategories = children };
+        if (node.Messages.Count == 0) return null;
+        return new { key = node.Key, label = node.Label, icon = node.Icon, iconKind = node.IconKind, colorToken = node.ColorToken, isCountryScoped = node.IsCountryScoped, sequences = Sequences(node.Messages, countries, values) };
+    }
+
+    private static Dictionary<string, object> Sequences(IEnumerable<ScriptMessage> source, List<ScriptCountry> countries, Dictionary<int, Dictionary<string, string>> values)
+    {
+        var messages = source.ToList();
+        var global = messages.Where(item => item.ScriptCountryId == null).ToList();
+        var specific = messages.Where(item => item.ScriptCountryId.HasValue).GroupBy(item => item.ScriptCountryId!.Value).ToDictionary(group => group.Key, group => group.ToList());
+        var result = new Dictionary<string, object>(StringComparer.Ordinal) { ["*"] = GenderedSequence(global, null) };
+        foreach (var country in countries)
+        {
+            var combined = global.Concat(specific.GetValueOrDefault(country.Id) ?? []).ToList();
+            if (combined.Count > 0) result[country.Code] = GenderedSequence(combined, values.GetValueOrDefault(country.Id));
+        }
+        return result;
+    }
+
+    private static object GenderedSequence(List<ScriptMessage> messages, Dictionary<string, string>? values)
+    {
+        var male = messages.Where(item => item.Gender == "M").ToList();
+        var female = messages.Where(item => item.Gender == "F").ToList();
+        if (male.Count > 0 && female.Count > 0)
+            return new { m = SequenceList(male, values), f = SequenceList(female, values) };
+        return new { single = SequenceList(messages, values) };
+    }
+
+    private static List<object> SequenceList(List<ScriptMessage> messages, Dictionary<string, string>? values) =>
+        messages.GroupBy(item => item.Phase).OrderBy(group => group.Key).Select(group => (object)new
+        {
+            phase = group.Key,
+            steps = group.OrderBy(item => item.StepOrder).ThenBy(item => item.Id)
+                .Select(item => values is null ? item.Text : PlaceholderPattern.Replace(item.Text, match => values.GetValueOrDefault(match.Groups[1].Value, match.Value))).ToList(),
+        }).ToList();
+
+    private static Dictionary<string, string> MergeGlobals(Dictionary<string, string>? local, Dictionary<string, string> globals, string target)
+    {
+        var result = globals.Where(pair => ScriptGlobalConfigCatalog.TargetFor(pair.Key) == target)
+            .ToDictionary(pair => ScriptGlobalConfigCatalog.RuntimeKeyFor(pair.Key), pair => pair.Value, StringComparer.Ordinal);
+        if (local is not null) foreach (var pair in local) result[pair.Key] = pair.Value;
+        return result;
+    }
     private async Task<StoreScript?> ByFolder(int id, CancellationToken ct) => await context.StoreScripts.FirstOrDefaultAsync(item => item.StoreCodeFolderId == id && !item.IsDeleted, ct);
     private bool CanManage() => User.IsInRole("Admin") || User.IsInRole("Administrator") || User.IsInRole("ExecutiveDirector");
     private async Task<bool> CanAccess(int companyId, CancellationToken ct) => CanManage() || await context.EmployeeManufacturingCompanies.AnyAsync(item => item.ApplicationUserId == (User.GetUserId() ?? "") && item.ManufacturingCompanyId == companyId && item.CanSeeManufacturingCompany, ct);

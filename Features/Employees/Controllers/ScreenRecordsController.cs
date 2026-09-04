@@ -33,6 +33,7 @@ public class ScreenRecordsController : ControllerBase
 
     [HttpGet]
     [HttpGet("GetRecords")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<ActionResult<List<ScreenRecord>>> GetRecords([FromQuery] string? employeeId, [FromQuery] DateTime? date, CancellationToken ct)
     {
         var query = _context.ScreenRecords.AsNoTracking().AsQueryable();
@@ -54,6 +55,7 @@ public class ScreenRecordsController : ControllerBase
 
     [HttpPost]
     [HttpPost("UploadRecord")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<ActionResult<ScreenRecord>> UploadRecord([FromBody] UploadScreenRecordRequest request, CancellationToken ct)
     {
         var rec = new ScreenRecord
