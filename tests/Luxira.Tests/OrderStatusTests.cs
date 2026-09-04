@@ -45,4 +45,17 @@ public class OrderStatusTests
         // Valid transition to Delivered
         policy.EnsureAllowed(order, OrderStatusCodes.Delivered, null, actor);
     }
+
+    [Fact]
+    public void OrderStatusTransitionPolicy_ShouldAllowTrustedCourierFailureWithoutReason()
+    {
+        var policy = new OrderStatusTransitionPolicy();
+        var order = new Order { Id = 1, OrderStatus = OrderStatusCodes.InDelivery };
+
+        policy.EnsureAllowed(
+            order,
+            OrderStatusCodes.FailedDelivery,
+            null,
+            OrderStatusActor.TrustedSystem("courier-webhook"));
+    }
 }

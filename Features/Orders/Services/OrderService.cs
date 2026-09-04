@@ -256,7 +256,7 @@ public partial class OrderService
         var now = IstanbulTimeHelper.Now;
         order.OrderStatus = request.NewStatus;
         order.LastEditedDate = now;
-        order.Editedby = actor.UserId;
+        if (!actor.IsTrustedSystem) order.Editedby = actor.UserId;
 
         if (request.NewStatus == OrderStatusCodes.Delivered && !order.IsBonusPaidForEmployee)
         {
@@ -280,7 +280,7 @@ public partial class OrderService
             OrderId = order.Id,
             Status = request.NewStatus,
             CreatedAt = now,
-            ApplicationUserId = actor.UserId,
+            ApplicationUserId = actor.IsTrustedSystem ? null : actor.UserId,
             Reason = CombineHistoryReason(
                 request.Reason ?? $"تغيير الحالة من {OrderStatusCodes.GetDisplayName(previousStatus)} إلى {OrderStatusCodes.GetDisplayName(request.NewStatus)}",
                 request.Note),

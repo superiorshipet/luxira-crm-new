@@ -124,12 +124,48 @@ public sealed class ApiCollectionJsonController(ApplicationDbContext context) : 
         var advances = transactions.Where(item => item.TransactionType == EmployeeTransactionType.Advance).Sum(item => Math.Abs(item.Amount));
         var bonuses = transactions.Where(item => item.TransactionType is EmployeeTransactionType.Bonus or EmployeeTransactionType.Overtime).Sum(item => Math.Abs(item.Amount));
         var overtime = transactions.Where(item => item.TransactionType == EmployeeTransactionType.Overtime).Sum(item => Math.Abs(item.Amount));
-        var due = Math.Max(0, decimal.Round(earned + bonuses - deductions - advances, 2));
-        var manual = await context.EmployeeSalaryPayments.AsNoTracking().Where(payment => payment.EmployeeId == employee.Id && !payment.IsPaid && !payment.IsDeleted && !payment.IsPermanentlyDeleted && payment.SalaryMonth.Year == now.Year && payment.SalaryMonth.Month == now.Month && payment.ReceiptNumber.StartsWith("MANUAL"))
-            .OrderByDescending(payment => payment.Id).Select(payment => (decimal?)payment.RemainingAmount).FirstOrDefaultAsync(ct);
-        if (manual.HasValue) due = Math.Max(0, decimal.Round(manual.Value, 2));
-        return Ok(new { AdjustedSalary = due.ToString("0.00"), Transactions = transactions.Select(item => new { item.Id, item.Amount, TransactionType = TransactionTypeText(item.TransactionType), TransactionTypeValue = (int)item.TransactionType, item.Reason, Date = item.Date.ToString("yyyy-MM-dd"), IsPositive = IsPositive(item.TransactionType) }), AdjustedSalaryUSD = due.ToString("0.00"), TotalSalary = earned.ToString("0.00"), TotalBonus = bonuses.ToString("0.00"), TotalOvertime = overtime.ToString("0.00"), TotalAdvance = advances.ToString("0.00"), TotalDeduction = deductions.ToString("0.00"), TotalOngoingAccount = due.ToString("0.00"), CommissionAmount = 0m, AccruedDays = days, DaysInMonth = DateTime.DaysInMonth(now.Year, now.Month), EarnedSalary = earned, DueAmount = due, Currency = CurrencyForEmployee(employee), ManualAmountApplied = manual.HasValue });
+        var countryText = string.IsNullOrWhiteSpace(employee.Country) ? employee.Nationality : employee.Country;
+        var commissionUsd = string.IsNullOrWhiteSpace(employee.ApplicationUserId) ? 0m : await CalculateUnpaidCommissionUsd(employee.ApplicationUserId, countryText, now, ct);
+        var countryId = CountryId(countryText); var employeeRate = countryId.HasValue ? await context.ExchangeRates.AsNoTracking().Where(item => item.Country == countryId).Select(item => (decimal?)item.SellToUSD).FirstOrDefaultAsync(ct) : null;
+        var commission = employeeRate > 0 ? decimal.Round(commissionUsd * employeeRate.Value, 2, MidpointRounding.AwayFromZero) : decimal.Round(commissionUsd, 2, MidpointRounding.AwayFromZero);
+        var due = Math.Max(0, decimal.Round(earned + bonuses + commission - deductions - advances, 2, MidpointRounding.AwayFromZero));
+        var manual = await context.EmployeeSalaryPayments.AsNoTracking().Where(payment => payment.EmployeeId == employee.Id && !payment.IsPaid && !payment.IsDeleted && !payment.IsPermanentlyDeleted && payment.SalaryMonth.Year == now.Year && payment.SalaryMonth.Month == now.Month && payment.ReceiptNumber != null)
+            .OrderByDescending(payment => payment.Id).Select(payment => new { payment.RemainingAmount, payment.ReceiptNumber }).FirstOrDefaultAsync(ct);
+        var manualApplied = manual is not null && (manual.ReceiptNumber.StartsWith("MANUAL|", StringComparison.OrdinalIgnoreCase) || manual.ReceiptNumber.StartsWith("MANUALAMOUNT|", StringComparison.OrdinalIgnoreCase) || manual.ReceiptNumber.StartsWith("MANUALBOTH|", StringComparison.OrdinalIgnoreCase));
+        if (manualApplied) due = Math.Max(0, decimal.Round(manual!.RemainingAmount, 2, MidpointRounding.AwayFromZero));
+        var dueUsd = employeeRate > 0 ? decimal.Round(due / employeeRate.Value, 2, MidpointRounding.AwayFromZero) : due;
+        return Ok(new { AdjustedSalary = due.ToString("0.00"), Transactions = transactions.Select(item => new { item.Id, item.Amount, TransactionType = TransactionTypeText(item.TransactionType), TransactionTypeValue = (int)item.TransactionType, item.Reason, Date = item.Date.ToString("yyyy-MM-dd"), IsPositive = IsPositive(item.TransactionType) }), AdjustedSalaryUSD = dueUsd.ToString("0.00"), TotalSalary = earned.ToString("0.00"), TotalBonus = bonuses.ToString("0.00"), TotalOvertime = overtime.ToString("0.00"), TotalAdvance = advances.ToString("0.00"), TotalDeduction = deductions.ToString("0.00"), TotalOngoingAccount = due.ToString("0.00"), CommissionAmount = commission, AccruedDays = days, DaysInMonth = DateTime.DaysInMonth(now.Year, now.Month), EarnedSalary = earned, DueAmount = due, Currency = CurrencyForEmployee(employee), ManualAmountApplied = manualApplied });
     }
+
+    private async Task<decimal> CalculateUnpaidCommissionUsd(string employeeId, string? employeeCountry, DateTime now, CancellationToken ct)
+    {
+        var rate = await context.EmployeeBonusRates.AsNoTracking().FirstOrDefaultAsync(item => item.EmployeeId == employeeId, ct); if (rate is null) return 0m;
+        var systemStart = new DateTime(2026, 4, 11, 10, 30, 0); var currentCycle = new DateTime(now.Year, now.Month, 1, 10, 30, 0); if (now < currentCycle) currentCycle = currentCycle.AddMonths(-1); if (currentCycle <= systemStart) return 0m;
+        int[] success = [OrderStatusCodes.Delivered, OrderStatusCodes.BalanceUpdated, OrderStatusCodes.Paid];
+        IQueryable<Order> Scope() => context.Orders.AsNoTracking().Where(item => success.Contains(item.OrderStatus) && item.CreatedDate >= systemStart && item.CreatedDate < currentCycle);
+        var candidates = Scope().Where(item => item.ApplicationUserId == employeeId).Union(Scope().Where(item => item.Fixedby == employeeId)).Union(Scope().Where(item => item.Editedby == employeeId)).Union(Scope().Where(item => context.OrderEditHistories.Any(history => history.OrderId == item.Id && history.Editedby == employeeId)));
+        var orders = await candidates.ToListAsync(ct); if (orders.Count == 0) return 0m; var ids = orders.Select(item => item.Id).ToArray();
+        var successDates = await context.OrderStatusHistories.AsNoTracking().Where(item => item.OrderId.HasValue && ids.Contains(item.OrderId.Value) && item.Status.HasValue && success.Contains(item.Status.Value)).GroupBy(item => item.OrderId!.Value).Select(group => new { Id = group.Key, At = group.Max(item => item.CreatedAt) }).ToDictionaryAsync(item => item.Id, item => item.At, ct);
+        var edits = await context.OrderEditHistories.AsNoTracking().Where(item => ids.Contains(item.OrderId)).OrderBy(item => item.OrderId).ThenBy(item => item.EditNumber).ToListAsync(ct); var editGroups = edits.GroupBy(item => item.OrderId).ToDictionary(group => group.Key, group => group.ToList());
+        var fx = await context.ExchangeRates.AsNoTracking().ToDictionaryAsync(item => item.Country, item => item.SellToUSD, ct);
+        decimal ToUsd(decimal amount, int country) => fx.GetValueOrDefault(country) > 0 ? amount / fx[country] : amount;
+        var stakes = new List<BonusStake>();
+        foreach (var order in orders) { var at = successDates.GetValueOrDefault(order.Id, order.CreatedDate); if (at < systemStart || at >= currentCycle) continue; var share = CalculateShare(order, editGroups.GetValueOrDefault(order.Id) ?? [], employeeId, ToUsd); if (share.Profit > 0 || order.ApplicationUserId == employeeId) stakes.Add(new(at, order.BonusPaymentId.HasValue, share.Creation, share.Processing)); }
+        var localFx = CountryId(employeeCountry) is int id && fx.GetValueOrDefault(id) > 0 ? fx[id] : 1m; var proThreshold = rate.ProThreshold / localFx; var minimum = rate.MinimumBonusThreshold / localFx; decimal total = 0m;
+        foreach (var cycle in stakes.GroupBy(item => CycleStart(item.At))) { var cycleProfit = cycle.Sum(item => item.Creation + item.Processing); var pro = proThreshold > 0 && cycleProfit >= proThreshold; if (minimum > 0 && cycleProfit < minimum) continue; var creatorPct = pro ? rate.ProBonusPercentage : rate.BonusPercentage; var processorPct = pro ? rate.ProBonusProcessingPercentage : rate.BonusProcessingPercentage; total += cycle.Where(item => !item.Paid).Sum(item => Math.Max(0, item.Creation * creatorPct / 100m) + Math.Max(0, item.Processing * processorPct / 100m)); }
+        return total;
+    }
+
+    private static (decimal Profit, decimal Creation, decimal Processing) CalculateShare(Order order, IReadOnlyList<OrderEditHistory> edits, string employeeId, Func<decimal, int, decimal> usd)
+    {
+        var creator = order.ApplicationUserId ?? string.Empty; var states = edits.Select(item => (Profit: usd(item.TotalPrice - item.DeliveryPrice, item.Country), Author: string.IsNullOrWhiteSpace(item.Editedby) ? creator : item.Editedby!, At: item.LastEditedDate ?? item.CreatedDate)).ToList(); states.Add((usd(order.TotalPrice - order.DeliveryPrice, order.Country), string.IsNullOrWhiteSpace(order.Editedby) ? creator : order.Editedby!, order.LastEditedDate ?? order.CreatedDate)); if (states.Count == 0) return default;
+        var tranches = new List<BonusTranche> { new(creator, Math.Max(0, states[0].Profit), order.CreatedDate) };
+        for (var index = 1; index < states.Count; index++) { var delta = states[index].Profit - states[index - 1].Profit; if (delta > 0) tranches.Add(new(states[index].Author, delta, states[index].At)); else for (var cursor = tranches.Count - 1; cursor >= 0 && delta < 0; cursor--) { var take = Math.Min(tranches[cursor].Amount, -delta); tranches[cursor] = tranches[cursor] with { Amount = tranches[cursor].Amount - take }; delta += take; } }
+        var processor = !string.IsNullOrWhiteSpace(order.Fixedby) && order.Fixedby != creator ? order.Fixedby : null; decimal creation = 0m, processing = 0m; foreach (var tranche in tranches.Where(item => item.Amount > 0)) { var amount = tranche.Amount; if (processor is not null && (!order.FixedOrderDate.HasValue || tranche.At <= order.FixedOrderDate.Value)) { amount /= 2m; if (processor == employeeId) processing += amount; } if (tranche.Owner == employeeId) creation += amount; } return (creation + processing, creation, processing);
+    }
+    private static DateTime CycleStart(DateTime at) { var start = new DateTime(at.Year, at.Month, 1, 10, 30, 0); return at < start ? start.AddMonths(-1) : start; }
+    private sealed record BonusStake(DateTime At, bool Paid, decimal Creation, decimal Processing);
+    private sealed record BonusTranche(string Owner, decimal Amount, DateTime At);
 
     private async Task<IActionResult> DeliveryAccounts(bool paid, CancellationToken ct)
     {

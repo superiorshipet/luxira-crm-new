@@ -13,5 +13,6 @@ public class DeliveryCompanyModule : IModule
         services.AddScoped<CourierDispatchService>();
         services.AddHostedService<ScheduledCourierSendService>();
         services.AddHostedService<CourierRetryService>();
+        services.AddHostedService<CamexReconciliationService>();
     }
 }

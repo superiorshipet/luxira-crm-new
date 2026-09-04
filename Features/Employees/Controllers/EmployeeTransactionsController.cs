@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Luxira.Api.Infrastructure.Pdf;
+using Luxira.Api.Features.Operations.Models;
 
 namespace Luxira.Api.Features.Employees.Controllers;
 
@@ -144,7 +145,13 @@ public class EmployeeTransactionsController : ControllerBase
         .Where(item => item.IsDeleted).OrderByDescending(item => item.DeletedAt ?? item.Date).Take(1_000).ToListAsync(ct));
 
     [HttpGet("/EmployeeTransactions/GetPermanentlyDeletedTransactions")]
-    public IActionResult GetPermanentlyDeletedTransactions() => Ok(Array.Empty<object>());
+    public async Task<IActionResult> GetPermanentlyDeletedTransactions(CancellationToken ct)
+    {
+        var rows = await _context.AppLogs.AsNoTracking().Where(item => item.Category == PermanentDeleteCategory).OrderByDescending(item => item.CreatedAtUtc).Take(1000).Select(item => item.Message).ToListAsync(ct);
+        var entries = rows.Select(message => { try { return JsonSerializer.Deserialize<PermanentDeleteEntry>(message); } catch (JsonException) { return null; } }).Where(item => item is not null).Cast<PermanentDeleteEntry>().ToList(); var employeeIds = entries.Select(item => item.EmployeeId).Distinct().ToArray(); var currencies = await _context.Employees.AsNoTracking().Where(item => employeeIds.Contains(item.Id)).Select(item => new { item.Id, item.Country, item.Nationality }).ToDictionaryAsync(item => item.Id, item => Currency(item.Country ?? item.Nationality), ct);
+        var items = entries.Select(item => { var currency = string.IsNullOrWhiteSpace(item.Currency) ? currencies.GetValueOrDefault(item.EmployeeId, "") : item.Currency; var amount = item.Amount.ToString("0.##"); return new { transactionId = item.TransactionId, employeeName = string.IsNullOrWhiteSpace(item.EmployeeName) ? "بدون اسم" : item.EmployeeName, amount, amountWithCurrency = string.IsNullOrWhiteSpace(currency) ? amount : amount + " " + currency, currency, transactionType = string.IsNullOrWhiteSpace(item.TransactionType) ? "-" : item.TransactionType, reason = string.IsNullOrWhiteSpace(item.Reason) ? "-" : item.Reason, transactionDate = item.TransactionDate.ToString("yyyy-MM-dd HH:mm:ss"), deletedAt = item.DeletedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-", deletedBy = string.IsNullOrWhiteSpace(item.DeletedBy) ? "-" : item.DeletedBy, permanentlyDeletedAt = item.PermanentlyDeletedAt.ToString("yyyy-MM-dd HH:mm:ss"), permanentlyDeletedBy = string.IsNullOrWhiteSpace(item.PermanentlyDeletedBy) ? "-" : item.PermanentlyDeletedBy }; });
+        return Ok(new { success = true, items });
+    }
 
     [HttpGet("/EmployeeTransactions/GetTransactionsByDay")]
     public async Task<IActionResult> GetTransactionsByDay([FromQuery] DateTime? date, [FromQuery] int? employeeId, CancellationToken ct)
@@ -198,15 +205,19 @@ public class EmployeeTransactionsController : ControllerBase
     [HttpPost("/EmployeeTransactions/DeleteDeletedPermanently")]
     public async Task<IActionResult> DeleteDeletedPermanently([FromForm] int id, CancellationToken ct)
     {
-        var changed = await _context.EmployeeTransactions.Where(item => item.Id == id && item.IsDeleted).ExecuteDeleteAsync(ct);
-        return changed == 0 ? NotFound() : Ok(new { success = true });
+        var item = await _context.EmployeeTransactions.Include(row => row.Employee).FirstOrDefaultAsync(row => row.Id == id && row.IsDeleted, ct);
+        if (item is null) return NotFound();
+        AddPermanentDeleteAudit(item); _context.EmployeeTransactions.Remove(item); await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true });
     }
 
     [HttpPost("/EmployeeTransactions/DeleteAllDeletedPermanently")]
     public async Task<IActionResult> DeleteAllDeletedPermanently(CancellationToken ct)
     {
-        var changed = await _context.EmployeeTransactions.Where(item => item.IsDeleted).ExecuteDeleteAsync(ct);
-        return Ok(new { success = true, deletedCount = changed });
+        var items = await _context.EmployeeTransactions.Include(item => item.Employee).Where(item => item.IsDeleted).ToListAsync(ct);
+        foreach (var item in items) AddPermanentDeleteAudit(item);
+        _context.EmployeeTransactions.RemoveRange(items); await _context.SaveChangesAsync(ct);
+        return Ok(new { success = true, deletedCount = items.Count });
     }
 
     [HttpPost("/EmployeeTransactions/DeleteConfirmed")]
@@ -235,6 +246,13 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     private IQueryable<EmployeeTransaction> TransactionQuery() => _context.EmployeeTransactions.AsNoTracking().Include(item => item.Employee);
+    private const string PermanentDeleteCategory = "EmployeeTransactionPermanentDelete";
+    private void AddPermanentDeleteAudit(EmployeeTransaction item)
+    {
+        var deletedAt = DateTime.UtcNow; var deletedBy = User.Identity?.Name ?? "Unknown";
+        var entry = new PermanentDeleteEntry(item.Id, item.EmployeeId, item.Employee?.DisplayName ?? item.Employee?.Name, item.Amount, item.TransactionType.ToString(), item.Reason, item.Date, item.DeletedAt, item.DeletedByUserName, deletedAt, deletedBy, Currency(item.Employee?.Country ?? item.Employee?.Nationality));
+        _context.AppLogs.Add(new AppLog { CreatedAtUtc = deletedAt, Level = "Information", Category = PermanentDeleteCategory, Type = "Audit", Kind = "PermanentDelete", Message = JsonSerializer.Serialize(entry) });
+    }
     private IQueryable<EmployeeTransaction> SoftDeleteQuery(List<int> ids) => _context.EmployeeTransactions.Where(item => ids.Contains(item.Id) && !item.IsDeleted);
     private static List<int> ParseIds(string ids) => ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(value => int.TryParse(value, out var id) ? id : 0).Where(id => id > 0).Distinct().Take(10_000).ToList();
@@ -264,7 +282,10 @@ public class EmployeeTransactionsController : ControllerBase
         };
         return (int)result >= 0;
     }
+    private static string Currency(string? country) { var value = (country ?? "").ToLowerInvariant(); if (value.Contains("مصر") || value.Contains("egypt") || value.Contains("egp")) return "EGP"; if (value.Contains("ترك") || value.Contains("turkey") || value.Contains("try")) return "TRY"; if (value.Contains("عراق") || value.Contains("iraq") || value.Contains("iqd")) return "IQD"; if (value.Contains("ليبيا") || value.Contains("libya") || value.Contains("lyd")) return "LYD"; if (value.Contains("الأردن") || value.Contains("اردن") || value.Contains("jordan") || value.Contains("jod")) return "JOD"; if (value.Contains("الكويت") || value.Contains("kuwait") || value.Contains("kwd")) return "KWD"; if (value.Contains("قطر") || value.Contains("qatar") || value.Contains("qar")) return "QAR"; if (value.Contains("عمان") || value.Contains("oman") || value.Contains("omr")) return "OMR"; if (value.Contains("البحرين") || value.Contains("bahrain") || value.Contains("bhd")) return "BHD"; if (value.Contains("تونس") || value.Contains("tunisia") || value.Contains("tnd")) return "TND"; if (value.Contains("السعود") || value.Contains("saudi") || value.Contains("sar")) return "SAR"; if (value.Contains("الإمارات") || value.Contains("الامارات") || value.Contains("emirates") || value.Contains("uae") || value.Contains("aed")) return "AED"; return value.Contains("usd") || value.Contains("دولار") ? "USD" : ""; }
 }
+
+public sealed record PermanentDeleteEntry(int TransactionId, int EmployeeId, string? EmployeeName, decimal Amount, string TransactionType, string? Reason, DateTime TransactionDate, DateTime? DeletedAt, string? DeletedBy, DateTime PermanentlyDeletedAt, string PermanentlyDeletedBy, string? Currency = null);
 
 public record CreateEmployeeTransactionRequest(int EmployeeId, decimal Amount, string TransactionType, string? Note);
 public record UpdateEmployeeTransactionRequest(int Id, decimal Amount, string TransactionType, string? Reason);

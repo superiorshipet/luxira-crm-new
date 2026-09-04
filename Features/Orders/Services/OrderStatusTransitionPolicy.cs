@@ -66,15 +66,15 @@ public sealed class OrderStatusTransitionPolicy
                 $"Order status '{targetStatus}' is not part of the legacy status contract.");
         }
 
+        if (actor.IsTrustedSystem)
+        {
+            return;
+        }
+
         if (OrderStatusCodes.FailureStatuses.Contains(targetStatus) &&
             string.IsNullOrWhiteSpace(reason))
         {
             throw new BadRequestException("A failure reason is required for failure statuses.");
-        }
-
-        if (actor.IsTrustedSystem)
-        {
-            return;
         }
 
         if (order.CamexTrackingNumber.HasValue)

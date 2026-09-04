@@ -1,90 +1,45 @@
+using System.Security.Cryptography;
+using System.Text;
 using Luxira.Api.Data;
-using Luxira.Api.Features.Orders.Services;
+using Luxira.Api.Features.DeliveryCompanies.Services;
+using Luxira.Api.Features.Orders.DTOs;
 using Luxira.Api.Features.Orders.Models;
-using Luxira.Api.Utils.Extensions;
+using Luxira.Api.Features.Orders.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Globalization;
-using Luxira.Api.Infrastructure.Webhooks;
-using Luxira.Api.Utils.Exceptions;
 
 namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 
-[ApiController]
-[AllowAnonymous]
-[Route("api/v1/webhooks/camex")]
-[Route("api/camex/webhook")]
-[Route("CamexWebhook")]
-public class CamexWebhookController : ControllerBase
+[ApiController, AllowAnonymous]
+[Route("api/v1/webhooks/camex"), Route("api/camex/webhook"), Route("CamexWebhook")]
+public sealed class CamexWebhookController(ApplicationDbContext context, OrderService orders, IConfiguration configuration, ILogger<CamexWebhookController> logger) : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-    private readonly OrderService _orderService;
-    private readonly WebhookSecurity _webhookSecurity;
-
-    public CamexWebhookController(
-        ApplicationDbContext context,
-        OrderService orderService,
-        WebhookSecurity webhookSecurity)
-    {
-        _context = context;
-        _orderService = orderService;
-        _webhookSecurity = webhookSecurity;
-    }
-
-    [HttpPost]
-    [HttpPost("ProcessWebhook")]
+    [HttpPost, HttpPost("ProcessWebhook")]
     public async Task<IActionResult> ProcessWebhook([FromBody] CamexWebhookPayload payload, CancellationToken ct)
     {
-        _webhookSecurity.ValidateSharedSecret(Request, "Camex");
-        if (payload == null || string.IsNullOrWhiteSpace(payload.TrackingNumber))
-        {
-            return BadRequest(new { message = "Invalid payload" });
-        }
-
-        if (!long.TryParse(
-                payload.TrackingNumber,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var trackingNumber))
-        {
-            return BadRequest(new { message = "Tracking number must be numeric." });
-        }
-
-        var normalizedStatus = payload.Status?.Trim().ToLowerInvariant();
-        var targetStatus = normalizedStatus switch
-        {
-            "delivered" => OrderStatusCodes.Delivered,
-            "returned" => OrderStatusCodes.Returned,
-            "in_transit" => OrderStatusCodes.InDelivery,
-            "cancelled" => OrderStatusCodes.Cancelled,
-            _ => throw new BadRequestException("Unsupported Camex webhook status.")
-        };
-
-        var eventKey = payload.EventId ??
-            $"{payload.TrackingNumber}|{normalizedStatus}|{payload.Timestamp:O}|{payload.Notes}";
-        await _webhookSecurity.ExecuteOnceAsync("Camex", eventKey, async cancellationToken =>
-        {
-            var order = await _context.Orders.AsNoTracking()
-                .FirstOrDefaultAsync(o => o.CamexTrackingNumber == trackingNumber, cancellationToken)
-                ?? throw new NotFoundException("Order for Camex tracking number was not found.");
-            if (targetStatus != order.OrderStatus)
-            {
-                await _orderService.UpdateOrderStatusAsync(
-                    order.Id,
-                    new Orders.DTOs.UpdateOrderStatusRequest(targetStatus, $"Camex Webhook: {payload.Status}", payload.Notes),
-                    OrderStatusActor.TrustedSystem("camex-webhook"),
-                    cancellationToken);
-            }
-        }, ct);
-
-        return Ok(new { success = true, trackingNumber = payload.TrackingNumber });
+        var bodySecret = configuration["Camex:WebhookSecretKey"];
+        if (string.IsNullOrWhiteSpace(bodySecret) || !FixedTimeEquals(payload.SecretKey, bodySecret)) return Unauthorized();
+        var tracking = payload.Id ?? (long.TryParse(payload.TrackingNumber, out var parsed) ? parsed : null);
+        if (!tracking.HasValue || tracking <= 0) return Envelope("missing id");
+        var state = payload.State ?? LegacyTextState(payload.Status);
+        if (!state.HasValue) return Envelope("missing or unknown state");
+        var order = await context.Orders.AsNoTracking().FirstOrDefaultAsync(item => item.CamexTrackingNumber == tracking, ct);
+        if (order is null) return Envelope("unknown tracking number");
+        var mapping = CamexReconciliationService.Map(state.Value); var target = mapping.Status; var now = DateTime.UtcNow;
+        var advisory = mapping.Advisory;
+        await context.Orders.Where(item => item.Id == order.Id).ExecuteUpdateAsync(update => update
+            .SetProperty(item => item.CamexState, state).SetProperty(item => item.CamexStateChangedAt, now)
+            .SetProperty(item => item.CamexAdvisoryState, advisory == null ? null : state)
+            .SetProperty(item => item.CamexAdvisoryAt, advisory == null ? null : now)
+            .SetProperty(item => item.CamexAdvisoryNote, advisory), ct);
+        if (target.HasValue && target.Value != order.OrderStatus)
+            await orders.UpdateOrderStatusAsync(order.Id, new UpdateOrderStatusRequest(target.Value, $"Camex state {state.Value}", payload.Notes), OrderStatusActor.TrustedSystem("camex-webhook"), ct);
+        else if (!target.HasValue && state is not 12) logger.LogWarning("Unmapped CAMEX state {State} for order {OrderId}", state, order.Id);
+        return Envelope(target.HasValue ? "applied" : "recorded without status change");
     }
+    private OkObjectResult Envelope(string trace) => Ok(new { type = 1, messages = Array.Empty<string>(), traceId = trace });
+    private static int? LegacyTextState(string? status) => status?.Trim().ToLowerInvariant() switch { "delivered" => 6, "returned" => 11, "in_transit" => 5, "cancelled" => 16, _ => null };
+    private static bool FixedTimeEquals(string? supplied, string expected) { if (string.IsNullOrEmpty(supplied)) return false; var left = Encoding.UTF8.GetBytes(supplied); var right = Encoding.UTF8.GetBytes(expected); return left.Length == right.Length && CryptographicOperations.FixedTimeEquals(left, right); }
 }
-
-public record CamexWebhookPayload(
-    string TrackingNumber,
-    string? Status,
-    string? Notes,
-    DateTime? Timestamp,
-    string? EventId = null);
+public sealed record CamexWebhookPayload(long? Id, int? State, string? SecretKey, string? TrackingNumber = null, string? Status = null, string? Notes = null, DateTime? Timestamp = null, string? EventId = null);

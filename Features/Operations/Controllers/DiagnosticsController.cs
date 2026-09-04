@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Luxira.Api.Data;
+using Luxira.Api.Features.DeliveryCompanies.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -60,8 +61,31 @@ public sealed class DiagnosticsController(ApplicationDbContext context, IConfigu
     public async Task<IActionResult> ClearLogs(string? key, CancellationToken ct)
     {
         if (!IsAuthorized(key)) return Unauthorized(new { message = "invalid or missing key" });
-        var removed = await context.AppLogs.ExecuteDeleteAsync(ct);
+        // Permanent-delete audit records are business records, not disposable diagnostics.
+        var removed = await context.AppLogs.Where(item => item.Category != "EmployeeTransactionPermanentDelete").ExecuteDeleteAsync(ct);
         return Ok(new { success = true, removed });
+    }
+
+    [HttpGet("camex/outbound-ip")]
+    public async Task<IActionResult> CamexOutboundIp(string? key, [FromServices] IHttpClientFactory clients, CancellationToken ct)
+    {
+        if (!IsAuthorized(key)) return Unauthorized(new { message = "invalid or missing key" });
+        try { return Ok(new { ok = true, ip = (await clients.CreateClient().GetStringAsync("https://api.ipify.org", ct)).Trim() }); }
+        catch (Exception exception) { return StatusCode(502, new { ok = false, error = exception.Message }); }
+    }
+
+    [HttpGet("camex/check")]
+    public async Task<IActionResult> CamexCheck(string? key, long? trackNo, [FromServices] CourierDispatchService courier, CancellationToken ct)
+    {
+        if (!IsAuthorized(key)) return Unauthorized(new { message = "invalid or missing key" });
+        var stores = await courier.GetCamexStoresAsync(ct); var known = stores is null ? null : new HashSet<string>(stores, StringComparer.Ordinal); var mappings = known is null ? [] : await context.CamexStoreMappings.AsNoTracking().Where(item => item.CamexStoreName != null && !known.Contains(item.CamexStoreName)).Select(item => new { item.ManufacturingCompanyId, item.CamexStoreName }).ToListAsync(ct); var cityCount = await context.CamexCities.AsNoTracking().CountAsync(item => item.IsActive, ct); var tracked = trackNo.HasValue ? await courier.GetCamexStateAsync(trackNo.Value, ct) : null;
+        return Ok(new { ok = stores is not null && mappings.Count == 0 && cityCount > 0 && (!trackNo.HasValue || tracked.HasValue), configured = courier.IsConfigured("camex"), steps = new object[] { new { step = "Stores", ok = stores is not null, count = stores?.Count ?? 0, sample = stores?.Take(5) }, new { step = "Cities", ok = cityCount > 0, count = cityCount }, new { step = "StoreMappingValidation", ok = mappings.Count == 0, issues = mappings }, new { step = "TrackState", ran = trackNo.HasValue, ok = !trackNo.HasValue || tracked.HasValue, trackNo, state = tracked } } });
+    }
+
+    [HttpPost("camex/sync-cities")]
+    public async Task<IActionResult> CamexSyncCities(string? key, [FromServices] CourierDispatchService courier, CancellationToken ct)
+    {
+        if (!IsAuthorized(key)) return Unauthorized(new { message = "invalid or missing key" }); var result = await courier.SyncCamexCitiesAsync(ct); return Ok(new { ok = result.Success, result.Added, result.Updated, result.Retired, result.Reactivated });
     }
 
     [HttpGet("metrics")]
