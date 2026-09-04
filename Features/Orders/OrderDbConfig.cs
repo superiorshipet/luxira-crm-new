@@ -266,6 +266,75 @@ public class OrderFollowUpRequestDbConfig : IDbConfig<OrderFollowUpRequest>
     }
 }
 
+public class OrderDetailsFieldAuditLogDbConfig : IDbConfig<OrderDetailsFieldAuditLog>
+{
+    public void Configure(EntityTypeBuilder<OrderDetailsFieldAuditLog> builder)
+    {
+        builder.ToTable("OrderDetailsFieldAuditLogs");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.ActionType).HasMaxLength(20).IsRequired();
+        builder.Property(item => item.FieldKey).HasMaxLength(120).IsRequired();
+        builder.Property(item => item.FieldLabel).HasMaxLength(250).IsRequired();
+        builder.Property(item => item.ChangeReason).HasMaxLength(1000);
+        builder.Property(item => item.SourcePageName).HasMaxLength(250);
+        builder.Property(item => item.CreatedByUserId).HasMaxLength(450);
+        builder.Property(item => item.CreatedByUserName).HasMaxLength(250);
+        builder.HasIndex(item => new { item.OrderId, item.FieldKey, item.ActionType, item.CreatedAt });
+    }
+}
+
+public class OrderContentViewLogDbConfig : IDbConfig<OrderContentViewLog>
+{
+    public void Configure(EntityTypeBuilder<OrderContentViewLog> builder)
+    {
+        builder.ToTable("OrderContentViewLogs");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.ContentType).HasMaxLength(80).IsRequired();
+        builder.Property(item => item.ContentKey).HasMaxLength(500).IsRequired();
+        builder.Property(item => item.ContentLabel).HasMaxLength(250);
+        builder.Property(item => item.SourcePageName).HasMaxLength(250);
+        builder.Property(item => item.ViewedByUserId).HasMaxLength(450);
+        builder.Property(item => item.ViewedByUserName).HasMaxLength(250);
+    }
+}
+
+public class OrderContentViewReadStateDbConfig : IDbConfig<OrderContentViewReadState>
+{
+    public void Configure(EntityTypeBuilder<OrderContentViewReadState> builder)
+    {
+        builder.ToTable("OrderContentViewReadStates");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.ContentType).HasMaxLength(80).IsRequired();
+        builder.Property(item => item.ContentKey).HasMaxLength(500).IsRequired();
+        builder.Property(item => item.ReaderUserId).HasMaxLength(450).IsRequired();
+    }
+}
+
+public class OrderPackagingAchievementRunDbConfig : IDbConfig<OrderPackagingAchievementRun>
+{
+    public void Configure(EntityTypeBuilder<OrderPackagingAchievementRun> builder)
+    {
+        builder.ToTable("OrderPackagingAchievementRuns");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.RunKey).HasColumnType("char(36)").IsRequired();
+        builder.Property(item => item.EmployeeUserId).HasMaxLength(450).IsRequired();
+        builder.Property(item => item.EmployeeName).HasMaxLength(250);
+        builder.Property(item => item.OrderIds).IsRequired();
+        builder.HasIndex(item => item.RunKey).IsUnique();
+    }
+}
+
+public class OrderPackagingAchievementNotificationDbConfig : IDbConfig<OrderPackagingAchievementNotification>
+{
+    public void Configure(EntityTypeBuilder<OrderPackagingAchievementNotification> builder)
+    {
+        builder.ToTable("OrderPackagingAchievementNotifications");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.UserId).HasMaxLength(450).IsRequired();
+        builder.HasIndex(item => new { item.UserId, item.AcknowledgedAt });
+    }
+}
+
 public class PotentialOrderDbConfig : IDbConfig<PotentialOrder>
 {
     public void Configure(EntityTypeBuilder<PotentialOrder> builder)

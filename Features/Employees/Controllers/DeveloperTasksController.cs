@@ -13,7 +13,7 @@ namespace Luxira.Api.Features.Employees.Controllers;
 [Authorize]
 [Route("api/v1/developer-tasks")]
 [Route("DeveloperTasks")]
-public sealed class DeveloperTasksController(ApplicationDbContext context) : ControllerBase
+public sealed partial class DeveloperTasksController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]
     [HttpGet("GetTasks")]

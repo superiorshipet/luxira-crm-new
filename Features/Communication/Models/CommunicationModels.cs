@@ -246,3 +246,8 @@ public class ConferenceMeeting
     public DateTime? ScheduledEndTime { get; set; }
     public string HostUserId { get; set; } = string.Empty;
 }
+
+public class CallRecording
+{
+    public int Id { get; set; } public string? EmployeeId { get; set; } public string? OtherPartyName { get; set; } public string? OtherPartyPhone { get; set; } public string? OtherPartyType { get; set; } public string? CallType { get; set; } public string? Department { get; set; } public DateTime StartedAt { get; set; } public DateTime? EndedAt { get; set; } public string RecordingPath { get; set; } = string.Empty; public string? RecordingS3Key { get; set; } public long FileSizeBytes { get; set; } public DateTime CreatedAt { get; set; }
+}

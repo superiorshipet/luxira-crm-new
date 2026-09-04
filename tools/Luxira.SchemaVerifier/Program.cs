@@ -38,6 +38,17 @@ catch (Exception exception)
 
 var databaseColumns = await ReadColumnsAsync(context.Database.GetDbConnection());
 Console.WriteLine($"Database target: {context.Database.GetDbConnection().Database}");
+var inventoryMatch = args.FirstOrDefault(argument => argument.StartsWith("--inventory-match=", StringComparison.OrdinalIgnoreCase))?["--inventory-match=".Length..];
+if (!string.IsNullOrWhiteSpace(inventoryMatch))
+{
+    foreach (var table in databaseColumns
+        .Where(column => column.Table.Contains(inventoryMatch, StringComparison.OrdinalIgnoreCase))
+        .GroupBy(column => $"{column.Schema}.{column.Table}", StringComparer.OrdinalIgnoreCase)
+        .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+    {
+        Console.WriteLine($"INVENTORY {table.Key}: {string.Join(',', table.Select(column => column.Column))}");
+    }
+}
 var relationalModel = context.Model.GetRelationalModel();
 var runSelectSmoke = args.Any(argument =>
     argument.Equals("--smoke-select", StringComparison.OrdinalIgnoreCase));

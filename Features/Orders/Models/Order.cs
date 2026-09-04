@@ -295,3 +295,69 @@ public class OrderFollowUpRequest
     public string? ProcessingStartedByUserId { get; set; }
     public string? ProcessingStartedByName { get; set; }
 }
+
+public class OrderDetailsFieldAuditLog
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public string ActionType { get; set; } = string.Empty;
+    public string FieldKey { get; set; } = string.Empty;
+    public string FieldLabel { get; set; } = string.Empty;
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public string? ChangeReason { get; set; }
+    public string? CopiedValue { get; set; }
+    public string? SourcePageName { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? CreatedByUserName { get; set; }
+}
+
+public class OrderContentViewLog
+{
+    public long Id { get; set; }
+    public int OrderId { get; set; }
+    public string ContentType { get; set; } = string.Empty;
+    public string ContentKey { get; set; } = string.Empty;
+    public string? ContentLabel { get; set; }
+    public string? SourcePageName { get; set; }
+    public DateTime ViewedAt { get; set; }
+    public string? ViewedByUserId { get; set; }
+    public string? ViewedByUserName { get; set; }
+}
+
+public class OrderContentViewReadState
+{
+    public long Id { get; set; }
+    public int OrderId { get; set; }
+    public string ContentType { get; set; } = string.Empty;
+    public string ContentKey { get; set; } = string.Empty;
+    public string ReaderUserId { get; set; } = string.Empty;
+    public DateTime LastReadAt { get; set; }
+}
+
+public class OrderPackagingAchievementRun
+{
+    public long Id { get; set; }
+    public string RunKey { get; set; } = string.Empty;
+    public string EmployeeUserId { get; set; } = string.Empty;
+    public string? EmployeeName { get; set; }
+    public string OrderIds { get; set; } = string.Empty;
+    public int OrderCount { get; set; }
+    public DateTime RunStartedAt { get; set; }
+    public DateTime? WorkStartedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public int? DurationSeconds { get; set; }
+    public DateTime? EmailSentAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class OrderPackagingAchievementNotification
+{
+    public long Id { get; set; }
+    public long RunId { get; set; }
+    public string UserId { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime? AcknowledgedAt { get; set; }
+}

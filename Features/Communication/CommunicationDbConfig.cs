@@ -280,6 +280,11 @@ public class ConferenceMeetingDbConfig : IDbConfig<ConferenceMeeting>
     }
 }
 
+public class CallRecordingDbConfig : IDbConfig<CallRecording>
+{
+    public void Configure(EntityTypeBuilder<CallRecording> builder) { builder.ToTable("CallRecordings"); builder.HasKey(item => item.Id); builder.Property(item => item.EmployeeId).HasMaxLength(450); builder.Property(item => item.OtherPartyName).HasMaxLength(200); builder.Property(item => item.OtherPartyPhone).HasMaxLength(50); builder.Property(item => item.OtherPartyType).HasMaxLength(50); builder.Property(item => item.CallType).HasMaxLength(50); builder.Property(item => item.Department).HasMaxLength(100); builder.Property(item => item.RecordingPath).HasMaxLength(2000).IsRequired(); builder.Property(item => item.RecordingS3Key).HasMaxLength(450); }
+}
+
 public class PasswordEmailDbConfig : IDbConfig<PasswordEmail>
 {
     public void Configure(EntityTypeBuilder<PasswordEmail> builder)

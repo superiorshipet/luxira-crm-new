@@ -22,8 +22,14 @@ public class EditHistoryController : ControllerBase
         _context = context;
     }
 
+    [HttpGet("Mockup")]
+    [HttpPost("Mockup")]
+    [Authorize]
+    public IActionResult Mockup() => Ok(new { });
+
     [HttpGet("AllEdits")]
     [HttpGet("/EditHistory/AllEdits")]
+    [HttpPost("/EditHistory/AllEdits")]
     public async Task<IActionResult> AllEdits([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
     {
         var query = _context.OrderEditHistories
@@ -39,6 +45,7 @@ public class EditHistoryController : ControllerBase
 
     [HttpGet("OrderChanges/{id:int}")]
     [HttpGet("/EditHistory/OrderChanges")]
+    [HttpPost("/EditHistory/OrderChanges")]
     public async Task<IActionResult> OrderChanges([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct = default)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
@@ -53,6 +60,7 @@ public class EditHistoryController : ControllerBase
 
     [HttpGet("EmployeeSearch")]
     [HttpGet("/EditHistory/EmployeeSearch")]
+    [HttpPost("/EditHistory/EmployeeSearch")]
     public async Task<IActionResult> EmployeeSearch([FromQuery] string q, CancellationToken ct = default)
     {
         var employees = await _context.Employees

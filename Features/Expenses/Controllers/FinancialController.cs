@@ -28,8 +28,22 @@ public class FinancialController : ControllerBase
         _employeeService = employeeService;
     }
 
+    [HttpGet("Index")]
+    [HttpGet("/Financial/Index")]
+    [HttpPost("/Financial/Index")]
+    public async Task<IActionResult> Index(CancellationToken ct)
+    {
+        var balanceUpdated = await _context.Orders.AsNoTracking()
+            .Where(order => order.OrderStatus == OrderStatusCodes.BalanceUpdated)
+            .GroupBy(order => 1)
+            .Select(group => new { Count = group.Count(), Total = group.Sum(order => order.TotalPrice), Delivery = group.Sum(order => order.DeliveryPrice) })
+            .FirstOrDefaultAsync(ct);
+        return Ok(new { balanceUpdated = balanceUpdated ?? new { Count = 0, Total = 0m, Delivery = 0m } });
+    }
+
     [HttpGet("Countries")]
     [HttpGet("/Financial/Countries")]
+    [HttpPost("/Financial/Countries")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
     public async Task<IActionResult> Countries(CancellationToken ct)
     {
@@ -56,6 +70,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("OrderByManfacturingCompanyOnGoingDeliveryCompany")]
     [HttpGet("/Financial/OrderByManfacturingCompanyOnGoingDeliveryCompany")]
+    [HttpPost("/Financial/OrderByManfacturingCompanyOnGoingDeliveryCompany")]
     public async Task<IActionResult> OrderByManfacturingCompanyOnGoingDeliveryCompany(
         [FromQuery] int? deliveryCompanyId,
         [FromQuery] int? countryId,
@@ -121,6 +136,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve")]
     [HttpGet("/Financial/OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve")]
+    [HttpPost("/Financial/OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve")]
     public async Task<IActionResult> OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve(
         [FromQuery] int? deliveryCompanyId,
         [FromQuery] int? countryId,
@@ -162,6 +178,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("OrderByManafactureCompanyThenDeliveryCompany")]
     [HttpGet("/Financial/OrderByManafactureCompanyThenDeliveryCompany")]
+    [HttpPost("/Financial/OrderByManafactureCompanyThenDeliveryCompany")]
     public async Task<IActionResult> OrderByManafactureCompanyThenDeliveryCompany(
         [FromQuery] int? deliveryCompanyId,
         [FromQuery] int? manafacturecompanyId,
@@ -195,6 +212,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("Employees")]
     [HttpGet("/Financial/Employees")]
+    [HttpPost("/Financial/Employees")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
     public async Task<IActionResult> Employees(
         [FromQuery] string? userId,
@@ -283,6 +301,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("EmployeeBonusDetails")]
     [HttpGet("/Financial/EmployeeBonusDetails")]
+    [HttpPost("/Financial/EmployeeBonusDetails")]
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
     public async Task<IActionResult> EmployeeBonusDetails([FromQuery] int employeeId, CancellationToken ct)
     {
@@ -477,6 +496,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("DownloadOrderReport/{orderReportId:int}")]
     [HttpGet("/Financial/DownloadOrderReport")]
+    [HttpPost("/Financial/DownloadOrderReport")]
     public async Task<IActionResult> DownloadOrderReport([RouteOrRequest] int orderReportId, [FromQuery] int? id, CancellationToken ct)
     {
         var reportId = orderReportId > 0 ? orderReportId : (id ?? 0);

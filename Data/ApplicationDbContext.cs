@@ -55,6 +55,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<OrderPostEmployeeDeduction> OrderPostEmployeeDeductions => Set<OrderPostEmployeeDeduction>();
     public DbSet<OrderMetaActionClick> OrderMetaActionClicks => Set<OrderMetaActionClick>();
     public DbSet<OrderFollowUpRequest> OrderFollowUpRequests => Set<OrderFollowUpRequest>();
+    public DbSet<OrderDetailsFieldAuditLog> OrderDetailsFieldAuditLogs => Set<OrderDetailsFieldAuditLog>();
+    public DbSet<OrderContentViewLog> OrderContentViewLogs => Set<OrderContentViewLog>();
+    public DbSet<OrderContentViewReadState> OrderContentViewReadStates => Set<OrderContentViewReadState>();
+    public DbSet<OrderPackagingAchievementRun> OrderPackagingAchievementRuns => Set<OrderPackagingAchievementRun>();
+    public DbSet<OrderPackagingAchievementNotification> OrderPackagingAchievementNotifications => Set<OrderPackagingAchievementNotification>();
     public DbSet<PotentialOrder> PotentialOrders => Set<PotentialOrder>();
     public DbSet<UrgentReport> UrgentReports => Set<UrgentReport>();
 
@@ -167,6 +172,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<AdminNotificationReplyState> AdminNotificationReplyStates => Set<AdminNotificationReplyState>();
     public DbSet<SystemEmailLog> SystemEmailLogs => Set<SystemEmailLog>();
     public DbSet<ConferenceMeeting> ConferenceMeetings => Set<ConferenceMeeting>();
+    public DbSet<CallRecording> CallRecordings => Set<CallRecording>();
     public DbSet<PasswordEmail> PasswordEmails => Set<PasswordEmail>();
     public DbSet<PasswordEmailHistory> PasswordEmailHistories => Set<PasswordEmailHistory>();
     public DbSet<PasswordPageType> PasswordPageTypes => Set<PasswordPageType>();
