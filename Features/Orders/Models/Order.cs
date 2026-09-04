@@ -1,5 +1,6 @@
 using Luxira.Api.Features.Auth.Models;
 using Luxira.Api.Features.DeliveryCompanies.Models;
+using Luxira.Api.Features.Warehouses.Models;
 
 namespace Luxira.Api.Features.Orders.Models;
 
@@ -60,8 +61,28 @@ public class Order
     public string? PaymentReceiptUrl { get; set; }
     public string? PaymentReceiptS3Key { get; set; }
 
-    public long? CamexTrackingNumber { get; set; }
+    public bool SandoogLegacyManual { get; set; }
+    public DateTime? SandoogConfirmedAt { get; set; }
+    public string? SandoogOrderId { get; set; }
+    public string? SandoogFulfillmentId { get; set; }
+    public string? SandoogDeliveryLabelUrl { get; set; }
+    public string? SandoogReason { get; set; }
     public string? SandoogReasonCode { get; set; }
+    public DateTime? SandoogLastAttemptAt { get; set; }
+    public int SandoogSendAttempts { get; set; }
+    public int SandoogSendGeneration { get; set; }
+
+    public bool CamexLegacyManual { get; set; }
+    public DateTime? CamexConfirmedAt { get; set; }
+    public long? CamexTrackingNumber { get; set; }
+    public int? CamexState { get; set; }
+    public DateTime? CamexStateChangedAt { get; set; }
+    public DateTime? CamexLastAttemptAt { get; set; }
+    public int CamexSendAttempts { get; set; }
+    public int CamexSendGeneration { get; set; }
+    public string? CamexAdvisoryNote { get; set; }
+    public DateTime? CamexAdvisoryAt { get; set; }
+    public int? CamexAdvisoryState { get; set; }
 
     public List<OrderWarehouse> OrderWarehouses { get; set; } = new();
     public List<OrderStatusHistory> StatusHistories { get; set; } = new();
@@ -73,6 +94,7 @@ public class OrderWarehouse
     public int OrderId { get; set; }
     public Order? Order { get; set; }
     public int WarehouseId { get; set; }
+    public Warehouse? Warehouse { get; set; }
     public int Amount { get; set; }
     public decimal? UnitPrice { get; set; }
 }
@@ -360,4 +382,23 @@ public class OrderPackagingAchievementNotification
     public string UserId { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime? AcknowledgedAt { get; set; }
+}
+
+public enum ScheduledSendStatus { Pending = 0, Firing = 1, Completed = 2, Cancelled = 3, Failed = 4 }
+
+public class ScheduledSendRequest
+{
+    public int Id { get; set; }
+    public string CourierKey { get; set; } = string.Empty;
+    public string? RequestedByUserId { get; set; }
+    public DateTime RequestedAtUtc { get; set; }
+    public int DelayMinutes { get; set; }
+    public int OrderCount { get; set; }
+    public DateTime FireAtUtc { get; set; }
+    public ScheduledSendStatus Status { get; set; }
+    public DateTime? ClaimedAtUtc { get; set; }
+    public DateTime? CompletedAtUtc { get; set; }
+    public string? CancelledByUserId { get; set; }
+    public DateTime? CancelledAtUtc { get; set; }
+    public string? ResultSummary { get; set; }
 }

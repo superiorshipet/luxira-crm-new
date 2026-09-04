@@ -61,6 +61,7 @@ public class OrderWarehouseDbConfig : IDbConfig<OrderWarehouse>
         builder.ToTable("OrderWarehouses");
         builder.HasKey(w => new { w.OrderId, w.WarehouseId });
         builder.Property(w => w.UnitPrice).HasPrecision(18, 2);
+        builder.HasOne(w => w.Warehouse).WithMany().HasForeignKey(w => w.WarehouseId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -332,6 +333,20 @@ public class OrderPackagingAchievementNotificationDbConfig : IDbConfig<OrderPack
         builder.HasKey(item => item.Id);
         builder.Property(item => item.UserId).HasMaxLength(450).IsRequired();
         builder.HasIndex(item => new { item.UserId, item.AcknowledgedAt });
+    }
+}
+
+public class ScheduledSendRequestDbConfig : IDbConfig<ScheduledSendRequest>
+{
+    public void Configure(EntityTypeBuilder<ScheduledSendRequest> builder)
+    {
+        builder.ToTable("ScheduledSendRequests");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.CourierKey).HasMaxLength(32).IsRequired();
+        builder.Property(item => item.RequestedByUserId).HasMaxLength(450);
+        builder.Property(item => item.CancelledByUserId).HasMaxLength(450);
+        builder.HasIndex(item => new { item.Status, item.FireAtUtc });
+        builder.HasIndex(item => new { item.CourierKey, item.Status }).IsUnique().HasFilter("[Status] = 0");
     }
 }
 

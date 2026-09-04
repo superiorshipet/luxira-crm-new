@@ -12,6 +12,7 @@ namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 [ApiController]
 [AllowAnonymous]
 [Route("api/v1/webhooks/sandoog")]
+[Route("api/sandoog/webhook")]
 [Route("SandoogWebhook")]
 public class SandoogWebhookController : ControllerBase
 {

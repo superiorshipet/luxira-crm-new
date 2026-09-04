@@ -14,6 +14,7 @@ namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 [ApiController]
 [AllowAnonymous]
 [Route("api/v1/webhooks/camex")]
+[Route("api/camex/webhook")]
 [Route("CamexWebhook")]
 public class CamexWebhookController : ControllerBase
 {

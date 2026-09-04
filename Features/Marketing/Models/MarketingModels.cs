@@ -93,6 +93,14 @@ public class StoreScript
     public ICollection<ScriptEditHistory> EditHistories { get; set; } = [];
 }
 
+public class SeedScriptSetting
+{
+    public int Id { get; set; }
+    public string Message { get; set; } = "alert('hello world');";
+    public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
 public class ScriptTarget { public int Id { get; set; } public int ScriptDefinitionId { get; set; } public StoreScript? ScriptDefinition { get; set; } public string Kind { get; set; } = string.Empty; public string Value { get; set; } = string.Empty; public int SortOrder { get; set; } public bool IsDeleted { get; set; } }
 public class ScriptThemeToken { public int Id { get; set; } public int ScriptDefinitionId { get; set; } public StoreScript? ScriptDefinition { get; set; } public string Key { get; set; } = string.Empty; public string Value { get; set; } = string.Empty; public int SortOrder { get; set; } }
 public class ScriptSetting { public int Id { get; set; } public int ScriptDefinitionId { get; set; } public StoreScript? ScriptDefinition { get; set; } public string Key { get; set; } = string.Empty; public string Value { get; set; } = string.Empty; public int SortOrder { get; set; } }

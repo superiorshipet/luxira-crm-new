@@ -75,6 +75,17 @@ public class StoreScriptDbConfig : IDbConfig<StoreScript>
     }
 }
 
+public class SeedScriptSettingDbConfig : IDbConfig<SeedScriptSetting>
+{
+    public void Configure(EntityTypeBuilder<SeedScriptSetting> builder)
+    {
+        builder.ToTable("SeedScriptSettings");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Message).IsRequired();
+        builder.Property(item => item.UpdatedBy).HasMaxLength(256);
+    }
+}
+
 public class ScriptTargetDbConfig : IDbConfig<ScriptTarget> { public void Configure(EntityTypeBuilder<ScriptTarget> builder) { builder.ToTable("ScriptTargets"); builder.HasKey(x => x.Id); builder.Property(x => x.Kind).HasMaxLength(20).IsRequired(); builder.Property(x => x.Value).HasMaxLength(64).IsRequired(); } }
 public class ScriptThemeTokenDbConfig : IDbConfig<ScriptThemeToken> { public void Configure(EntityTypeBuilder<ScriptThemeToken> builder) { builder.ToTable("ScriptThemeTokens"); builder.HasKey(x => x.Id); builder.Property(x => x.Key).HasMaxLength(64).IsRequired(); builder.Property(x => x.Value).HasMaxLength(64).IsRequired(); } }
 public class ScriptSettingDbConfig : IDbConfig<ScriptSetting> { public void Configure(EntityTypeBuilder<ScriptSetting> builder) { builder.ToTable("ScriptSettings"); builder.HasKey(x => x.Id); builder.Property(x => x.Key).HasMaxLength(64).IsRequired(); builder.Property(x => x.Value).HasMaxLength(256).IsRequired(); } }

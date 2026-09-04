@@ -113,7 +113,29 @@ public sealed class AdvertisingManagerController(ApplicationDbContext context, I
     {
         var query = context.AdvertisingManagerItems.AsNoTracking().Where(item => !item.IsDeleted).Include(item => item.StoreFolder).ThenInclude(folder => folder!.ManufacturingCompany).Include(item => item.StorePasswordPage).AsSplitQuery();
         if (storeId is > 0) query = query.Where(item => item.StoreFolder!.ManufacturingCompanyId == storeId); if (!string.IsNullOrWhiteSpace(accountName)) query = query.Where(item => item.AccountName != null && item.AccountName.Contains(accountName)); if (!string.IsNullOrWhiteSpace(folderName)) query = query.Where(item => item.FolderName != null && item.FolderName.Contains(folderName)); if (!string.IsNullOrWhiteSpace(pageName)) query = query.Where(item => item.FacebookPageNameSnapshot.Contains(pageName)); if (!string.IsNullOrWhiteSpace(email)) query = query.Where(item => item.EmailSnapshot != null && item.EmailSnapshot.Contains(email));
-        var items = await query.OrderBy(item => item.StoreFolder!.SortOrder).ThenBy(item => item.CreatedAt).Take(1000).ToListAsync(ct); var ids = items.Select(item => item.Id).ToArray(); var accounts = await context.AdvertisingManagerItemAccounts.AsNoTracking().Where(item => ids.Contains(item.AdvertisingManagerItemId)).ToListAsync(ct); return Ok(new { totalStores = items.Select(item => item.AdvertisingManagerStoreFolderId).Distinct().Count(), totalPages = items.Count, totalFolders = items.Count(item => !string.IsNullOrWhiteSpace(item.FolderName)), totalAccounts = items.Count(item => !string.IsNullOrWhiteSpace(item.AccountName)) + accounts.Count, items, additionalAccounts = accounts });
+        var items = await query.OrderBy(item => item.StoreFolder!.SortOrder).ThenBy(item => item.CreatedAt).Take(1000).ToListAsync(ct);
+        var ids = items.Select(item => item.Id).ToArray();
+        var accounts = await context.AdvertisingManagerItemAccounts.AsNoTracking().Where(item => ids.Contains(item.AdvertisingManagerItemId)).ToListAsync(ct);
+        var responseItems = items.Select(item => new
+        {
+            item.Id,
+            item.AdvertisingManagerStoreFolderId,
+            item.StorePasswordPageId,
+            item.FolderName,
+            item.AccountName,
+            item.FacebookPageNameSnapshot,
+            item.EmailSnapshot,
+            item.PasswordSnapshot,
+            item.CreatedAt,
+            item.UpdatedAt,
+            manufacturingCompanyId = item.StoreFolder?.ManufacturingCompanyId,
+            storeName = item.StoreFolder?.ManufacturingCompany?.Name,
+            storeImageUrl = item.StoreFolder?.ManufacturingCompany?.ImageUrl,
+            pageName = item.StorePasswordPage?.PageName ?? item.FacebookPageNameSnapshot,
+            email = item.StorePasswordPage?.Email ?? item.EmailSnapshot,
+            password = item.StorePasswordPage?.Password ?? item.PasswordSnapshot
+        });
+        return Ok(new { totalStores = items.Select(item => item.AdvertisingManagerStoreFolderId).Distinct().Count(), totalPages = items.Count, totalFolders = items.Count(item => !string.IsNullOrWhiteSpace(item.FolderName)), totalAccounts = items.Count(item => !string.IsNullOrWhiteSpace(item.AccountName)) + accounts.Count, items = responseItems, additionalAccounts = accounts });
     }
 
     private async Task<IActionResult> SaveAccount(AdvertisingAccountRequest request, bool edit, CancellationToken ct)

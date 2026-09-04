@@ -32,8 +32,8 @@ public sealed class ApiCollectionJsonController(ApplicationDbContext context) : 
             row.SelectedCountry,
             Currency = CurrencyForCountry(row.SelectedCountry),
             TotalPrice = decimal.Round(row.TotalPrice, 2),
-            TotalPirceDollar = rates.TryGetValue(row.SelectedCountry, out var rate) && rate.BuyToUSD > 0
-                ? decimal.Round(row.TotalPrice / rate.BuyToUSD, 2) : row.TotalPrice
+            TotalPirceDollar = rates.TryGetValue(row.SelectedCountry, out var rate) && rate.SellToUSD > 0
+                ? decimal.Round(row.TotalPrice / rate.SellToUSD, 2) : row.TotalPrice
         }));
     }
 
@@ -82,9 +82,18 @@ public sealed class ApiCollectionJsonController(ApplicationDbContext context) : 
             .Select(group => group.OrderByDescending(payment => payment.PaidAt).ThenByDescending(payment => payment.Id).First())
             .OrderBy(payment => payment.SalaryMonth).ToList();
         var currency = CurrencyForEmployee(employee);
-        var payments = rows.Select(payment => new { MonthText = payment.SalaryMonth.ToString("MM/yyyy"), Amount = decimal.Round(payment.RemainingAmount, 2), Currency = string.IsNullOrWhiteSpace(payment.Currency) ? currency : payment.Currency, IsHistorical = false }).ToList();
+        var payments = new List<EmployeeSalaryReceivedRow>();
+        var currentMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+        var firstRecordedMonth = rows.Count == 0 ? currentMonth : new DateTime(rows[0].SalaryMonth.Year, rows[0].SalaryMonth.Month, 1);
+        for (var month = new DateTime(employee.DateAdded.Year, employee.DateAdded.Month, 1); month < firstRecordedMonth && month < currentMonth; month = month.AddMonths(1))
+            payments.Add(new(month.ToString("MM/yyyy"), decimal.Round(employee.Salary, 2), currency, true));
+        payments.AddRange(rows.Select(payment => new EmployeeSalaryReceivedRow(payment.SalaryMonth.ToString("MM/yyyy"), decimal.Round(payment.RemainingAmount, 2), string.IsNullOrWhiteSpace(payment.Currency) ? currency : payment.Currency, false)));
         var total = payments.Sum(payment => payment.Amount);
-        return Ok(new { TotalEarned = total.ToString("0.00"), TotalEarnedUSD = total.ToString("0.00"), TotalReceived = total, Currency = currency, Payments = payments });
+        var countryText = string.IsNullOrWhiteSpace(employee.Country) ? employee.Nationality : employee.Country;
+        var countryId = CountryId(countryText);
+        var sellRate = countryId.HasValue ? await context.ExchangeRates.AsNoTracking().Where(rate => rate.Country == countryId).Select(rate => (decimal?)rate.SellToUSD).FirstOrDefaultAsync(ct) : null;
+        var totalUsd = sellRate > 0 ? decimal.Round(total / sellRate.Value, 2) : total;
+        return Ok(new { TotalEarned = total.ToString("0.00"), TotalEarnedUSD = totalUsd.ToString("0.00"), TotalReceived = total, Currency = currency, Payments = payments });
     }
 
     [HttpGet("Last10EmployeeTransactions")]
@@ -145,4 +154,7 @@ public sealed class ApiCollectionJsonController(ApplicationDbContext context) : 
     private static string CurrencyForEmployee(Employee employee) => CurrencyForCountryName(string.IsNullOrWhiteSpace(employee.Country) ? employee.Nationality : employee.Country);
     private static string CurrencyForCountry(int country) => country switch { 1 => "IQD", 2 => "AED", 3 => "QAR", 4 => "LYD", 5 => "OMR", 6 => "ILS", 7 => "TRY", 8 => "JOD", 9 => "KWD", 10 => "BHD", 11 => "SAR", 12 => "TND", 13 => "MAD", 14 => "DZD", 15 => "LBP", 16 => "EGP", _ => "USD" };
     private static string CurrencyForCountryName(string? country) { var value = (country ?? string.Empty).ToLowerInvariant(); if (value.Contains("مصر") || value.Contains("egypt")) return "EGP"; if (value.Contains("ترك") || value.Contains("turkey")) return "TRY"; if (value.Contains("عراق") || value.Contains("iraq")) return "IQD"; return "USD"; }
+    private static int? CountryId(string? country) { var value = (country ?? string.Empty).ToLowerInvariant(); if (value.Contains("مصر") || value.Contains("egypt")) return 16; if (value.Contains("ترك") || value.Contains("turkey")) return 7; if (value.Contains("عراق") || value.Contains("iraq")) return 1; return null; }
 }
+
+public sealed record EmployeeSalaryReceivedRow(string MonthText, decimal Amount, string Currency, bool IsHistorical);

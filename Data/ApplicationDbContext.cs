@@ -60,6 +60,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<OrderContentViewReadState> OrderContentViewReadStates => Set<OrderContentViewReadState>();
     public DbSet<OrderPackagingAchievementRun> OrderPackagingAchievementRuns => Set<OrderPackagingAchievementRun>();
     public DbSet<OrderPackagingAchievementNotification> OrderPackagingAchievementNotifications => Set<OrderPackagingAchievementNotification>();
+    public DbSet<ScheduledSendRequest> ScheduledSendRequests => Set<ScheduledSendRequest>();
     public DbSet<PotentialOrder> PotentialOrders => Set<PotentialOrder>();
     public DbSet<UrgentReport> UrgentReports => Set<UrgentReport>();
 
@@ -136,6 +137,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<AdvertisingManagerPaymentCard> AdvertisingManagerPaymentCards => Set<AdvertisingManagerPaymentCard>();
     public DbSet<MarketingLead> MarketingLeads => Set<MarketingLead>();
     public DbSet<StoreScript> StoreScripts => Set<StoreScript>();
+    public DbSet<SeedScriptSetting> SeedScriptSettings => Set<SeedScriptSetting>();
     public DbSet<ScriptTarget> ScriptTargets => Set<ScriptTarget>();
     public DbSet<ScriptThemeToken> ScriptThemeTokens => Set<ScriptThemeToken>();
     public DbSet<ScriptSetting> ScriptSettings => Set<ScriptSetting>();

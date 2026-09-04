@@ -223,39 +223,30 @@ public class EmployeeService
         }
 
         var employees = await empQuery.ToListAsync(ct);
-        var summaries = new List<PayrollSummaryDto>();
+        var employeeIds = employees.Select(employee => employee.Id).ToArray();
+        var userIds = employees.Where(employee => !string.IsNullOrWhiteSpace(employee.ApplicationUserId)).Select(employee => employee.ApplicationUserId!).Distinct().ToArray();
+        var attendance = await _context.EmployeeAttendanceLogs.AsNoTracking().Where(item => item.EmployeeId.HasValue && employeeIds.Contains(item.EmployeeId.Value) && item.CheckInAt >= startDate && item.CheckInAt < endDate)
+            .GroupBy(item => item.EmployeeId!.Value).Select(group => new { EmployeeId = group.Key, Days = group.Select(item => item.CheckInAt.Date).Distinct().Count() }).ToDictionaryAsync(item => item.EmployeeId, item => item.Days, ct);
+        var bonusTotals = await _context.EmployeeBonusPayments.AsNoTracking().Where(item => userIds.Contains(item.EmployeeId) && item.DatePaid >= startDate && item.DatePaid < endDate)
+            .GroupBy(item => item.EmployeeId).Select(group => new { EmployeeId = group.Key, Amount = group.Sum(item => item.AmountPaid) }).ToDictionaryAsync(item => item.EmployeeId, item => item.Amount, ct);
+        var violationTotals = await _context.EmployeeViolations.AsNoTracking().Where(item => employeeIds.Contains(item.EmployeeId) && item.OccurredAt >= startDate && item.OccurredAt < endDate)
+            .GroupBy(item => item.EmployeeId).Select(group => new { EmployeeId = group.Key, Amount = group.Sum(item => item.PenaltyAmount) }).ToDictionaryAsync(item => item.EmployeeId, item => item.Amount, ct);
+        var advanceTotals = await _context.EmployeeTransactions.AsNoTracking().Where(item => employeeIds.Contains(item.EmployeeId) && item.Date >= startDate && item.Date < endDate && item.TransactionType == EmployeeTransactionType.Advance)
+            .GroupBy(item => item.EmployeeId).Select(group => new { EmployeeId = group.Key, Amount = group.Sum(item => item.Amount) }).ToDictionaryAsync(item => item.EmployeeId, item => item.Amount, ct);
+        var paidTotals = await _context.EmployeeSalaryPayments.AsNoTracking().Where(item => employeeIds.Contains(item.EmployeeId) && item.SalaryMonth >= startDate && item.SalaryMonth < endDate && item.IsPaid && !item.IsDeleted && !item.IsPermanentlyDeleted)
+            .GroupBy(item => item.EmployeeId).Select(group => new { EmployeeId = group.Key, Amount = group.Sum(item => item.RemainingAmount) }).ToDictionaryAsync(item => item.EmployeeId, item => item.Amount, ct);
+        var summaries = new List<PayrollSummaryDto>(employees.Count);
 
         foreach (var emp in employees)
         {
-            var attendedDays = await _context.EmployeeAttendanceLogs
-                .Where(a => a.EmployeeId == emp.Id && a.CheckInAt >= startDate && a.CheckInAt < endDate)
-                .Select(a => a.CheckInAt.Date)
-                .Distinct()
-                .CountAsync(ct);
-
-            // If no biometric logs recorded yet, treat active employees as fully attended for preview
+            var attendedDays = attendance.GetValueOrDefault(emp.Id);
             int effectiveDays = attendedDays > 0 ? attendedDays : totalDays;
             decimal dailyRate = totalDays > 0 ? emp.Salary / totalDays : 0;
             decimal earnedSalary = Math.Round(dailyRate * effectiveDays, 2);
-
-            decimal bonuses = await _context.EmployeeBonusPayments
-                .Where(b => b.EmployeeId == emp.ApplicationUserId && b.DatePaid >= startDate && b.DatePaid < endDate)
-                .SumAsync(b => (decimal?)b.AmountPaid, ct) ?? 0;
-
-            decimal deductions = await _context.EmployeeViolations
-                .Where(v => v.EmployeeId == emp.Id && v.OccurredAt >= startDate && v.OccurredAt < endDate)
-                .SumAsync(v => (decimal?)v.PenaltyAmount, ct) ?? 0;
-
-            decimal advances = await _context.EmployeeTransactions
-                .Where(t => t.EmployeeId == emp.Id && t.Date >= startDate && t.Date < endDate &&
-                            t.TransactionType == EmployeeTransactionType.Advance)
-                .SumAsync(t => (decimal?)t.Amount, ct) ?? 0;
-
-            decimal paidAmount = await _context.EmployeeSalaryPayments
-                .Where(p => p.EmployeeId == emp.Id
-                    && p.SalaryMonth >= startDate && p.SalaryMonth < endDate
-                    && p.IsPaid && !p.IsDeleted && !p.IsPermanentlyDeleted)
-                .SumAsync(p => (decimal?)p.RemainingAmount, ct) ?? 0;
+            var bonuses = string.IsNullOrWhiteSpace(emp.ApplicationUserId) ? 0 : bonusTotals.GetValueOrDefault(emp.ApplicationUserId);
+            var deductions = violationTotals.GetValueOrDefault(emp.Id);
+            var advances = advanceTotals.GetValueOrDefault(emp.Id);
+            var paidAmount = paidTotals.GetValueOrDefault(emp.Id);
 
             decimal netDue = Math.Max(0, earnedSalary + bonuses - deductions - advances);
             decimal remaining = Math.Max(0, netDue - paidAmount);

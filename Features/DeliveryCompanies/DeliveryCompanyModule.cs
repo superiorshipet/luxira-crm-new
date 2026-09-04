@@ -10,5 +10,8 @@ public class DeliveryCompanyModule : IModule
     {
         services.AddScoped<DeliveryCompanyRepository>();
         services.AddScoped<DeliveryCompanyService>();
+        services.AddScoped<CourierDispatchService>();
+        services.AddHostedService<ScheduledCourierSendService>();
+        services.AddHostedService<CourierRetryService>();
     }
 }

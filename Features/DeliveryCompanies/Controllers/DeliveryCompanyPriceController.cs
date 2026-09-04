@@ -37,7 +37,7 @@ public class DeliveryCompanyPriceController : ControllerBase
         if (deliveryCompanyId.HasValue) query = query.Where(p => p.DeliveryCompanyId == deliveryCompanyId.Value);
         if (country.HasValue) query = query.Where(p => p.Country == country.Value);
 
-        var prices = await query.ToListAsync(ct);
+        var prices = await query.Select(item => new { item.Id, item.DeliveryCompanyId, item.Country, item.City, item.Price, deliveryCompanyName = item.DeliveryCompany!.Name }).ToListAsync(ct);
         return Ok(prices);
     }
 
@@ -124,7 +124,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
         if (deliveryRepresentativeId.HasValue) query = query.Where(p => p.DeliveryCompanyId == deliveryRepresentativeId.Value);
         if (country.HasValue) query = query.Where(p => p.Country == country.Value);
 
-        var prices = await query.ToListAsync(ct);
+        var prices = await query.Select(item => new { item.Id, item.DeliveryCompanyId, item.Country, item.City, item.Price, deliveryRepresentativeName = item.DeliveryCompany!.Name }).ToListAsync(ct);
         return Ok(prices);
     }
 
@@ -156,7 +156,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
     {
         var price = await _context.DeliveryCompanyPrices.AsNoTracking().Include(item => item.DeliveryCompany)
             .FirstOrDefaultAsync(item => item.Id == id && item.DeliveryCompany != null && item.DeliveryCompany.IsRepresentative, ct);
-        return price is null ? NotFound() : Ok(price);
+        return price is null ? NotFound() : Ok(new { price.Id, price.DeliveryCompanyId, price.Country, price.City, price.Price, deliveryRepresentativeName = price.DeliveryCompany!.Name });
     }
 
     [HttpPost("/DeliveryRepresentativePrice/Edit")]

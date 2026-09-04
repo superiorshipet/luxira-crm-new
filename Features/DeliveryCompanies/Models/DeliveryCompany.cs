@@ -35,6 +35,7 @@ public class DeliveryCompany
     public bool AutoPullDeliveryInvoice { get; set; }
     public bool AutoPullAccountingInvoice { get; set; }
     public bool AutoPullCustomerInvoice { get; set; }
+    public bool IsApiIntegrationEnabled { get; set; } = true;
 
     public List<DeliveryCompanyPrice> Prices { get; set; } = new();
 }

@@ -209,7 +209,17 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
 
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     [HttpPost("/StoreScript/RestoreHistoryEntryAjax")]
-    public async Task<IActionResult> RestoreHistoryEntryAjax([FromForm] int id, CancellationToken ct) { var history = await context.ScriptEditHistories.FindAsync([id], ct); if (history is null) return NotFound(); History(history.ScriptDefinitionId, history.EntityType, history.EntityId, history.Field, history.NewValue, history.OldValue, true); var script = await context.StoreScripts.FindAsync([history.ScriptDefinitionId], ct); Bump(script!); await context.SaveChangesAsync(ct); return Ok(new { success = true, revision = script!.RevisionStamp, restoredValue = history.OldValue }); }
+    public async Task<IActionResult> RestoreHistoryEntryAjax([FromForm] int id, CancellationToken ct)
+    {
+        var history = await context.ScriptEditHistories.FindAsync([id], ct); if (history is null) return NotFound();
+        var script = await context.StoreScripts.FindAsync([history.ScriptDefinitionId], ct); if (script is null) return NotFound();
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
+        var restored = await ApplyHistoryValue(history, script, ct);
+        if (!restored) { await tx.RollbackAsync(ct); return BadRequest(new { message = "لا يمكن استرداد هذا الحقل." }); }
+        History(history.ScriptDefinitionId, history.EntityType, history.EntityId, history.Field, history.NewValue, history.OldValue, true);
+        Bump(script); await context.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        return Ok(new { success = true, revision = script.RevisionStamp, restoredValue = history.OldValue });
+    }
 
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     [HttpPost("/StoreScript/SetActiveAjax")]
@@ -224,7 +234,49 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
 
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     [HttpPost("/StoreScript/ImportSeedAjax")]
-    public async Task<IActionResult> ImportSeedAjax([FromForm] int folderId, [FromForm] string? seedJson, CancellationToken ct) { var script = await ByFolder(folderId, ct); if (script is null) return NotFound(); if (string.IsNullOrWhiteSpace(seedJson)) return BadRequest(new { message = "بيانات الاستيراد مطلوبة." }); try { using var document = JsonDocument.Parse(seedJson); script.Notes = document.RootElement.TryGetProperty("notes", out var notes) ? notes.GetString() : script.Notes; } catch (JsonException) { return BadRequest(new { message = "تعذر قراءة ملف الاستيراد." }); } Bump(script); History(script.Id, "ScriptDefinition", script.Id, "ImportSeed", null, "Imported"); await context.SaveChangesAsync(ct); return Ok(new { success = true, revision = script.RevisionStamp }); }
+    [RequestSizeLimit(20_000_000)]
+    public async Task<IActionResult> ImportSeedAjax([FromForm] int folderId, [FromForm] string? seedJson, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(seedJson)) return BadRequest(new { message = "بيانات الاستيراد مطلوبة." });
+        ScriptSeedInput? seed; try { seed = JsonSerializer.Deserialize<ScriptSeedInput>(seedJson, JsonOptions); } catch (JsonException exception) { return BadRequest(new { message = "تعذر قراءة ملف الاستيراد: " + exception.Message }); }
+        if (seed is null || seed.Buttons.Count == 0) return BadRequest(new { message = "ملف الاستيراد لا يحتوي على أزرار." });
+        var platform = Platforms.FirstOrDefault(item => item.Equals(seed.Platform, StringComparison.OrdinalIgnoreCase)); if (platform is null) return BadRequest(new { message = "المنصة يجب أن تكون Meta أو WhatsApp." });
+        var script = await ByFolder(folderId, ct); if (script is null) return NotFound(); if (!script.Platform.Equals(platform, StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "منصة الملف لا تطابق منصة السكربت." });
+        if (seed.Buttons.Any(item => string.IsNullOrWhiteSpace(item.Key) || string.IsNullOrWhiteSpace(item.Label))) return BadRequest(new { message = "يوجد زر رئيسي بلا مفتاح أو اسم." });
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
+        var categoryIds = await context.ScriptCategories.Where(item => item.ScriptDefinitionId == script.Id).Select(item => item.Id).ToListAsync(ct);
+        var subIds = await context.ScriptSubCategories.Where(item => categoryIds.Contains(item.ScriptCategoryId)).Select(item => item.Id).ToListAsync(ct);
+        await context.ScriptMessages.Where(item => item.ScriptCategoryId != null && categoryIds.Contains(item.ScriptCategoryId.Value) || item.ScriptSubCategoryId != null && subIds.Contains(item.ScriptSubCategoryId.Value)).ExecuteDeleteAsync(ct);
+        await context.ScriptSubCategories.Where(item => subIds.Contains(item.Id)).ExecuteDeleteAsync(ct);
+        await context.ScriptCategories.Where(item => categoryIds.Contains(item.Id)).ExecuteDeleteAsync(ct);
+        await context.ScriptThemeTokens.Where(item => item.ScriptDefinitionId == script.Id).ExecuteDeleteAsync(ct);
+        await context.ScriptTargets.Where(item => item.ScriptDefinitionId == script.Id).ExecuteDeleteAsync(ct);
+        var theme = new[] { ("BACKGROUND", seed.Settings.BackgroundColor), ("HOVER", seed.Settings.HoverColor), ("PROGRESS", seed.Settings.ProgressColor), ("STOP", seed.Settings.StopColor) };
+        context.ScriptThemeTokens.AddRange(theme.Where(item => !string.IsNullOrWhiteSpace(item.Item2)).Select((item, index) => new ScriptThemeToken { ScriptDefinitionId = script.Id, Key = item.Item1, Value = item.Item2!.Trim(), SortOrder = index }));
+        var targets = seed.Targets.Where(item => TargetKinds.Contains(item.Kind) && !string.IsNullOrWhiteSpace(item.Value)).GroupBy(item => item.Kind + "\0" + item.Value.Trim(), StringComparer.OrdinalIgnoreCase).Select(item => item.First()).ToList();
+        if (targets.Count != seed.Targets.Count) { await tx.RollbackAsync(ct); return BadRequest(new { message = "قائمة المعرفات غير صحيحة أو مكررة." }); }
+        var targetValues = targets.Select(item => item.Value.Trim()).ToArray();
+        if (await context.ScriptTargets.AnyAsync(item => item.ScriptDefinitionId != script.Id && !item.IsDeleted && targetValues.Contains(item.Value), ct)) { await tx.RollbackAsync(ct); return Conflict(new { message = "أحد المعرفات مستخدم بالفعل من متجر آخر." }); }
+        context.ScriptTargets.AddRange(targets.Select(item => new ScriptTarget { ScriptDefinitionId = script.Id, Kind = item.Kind, Value = item.Value.Trim(), SortOrder = item.SortOrder }));
+        var categoryCount = 0; var subCount = 0; var lineCount = 0;
+        foreach (var (button, index) in seed.Buttons.Select((value, index) => (value, index)))
+        {
+            var category = new ScriptCategory { ScriptDefinitionId = script.Id, Key = button.Key.Trim(), Label = button.Label.Trim(), Icon = Clean(button.Icon) ?? "•", IconKind = Clean(button.IconKind) ?? "emoji", SortOrder = button.SortOrder != 0 ? button.SortOrder : index, IsEnabled = true, CreatedAt = IstanbulTimeHelper.Now, UpdatedAt = IstanbulTimeHelper.Now, CreatedByUserId = User.GetUserId(), CreatedByName = User.Identity?.Name, UpdatedByUserId = User.GetUserId(), UpdatedByName = User.Identity?.Name };
+            context.ScriptCategories.Add(category); await context.SaveChangesAsync(ct); categoryCount++;
+            foreach (var (child, childIndex) in button.SubButtons.Select((value, childIndex) => (value, childIndex))) await ImportSubButton(child, childIndex, category.Id, null);
+        }
+        async Task ImportSubButton(ScriptSeedSubButtonInput input, int index, int categoryId, int? parentId)
+        {
+            if (string.IsNullOrWhiteSpace(input.Key) || string.IsNullOrWhiteSpace(input.Label)) throw new InvalidOperationException("يوجد زر فرعي بلا مفتاح أو اسم.");
+            var node = new ScriptSubCategory { ScriptCategoryId = categoryId, ParentSubCategoryId = parentId, Key = input.Key.Trim(), Label = input.Label.Trim(), Icon = Clean(input.Icon) ?? "•", IconKind = Clean(input.IconKind) ?? "emoji", SortOrder = input.SortOrder != 0 ? input.SortOrder : index, IsEnabled = true, CreatedAt = IstanbulTimeHelper.Now, UpdatedAt = IstanbulTimeHelper.Now, CreatedByUserId = User.GetUserId(), CreatedByName = User.Identity?.Name, UpdatedByUserId = User.GetUserId(), UpdatedByName = User.Identity?.Name };
+            context.ScriptSubCategories.Add(node); await context.SaveChangesAsync(ct); subCount++;
+            var both = !string.IsNullOrWhiteSpace(input.Male) && !string.IsNullOrWhiteSpace(input.Female);
+            lineCount += AddSeedLines(node.Id, both ? "M" : "", input.Male); lineCount += AddSeedLines(node.Id, both ? "F" : "", input.Female);
+            foreach (var (child, childIndex) in input.SubButtons.Select((value, childIndex) => (value, childIndex))) await ImportSubButton(child, childIndex, categoryId, node.Id);
+        }
+        script.IsActive = false; Bump(script); History(script.Id, "ScriptDefinition", script.Id, "Imported", null, $"{seed.SourceScriptId} — {categoryCount}/{subCount}/{lineCount}"); await context.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        return Ok(new { success = true, scriptId = script.Id, platform = script.Platform, script.IsActive, revision = script.RevisionStamp, primaryCount = categoryCount, secondaryCount = subCount, lineCount });
+    }
 
     private async Task<StoreScript?> LoadTree(int id, bool liveOnly, CancellationToken ct) => await context.StoreScripts.AsSplitQuery().Include(item => item.Targets).Include(item => item.ThemeTokens).Include(item => item.Settings).Include(item => item.Countries).ThenInclude(item => item.Values).Include(item => item.Categories).ThenInclude(item => item.Messages).Include(item => item.Categories).ThenInclude(item => item.SubCategories).ThenInclude(item => item.Messages).Include(item => item.Translations).FirstOrDefaultAsync(item => item.Id == id && (!liveOnly || item.IsActive && !item.IsDeleted), ct);
     private object Tree(StoreScript script, bool liveOnly) => new { script.Id, script.StoreCodeFolderId, script.ManufacturingCompanyId, script.Platform, script.EngineVersion, revision = script.RevisionStamp, script.IsActive, targets = script.Targets.Where(item => !liveOnly || !item.IsDeleted).OrderBy(item => item.SortOrder), theme = script.ThemeTokens.OrderBy(item => item.SortOrder), settings = script.Settings.OrderBy(item => item.SortOrder), countries = script.Countries.Where(item => !liveOnly || item.IsEnabled && !item.IsDeleted).OrderBy(item => item.SortOrder).Select(item => new { item.Id, item.Code, item.Label, item.FlagHex, item.IsEnabled, values = item.Values.ToDictionary(value => value.Key, value => value.Value) }), categories = script.Categories.Where(item => !liveOnly || item.IsEnabled && !item.IsDeleted).OrderBy(item => item.SortOrder).Select(item => new { item.Id, item.Key, item.Label, item.Icon, item.IconKind, item.SortOrder, item.IsEnabled, messages = item.Messages.OrderBy(message => message.Phase).ThenBy(message => message.StepOrder), subCategories = item.SubCategories.Where(node => !liveOnly || node.IsEnabled && !node.IsDeleted).OrderBy(node => node.SortOrder).Select(node => new { node.Id, node.ParentSubCategoryId, node.Key, node.Label, node.Icon, node.IconKind, node.ColorToken, node.IsCountryScoped, node.SortOrder, node.IsEnabled, messages = node.Messages.OrderBy(message => message.Phase).ThenBy(message => message.StepOrder) }) }), translations = script.Translations.Where(item => !liveOnly || !item.IsDeleted) };
@@ -236,6 +288,37 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
     private static List<T>? ParseList<T>(string? json) { try { return JsonSerializer.Deserialize<List<T>>(json ?? "[]", JsonOptions) ?? []; } catch (JsonException) { return null; } }
     private static bool ValidPairs(List<KeyValueOrder> items, int keyMax, int valueMax) => items.All(item => !string.IsNullOrWhiteSpace(item.Key) && item.Key.Trim().Length <= keyMax && !string.IsNullOrEmpty(item.Value) && item.Value.Length <= valueMax) && items.Select(item => item.Key.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() == items.Count;
     private async Task<IActionResult> SetDeleted(string type, int id, bool deleted, CancellationToken ct) { StoreScript? script; if (type == "Category") { var item = await context.ScriptCategories.FindAsync([id], ct); if (item is null) return NotFound(); item.IsDeleted = deleted; item.DeletedAt = deleted ? IstanbulTimeHelper.Now : null; script = await context.StoreScripts.FindAsync([item.ScriptDefinitionId], ct); } else if (type == "SubCategory") { var item = await context.ScriptSubCategories.Include(row => row.ScriptCategory).FirstOrDefaultAsync(row => row.Id == id, ct); if (item?.ScriptCategory is null) return NotFound(); item.IsDeleted = deleted; item.DeletedAt = deleted ? IstanbulTimeHelper.Now : null; script = await context.StoreScripts.FindAsync([item.ScriptCategory.ScriptDefinitionId], ct); } else if (type == "Country") { var item = await context.ScriptCountries.FindAsync([id], ct); if (item is null) return NotFound(); item.IsDeleted = deleted; script = await context.StoreScripts.FindAsync([item.ScriptDefinitionId], ct); } else return BadRequest(new { message = "نوع العنصر غير معروف." }); Bump(script!); await context.SaveChangesAsync(ct); return Ok(new { success = true, revision = script!.RevisionStamp }); }
+    private async Task<bool> ApplyHistoryValue(ScriptEditHistory history, StoreScript script, CancellationToken ct)
+    {
+        static bool Bool(string? value) => bool.TryParse(value, out var parsed) && parsed;
+        static int Int(string? value, int fallback) => int.TryParse(value, out var parsed) ? parsed : fallback;
+        if (history.EntityType == "ScriptDefinition")
+        {
+            if (history.Field == "IsActive") { script.IsActive = Bool(history.OldValue); return true; }
+            if (history.Field == "IsDeleted") { script.IsDeleted = Bool(history.OldValue); script.DeletedAt = script.IsDeleted ? IstanbulTimeHelper.Now : null; return true; }
+            if (history.Field == "Notes") { script.Notes = history.OldValue; return true; }
+            if (history.Field == "Theme") { var values = ParseList<KeyValueOrder>(history.OldValue); if (values is null) return false; await context.ScriptThemeTokens.Where(item => item.ScriptDefinitionId == script.Id).ExecuteDeleteAsync(ct); context.ScriptThemeTokens.AddRange(values.Select(item => new ScriptThemeToken { ScriptDefinitionId = script.Id, Key = item.Key, Value = item.Value, SortOrder = item.SortOrder })); return true; }
+            if (history.Field == "Targets") { var values = ParseList<TargetInput>(history.OldValue); if (values is null) return false; await context.ScriptTargets.Where(item => item.ScriptDefinitionId == script.Id).ExecuteDeleteAsync(ct); context.ScriptTargets.AddRange(values.Select(item => new ScriptTarget { ScriptDefinitionId = script.Id, Kind = item.Kind, Value = item.Value, SortOrder = item.SortOrder })); return true; }
+            return false;
+        }
+        if (history.EntityType == "ScriptCategory")
+        {
+            var item = await context.ScriptCategories.FirstOrDefaultAsync(row => row.Id == history.EntityId && row.ScriptDefinitionId == script.Id, ct); if (item is null) return false;
+            switch (history.Field) { case "Key": item.Key = history.OldValue ?? item.Key; break; case "Label": item.Label = history.OldValue ?? item.Label; break; case "Icon": item.Icon = history.OldValue ?? item.Icon; break; case "IconKind": item.IconKind = history.OldValue ?? item.IconKind; break; case "SortOrder": item.SortOrder = Int(history.OldValue, item.SortOrder); break; case "IsEnabled": item.IsEnabled = Bool(history.OldValue); break; case "IsDeleted": item.IsDeleted = Bool(history.OldValue); item.DeletedAt = item.IsDeleted ? IstanbulTimeHelper.Now : null; break; default: return false; } Touch(item); return true;
+        }
+        if (history.EntityType == "ScriptSubCategory")
+        {
+            var item = await context.ScriptSubCategories.Include(row => row.ScriptCategory).FirstOrDefaultAsync(row => row.Id == history.EntityId && row.ScriptCategory!.ScriptDefinitionId == script.Id, ct); if (item is null) return false;
+            switch (history.Field) { case "Key": item.Key = history.OldValue ?? item.Key; break; case "Label": item.Label = history.OldValue ?? item.Label; break; case "Icon": item.Icon = history.OldValue ?? item.Icon; break; case "IconKind": item.IconKind = history.OldValue ?? item.IconKind; break; case "ColorToken": item.ColorToken = history.OldValue; break; case "SortOrder": item.SortOrder = Int(history.OldValue, item.SortOrder); break; case "IsCountryScoped": item.IsCountryScoped = Bool(history.OldValue); break; case "IsEnabled": item.IsEnabled = Bool(history.OldValue); break; case "IsDeleted": item.IsDeleted = Bool(history.OldValue); item.DeletedAt = item.IsDeleted ? IstanbulTimeHelper.Now : null; break; case "ParentSubCategoryId": item.ParentSubCategoryId = string.IsNullOrWhiteSpace(history.OldValue) ? null : Int(history.OldValue, 0); break; default: return false; } Touch(item); return true;
+        }
+        if (history.EntityType == "ScriptCountry")
+        {
+            var item = await context.ScriptCountries.Include(row => row.Values).FirstOrDefaultAsync(row => row.Id == history.EntityId && row.ScriptDefinitionId == script.Id, ct); if (item is null) return false;
+            switch (history.Field) { case "Code": item.Code = history.OldValue ?? item.Code; break; case "Label": item.Label = history.OldValue ?? item.Label; break; case "FlagHex": item.FlagHex = history.OldValue ?? item.FlagHex; break; case "SortOrder": item.SortOrder = Int(history.OldValue, item.SortOrder); break; case "IsEnabled": item.IsEnabled = Bool(history.OldValue); break; case "IsDeleted": item.IsDeleted = Bool(history.OldValue); break; case "Values": var values = ParseList<KeyValueOrder>(history.OldValue); if (values is null) return false; context.ScriptCountryValues.RemoveRange(item.Values); context.ScriptCountryValues.AddRange(values.Select(value => new ScriptCountryValue { ScriptCountryId = item.Id, Key = value.Key, Value = value.Value })); break; default: return false; } return true;
+        }
+        return false;
+    }
+    private int AddSeedLines(int subCategoryId, string gender, string? text) { var lines = (text ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); for (var index = 0; index < lines.Length; index++) context.ScriptMessages.Add(new ScriptMessage { ScriptSubCategoryId = subCategoryId, Phase = 0, StepOrder = index, Gender = gender, Text = lines[index] }); return lines.Length; }
     private void History(int scriptId, string entity, int entityId, string field, string? oldValue, string? newValue, bool restore = false) => context.ScriptEditHistories.Add(new ScriptEditHistory { ScriptDefinitionId = scriptId, EntityType = entity, EntityId = entityId, Field = field, OldValue = oldValue, NewValue = newValue, IsRestoreAction = restore, CreatedAt = IstanbulTimeHelper.Now, CreatedByUserId = User.GetUserId(), CreatedByName = User.Identity?.Name });
     private void Bump(StoreScript script) { script.RevisionStamp = Math.Max(script.RevisionStamp + 1, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()); script.UpdatedAt = IstanbulTimeHelper.Now; script.UpdatedByUserId = User.GetUserId(); script.UpdatedByName = User.Identity?.Name; }
     private void Touch(ScriptCategory item) { item.UpdatedAt = IstanbulTimeHelper.Now; item.UpdatedByUserId = User.GetUserId(); item.UpdatedByName = User.Identity?.Name; }
@@ -248,3 +331,7 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
 public sealed record MessageInput(string? CountryCode, int Phase, int StepOrder, string? Gender, string Text);
 public sealed record KeyValueOrder(string Key, string Value, int SortOrder);
 public sealed record TargetInput(string Kind, string Value, int SortOrder);
+public sealed class ScriptSeedInput { public int SourceScriptId { get; set; } public string Platform { get; set; } = string.Empty; public ScriptSeedSettingsInput Settings { get; set; } = new(); public List<TargetInput> Targets { get; set; } = []; public List<ScriptSeedButtonInput> Buttons { get; set; } = []; }
+public sealed class ScriptSeedSettingsInput { public string? BackgroundColor { get; set; } public string? HoverColor { get; set; } public string? ProgressColor { get; set; } public string? StopColor { get; set; } }
+public sealed class ScriptSeedButtonInput { public string Key { get; set; } = string.Empty; public string Label { get; set; } = string.Empty; public string? Icon { get; set; } public string? IconKind { get; set; } public int SortOrder { get; set; } public List<ScriptSeedSubButtonInput> SubButtons { get; set; } = []; }
+public sealed class ScriptSeedSubButtonInput { public string Key { get; set; } = string.Empty; public string Label { get; set; } = string.Empty; public string? Icon { get; set; } public string? IconKind { get; set; } public int SortOrder { get; set; } public string? Male { get; set; } public string? Female { get; set; } public List<ScriptSeedSubButtonInput> SubButtons { get; set; } = []; }

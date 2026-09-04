@@ -467,6 +467,7 @@ public class FinancialController : ControllerBase
             .OrderByDescending(r => r.GeneratedTime)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(r => new { r.Id, r.GeneratedTime, r.TotalAmount, r.Country, r.DeliveryCompanyId, r.OrderStatus, orderIds = r.ReportOrders.Select(item => item.OrderId) })
             .ToListAsync(ct);
 
         return Ok(new { total, page, pageSize, items = reports });
@@ -489,6 +490,7 @@ public class FinancialController : ControllerBase
             .OrderByDescending(r => r.GeneratedTime)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(r => new { r.Id, r.GeneratedTime, r.TotalAmount, r.Country, r.DeliveryCompanyId, r.OrderStatus, orderIds = r.ReportOrders.Select(item => item.OrderId) })
             .ToListAsync(ct);
 
         return Ok(reports);
