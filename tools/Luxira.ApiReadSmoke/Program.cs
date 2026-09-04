@@ -103,6 +103,7 @@ var checkedRoutes = 0;
 var serverFailures = new List<string>();
 var timedOutRoutes = new List<string>();
 var routeDurations = new List<double>();
+var routeTimings = new List<(string Route, double Milliseconds)>();
 var totalWatch = Stopwatch.StartNew();
 foreach (var pathProperty in document.RootElement.GetProperty("paths").EnumerateObject())
 {
@@ -126,6 +127,7 @@ foreach (var pathProperty in document.RootElement.GetProperty("paths").Enumerate
             timeout.Token);
         routeWatch.Stop();
         routeDurations.Add(routeWatch.Elapsed.TotalMilliseconds);
+        routeTimings.Add((route, routeWatch.Elapsed.TotalMilliseconds));
         if ((int)response.StatusCode >= 500)
             serverFailures.Add($"{(int)response.StatusCode} {route}");
     }
@@ -148,6 +150,8 @@ if (routeDurations.Count > 0)
 {
     routeDurations.Sort();
     Console.WriteLine($"GET latency ms: p50={Percentile(routeDurations, 0.50):0.0}, p95={Percentile(routeDurations, 0.95):0.0}, max={routeDurations[^1]:0.0}, total={totalWatch.Elapsed.TotalMilliseconds:0.0}");
+    foreach (var timing in routeTimings.OrderByDescending(item => item.Milliseconds).Take(10))
+        Console.WriteLine($"SLOW {timing.Milliseconds:0.0} ms {timing.Route}");
 }
 return realtimeFailures.Count == 0 && serverFailures.Count == 0 && timedOutRoutes.Count == 0
     ? 0

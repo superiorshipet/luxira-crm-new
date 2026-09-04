@@ -267,9 +267,10 @@ public class HelpCenterChatController : ControllerBase
     }
 
     [HttpGet("EditHistory")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize]
     public async Task<IActionResult> EditHistory([FromQuery] long id, CancellationToken ct)
     {
+        if (!CanManageAll()) return Forbid();
         var items = await _context.HelpCenterChatMessageEdits.AsNoTracking()
             .Where(item => item.MessageId == id)
             .OrderByDescending(item => item.Id)
@@ -473,12 +474,13 @@ public class HelpCenterChatController : ControllerBase
         Ok(new { ok = true, settings = await ReadSettingsAsync(ct) });
 
     [HttpPost("UpdateSettings")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize]
     public async Task<IActionResult> UpdateSettings(
         [FromForm] bool? isMuted,
         [FromForm] bool? isReadOnly,
         CancellationToken ct)
     {
+        if (!CanManageAll()) return Forbid();
         var settings = await _context.HelpCenterChatSettings.FirstOrDefaultAsync(item => item.Id == 1, ct);
         if (settings is null)
         {
@@ -693,9 +695,10 @@ public class HelpCenterChatController : ControllerBase
     }
 
     [HttpPost("HardDelete")]
-    [Authorize(Roles = "Admin,Administrator")]
+    [Authorize]
     public async Task<IActionResult> HardDelete([FromForm] long id, CancellationToken ct)
     {
+        if (!User.IsInRole("Admin") && !User.IsInRole("Administrator")) return Forbid();
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         await _context.HelpCenterChatMessageOrderLinks.Where(item => item.MessageId == id).ExecuteDeleteAsync(ct);
         await _context.HelpCenterChatMessageEdits.Where(item => item.MessageId == id).ExecuteDeleteAsync(ct);

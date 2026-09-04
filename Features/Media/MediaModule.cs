@@ -12,6 +12,7 @@ public class MediaModule : IModule
         services.AddScoped<MediaService>();
         services.AddScoped<MediaMigrationService>();
         services.AddScoped<MediaReferenceCleanupService>();
-        services.AddHostedService<MediaReferenceCleanupBackgroundService>();
+        if (!environment.IsEnvironment("Testing") && configuration.GetValue<bool>("BackgroundJobs:Enabled"))
+            services.AddHostedService<MediaReferenceCleanupBackgroundService>();
     }
 }

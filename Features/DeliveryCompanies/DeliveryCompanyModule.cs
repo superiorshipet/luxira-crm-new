@@ -11,8 +11,11 @@ public class DeliveryCompanyModule : IModule
         services.AddScoped<DeliveryCompanyRepository>();
         services.AddScoped<DeliveryCompanyService>();
         services.AddScoped<CourierDispatchService>();
-        services.AddHostedService<ScheduledCourierSendService>();
-        services.AddHostedService<CourierRetryService>();
-        services.AddHostedService<CamexReconciliationService>();
+        if (!environment.IsEnvironment("Testing") && configuration.GetValue<bool>("BackgroundJobs:Enabled"))
+        {
+            services.AddHostedService<ScheduledCourierSendService>();
+            services.AddHostedService<CourierRetryService>();
+            services.AddHostedService<CamexReconciliationService>();
+        }
     }
 }

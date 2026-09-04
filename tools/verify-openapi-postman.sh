@@ -44,7 +44,7 @@ dotnet run \
 
 server_pid=$!
 
-for _ in $(seq 1 80); do
+for _ in $(seq 1 240); do
     if curl --fail --silent --show-error \
         "$base_url/health/live" >/dev/null 2>&1; then
         break
