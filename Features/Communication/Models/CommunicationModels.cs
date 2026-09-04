@@ -145,6 +145,50 @@ public class WhatsAppMessage
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public class WhatsAppAutomationAccount
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string SenderPhoneNumber { get; set; } = string.Empty;
+    public int ProviderType { get; set; } = 1;
+    public int? Country { get; set; }
+    public int? ManufacturingCompanyId { get; set; }
+    public string? ApiBaseUrl { get; set; }
+    public string? ApiKey { get; set; }
+    public string? GreenApiInstanceId { get; set; }
+    public string? GreenApiToken { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? UpdatedByUserId { get; set; }
+    public ICollection<WhatsAppAutomationTemplate> Templates { get; set; } = [];
+    public ICollection<WhatsAppAutomationAccountStore> AccountStores { get; set; } = [];
+}
+
+public class WhatsAppAutomationAccountStore
+{
+    public int Id { get; set; }
+    public int AccountId { get; set; }
+    public WhatsAppAutomationAccount Account { get; set; } = null!;
+    public int ManufacturingCompanyId { get; set; }
+}
+
+public class WhatsAppAutomationTemplate
+{
+    public int Id { get; set; }
+    public int? AccountId { get; set; }
+    public WhatsAppAutomationAccount? Account { get; set; }
+    public int EventType { get; set; } = 2;
+    public int? OrderStatus { get; set; }
+    public string MessageText { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string? UpdatedByUserId { get; set; }
+}
+
 public class AdminNotification
 {
     public int Id { get; set; }

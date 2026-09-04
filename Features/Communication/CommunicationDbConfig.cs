@@ -173,6 +173,47 @@ public class WhatsAppMessageDbConfig : IDbConfig<WhatsAppMessage>
     }
 }
 
+public class WhatsAppAutomationAccountDbConfig : IDbConfig<WhatsAppAutomationAccount>
+{
+    public void Configure(EntityTypeBuilder<WhatsAppAutomationAccount> builder)
+    {
+        builder.ToTable("WhatsAppAutomationAccounts");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Name).HasMaxLength(120).IsRequired();
+        builder.Property(item => item.SenderPhoneNumber).HasMaxLength(40).IsRequired();
+        builder.Property(item => item.ApiBaseUrl).HasMaxLength(500);
+        builder.Property(item => item.ApiKey).HasMaxLength(200);
+        builder.Property(item => item.GreenApiInstanceId).HasMaxLength(120);
+        builder.Property(item => item.GreenApiToken).HasMaxLength(300);
+        builder.Property(item => item.CreatedByUserId).HasMaxLength(450);
+        builder.Property(item => item.UpdatedByUserId).HasMaxLength(450);
+        builder.HasMany(item => item.Templates).WithOne(item => item.Account).HasForeignKey(item => item.AccountId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(item => item.AccountStores).WithOne(item => item.Account).HasForeignKey(item => item.AccountId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class WhatsAppAutomationAccountStoreDbConfig : IDbConfig<WhatsAppAutomationAccountStore>
+{
+    public void Configure(EntityTypeBuilder<WhatsAppAutomationAccountStore> builder)
+    {
+        builder.ToTable("WhatsAppAutomationAccountStores");
+        builder.HasKey(item => item.Id);
+        builder.HasIndex(item => new { item.AccountId, item.ManufacturingCompanyId }).IsUnique();
+    }
+}
+
+public class WhatsAppAutomationTemplateDbConfig : IDbConfig<WhatsAppAutomationTemplate>
+{
+    public void Configure(EntityTypeBuilder<WhatsAppAutomationTemplate> builder)
+    {
+        builder.ToTable("WhatsAppAutomationTemplates");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.MessageText).HasMaxLength(2000).IsRequired();
+        builder.Property(item => item.CreatedByUserId).HasMaxLength(450);
+        builder.Property(item => item.UpdatedByUserId).HasMaxLength(450);
+    }
+}
+
 public class AdminNotificationDbConfig : IDbConfig<AdminNotification>
 {
     public void Configure(EntityTypeBuilder<AdminNotification> builder)

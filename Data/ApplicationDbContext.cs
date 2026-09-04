@@ -115,8 +115,24 @@ public class ApplicationDbContext : DbContext
 
     // Marketing & Advertising
     public DbSet<AdvertisingCampaign> AdvertisingCampaigns => Set<AdvertisingCampaign>();
+    public DbSet<AdvertisingManagerStoreFolder> AdvertisingManagerStoreFolders => Set<AdvertisingManagerStoreFolder>();
+    public DbSet<AdvertisingManagerItem> AdvertisingManagerItems => Set<AdvertisingManagerItem>();
+    public DbSet<AdvertisingManagerItemAccount> AdvertisingManagerItemAccounts => Set<AdvertisingManagerItemAccount>();
+    public DbSet<AdvertisingManagerAccountProfile> AdvertisingManagerAccountProfiles => Set<AdvertisingManagerAccountProfile>();
+    public DbSet<AdvertisingManagerAccountLink> AdvertisingManagerAccountLinks => Set<AdvertisingManagerAccountLink>();
+    public DbSet<AdvertisingManagerPaymentCard> AdvertisingManagerPaymentCards => Set<AdvertisingManagerPaymentCard>();
     public DbSet<MarketingLead> MarketingLeads => Set<MarketingLead>();
     public DbSet<StoreScript> StoreScripts => Set<StoreScript>();
+    public DbSet<ScriptTarget> ScriptTargets => Set<ScriptTarget>();
+    public DbSet<ScriptThemeToken> ScriptThemeTokens => Set<ScriptThemeToken>();
+    public DbSet<ScriptSetting> ScriptSettings => Set<ScriptSetting>();
+    public DbSet<ScriptCountry> ScriptCountries => Set<ScriptCountry>();
+    public DbSet<ScriptCountryValue> ScriptCountryValues => Set<ScriptCountryValue>();
+    public DbSet<ScriptCategory> ScriptCategories => Set<ScriptCategory>();
+    public DbSet<ScriptSubCategory> ScriptSubCategories => Set<ScriptSubCategory>();
+    public DbSet<ScriptMessage> ScriptMessages => Set<ScriptMessage>();
+    public DbSet<ScriptTranslation> ScriptTranslations => Set<ScriptTranslation>();
+    public DbSet<ScriptEditHistory> ScriptEditHistories => Set<ScriptEditHistory>();
     public DbSet<WebsiteDomain> WebsiteDomains => Set<WebsiteDomain>();
     public DbSet<WebsiteDomainEditLog> WebsiteDomainEditLogs => Set<WebsiteDomainEditLog>();
     public DbSet<VideoLink> VideoLinks => Set<VideoLink>();
@@ -136,6 +152,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<HelpCenterChatUserPresence> HelpCenterChatUserPresence => Set<HelpCenterChatUserPresence>();
     public DbSet<HelpCenterChatKeyword> HelpCenterChatKeywords => Set<HelpCenterChatKeyword>();
     public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
+    public DbSet<WhatsAppAutomationAccount> WhatsAppAutomationAccounts => Set<WhatsAppAutomationAccount>();
+    public DbSet<WhatsAppAutomationAccountStore> WhatsAppAutomationAccountStores => Set<WhatsAppAutomationAccountStore>();
+    public DbSet<WhatsAppAutomationTemplate> WhatsAppAutomationTemplates => Set<WhatsAppAutomationTemplate>();
     public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
     public DbSet<AdminNotificationReplyState> AdminNotificationReplyStates => Set<AdminNotificationReplyState>();
     public DbSet<SystemEmailLog> SystemEmailLogs => Set<SystemEmailLog>();
