@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Luxira.Api.Data;
+using Luxira.Api.Features.Warehouses.DTOs;
 using Luxira.Api.Features.Warehouses.Models;
 
 namespace Luxira.Api.Features.Warehouses.Repositories;
@@ -13,10 +14,9 @@ public class WarehouseRepository
         _context = context;
     }
 
-    public async Task<List<Warehouse>> GetAllAsync(int? countryId = null, bool? isActive = null, CancellationToken ct = default)
+    public async Task<List<WarehouseDto>> GetAllAsync(int? countryId = null, bool? isActive = null, CancellationToken ct = default)
     {
         var query = _context.Warehouses
-            .Include(w => w.MainWarehouse)
             .AsNoTracking()
             .AsQueryable();
 
@@ -30,7 +30,18 @@ public class WarehouseRepository
             query = query.Where(w => w.IsShown == isActive.Value);
         }
 
-        return await query.OrderBy(w => w.Name).ToListAsync(ct);
+        return await query.OrderBy(w => w.Name)
+            .Select(w => new WarehouseDto(
+                w.Id,
+                w.Name ?? string.Empty,
+                w.Name,
+                string.Empty,
+                w.Countries,
+                w.City,
+                w.IsShown,
+                w.MainWarehouseId,
+                w.MainWarehouse != null ? w.MainWarehouse.Name : null))
+            .ToListAsync(ct);
     }
 
     public async Task<Warehouse?> GetByIdAsync(int id, CancellationToken ct = default)
@@ -47,10 +58,9 @@ public class WarehouseRepository
         return result.Entity;
     }
 
-    public async Task<List<MainWarehouse>> GetMainWarehousesAsync(int? countryId = null, CancellationToken ct = default)
+    public async Task<List<MainWarehouseDto>> GetMainWarehousesAsync(int? countryId = null, CancellationToken ct = default)
     {
         var query = _context.MainWarehouses
-            .Include(m => m.SubWarehouses)
             .AsNoTracking()
             .AsQueryable();
 
@@ -59,6 +69,24 @@ public class WarehouseRepository
             query = query.Where(m => m.SubWarehouses.Any(w => w.Countries == countryId.Value));
         }
 
-        return await query.OrderBy(m => m.Name).ToListAsync(ct);
+        return await query.OrderBy(m => m.Name)
+            .Select(main => new MainWarehouseDto(
+                main.Id,
+                main.Name,
+                0,
+                true,
+                main.SubWarehouses.OrderBy(warehouse => warehouse.Name)
+                    .Select(warehouse => new WarehouseDto(
+                        warehouse.Id,
+                        warehouse.Name ?? string.Empty,
+                        warehouse.Name,
+                        string.Empty,
+                        warehouse.Countries,
+                        warehouse.City,
+                        warehouse.IsShown,
+                        warehouse.MainWarehouseId,
+                        main.Name))
+                    .ToList()))
+            .ToListAsync(ct);
     }
 }

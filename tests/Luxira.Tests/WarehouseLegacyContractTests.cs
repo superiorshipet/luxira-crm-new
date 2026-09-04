@@ -7,8 +7,8 @@ namespace Luxira.Tests;
 public sealed class WarehouseLegacyContractTests
 {
     [Theory]
-    [InlineData(typeof(WarehouseController), nameof(WarehouseController.GetWarehouses), "GET", "/Warehouse/Index")]
-    [InlineData(typeof(WarehouseController), nameof(WarehouseController.GetWarehouses), "POST", "/Warehouse/Index")]
+    [InlineData(typeof(WarehouseController), nameof(WarehouseController.Index), "GET", "/Warehouse/Index")]
+    [InlineData(typeof(WarehouseController), nameof(WarehouseController.Index), "POST", "/Warehouse/Index")]
     [InlineData(typeof(WarehouseController), nameof(WarehouseController.Create), "GET", "/Warehouse/Create")]
     [InlineData(typeof(WarehouseController), nameof(WarehouseController.Edit), "GET", "/Warehouse/Edit")]
     [InlineData(typeof(WarehouseController), nameof(WarehouseController.Edit), "POST", "/Warehouse/Edit")]
@@ -18,7 +18,7 @@ public sealed class WarehouseLegacyContractTests
     [InlineData(typeof(WarehouseController), nameof(WarehouseController.GetSubWarehouses), "GET", "/Warehouse/GetSubWarehouses")]
     [InlineData(typeof(WarehouseController), nameof(WarehouseController.GetSubWarehouses), "POST", "/Warehouse/GetSubWarehouses")]
     [InlineData(typeof(WarehouseController), nameof(WarehouseController.AllWarehousesPdf), "POST", "/Warehouse/AllWarehousesPdf")]
-    [InlineData(typeof(MainWareHouseController), nameof(MainWareHouseController.GetMainWarehouses), "GET", "Index")]
+    [InlineData(typeof(MainWareHouseController), nameof(MainWareHouseController.Index), "GET", "Index")]
     [InlineData(typeof(MainWareHouseController), nameof(MainWareHouseController.Create), "GET", "Create")]
     [InlineData(typeof(MainWareHouseController), nameof(MainWareHouseController.Create), "POST", "Create")]
     [InlineData(typeof(MainWareHouseController), nameof(MainWareHouseController.Edit), "GET", "Edit")]

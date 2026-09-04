@@ -120,6 +120,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<StoreCodeFolder> StoreCodeFolders => Set<StoreCodeFolder>();
     public DbSet<StoreCodeStoreGroup> StoreCodeStoreGroups => Set<StoreCodeStoreGroup>();
     public DbSet<StoreCodeEditHistory> StoreCodeEditHistories => Set<StoreCodeEditHistory>();
+    public DbSet<TraineeStore> TraineeStores => Set<TraineeStore>();
+    public DbSet<TraineeStoreManufacturingCompany> TraineeStoreManufacturingCompanies => Set<TraineeStoreManufacturingCompany>();
 
     // Search Keywords
     public DbSet<SearchKeywordOption> SearchKeywordOptions => Set<SearchKeywordOption>();

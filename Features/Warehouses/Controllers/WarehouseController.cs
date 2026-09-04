@@ -3,6 +3,7 @@ using Luxira.Api.Features.Warehouses.Services;
 using Luxira.Api.Data;
 using Luxira.Api.Features.Warehouses.Models;
 using Luxira.Api.Infrastructure.Pdf;
+using Luxira.Api.Utils.Binding;
 using Luxira.Api.Utils.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
@@ -28,14 +29,73 @@ public class WarehouseController : ControllerBase
     }
 
     [HttpGet]
-    [HttpGet("/Warehouse/Index")]
-    [HttpPost("/Warehouse/Index")]
     [HttpGet("/Warehouse/GetWarehouses")]
     [Authorize(Roles = "Admin,Administrator,DeliveryCompany,Accountant,OrderPreparer,Observer,ExecutiveDirector,FollowUpDepartment")]
     public async Task<ActionResult<List<WarehouseDto>>> GetWarehouses([FromQuery] int? countryId, [FromQuery] bool? isActive, CancellationToken ct)
     {
         var result = await _service.GetWarehousesAsync(countryId, isActive, ct);
         return Ok(result);
+    }
+
+    [HttpGet("/Warehouse/Index")]
+    [HttpPost("/Warehouse/Index")]
+    [Authorize(Roles = "Admin,DeliveryCompany,Accountant,OrderPreparer,Observer,ExecutiveDirector,FollowUpDepartment")]
+    public async Task<IActionResult> Index(
+        [RouteOrRequest] int? page,
+        [RouteOrRequest] int? pageSize,
+        [RouteOrRequest] int? countryId,
+        [RouteOrRequest] int? deliveryCompanyId,
+        [RouteOrRequest] int? mainwarehouseId,
+        [RouteOrRequest] int? storeId,
+        CancellationToken ct = default)
+    {
+        var currentPage = Math.Max(page ?? 1, 1);
+        var effectivePageSize = Math.Clamp(pageSize ?? 10, 1, 200);
+        var query =
+            from warehouse in _context.Warehouses.AsNoTracking()
+            join deliveryCompany in _context.DeliveryCompanies.AsNoTracking()
+                on warehouse.DeliveryCompanyId equals deliveryCompany.Id
+            join mainWarehouse in _context.MainWarehouses.AsNoTracking()
+                on warehouse.MainWarehouseId equals mainWarehouse.Id into mainWarehouses
+            from mainWarehouse in mainWarehouses.DefaultIfEmpty()
+            join company in _context.ManufacturingCompanies.AsNoTracking()
+                on warehouse.ManufacturingCompanyId equals company.Id into companies
+            from company in companies.DefaultIfEmpty()
+            where !deliveryCompany.IsRepresentative
+            select new { warehouse, deliveryCompany, mainWarehouse, company };
+
+        if (User.IsInRole("DeliveryCompany"))
+        {
+            var userId = User.GetUserId();
+            query = query.Where(row => row.deliveryCompany.UserId == userId);
+        }
+        if (countryId.HasValue) query = query.Where(row => row.warehouse.Countries == countryId.Value);
+        if (deliveryCompanyId.HasValue) query = query.Where(row => row.warehouse.DeliveryCompanyId == deliveryCompanyId.Value);
+        if (mainwarehouseId.HasValue) query = query.Where(row => row.warehouse.MainWarehouseId == mainwarehouseId.Value);
+        if (storeId.HasValue) query = query.Where(row => row.warehouse.ManufacturingCompanyId == storeId.Value);
+
+        var totalItems = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(row => row.warehouse.Id)
+            .Skip((currentPage - 1) * effectivePageSize)
+            .Take(effectivePageSize)
+            .Select(row => new
+            {
+                row.warehouse.Id,
+                name = row.warehouse.Name ?? "Unknown",
+                productImage = row.mainWarehouse != null ? row.mainWarehouse.ImageUrl ?? "static/DefaultImage.svg" : "static/DefaultImage.svg",
+                row.warehouse.Amount,
+                row.warehouse.ReservedAmount,
+                row.warehouse.Price,
+                deliveryCompanyName = row.deliveryCompany.Name,
+                manufacturingCompanyName = row.company != null ? row.company.Name : "Unknown Manufacturer",
+                row.warehouse.DateAdded,
+                row.warehouse.DateUpdated,
+                countries = row.warehouse.Countries,
+                row.warehouse.IsShown
+            })
+            .ToListAsync(ct);
+
+        return Ok(new { items, currentPage, pageSize = effectivePageSize, totalItems });
     }
 
     [HttpGet("{id:int}")]

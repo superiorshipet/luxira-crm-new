@@ -18,12 +18,10 @@ public class StoreCodesController(ApplicationDbContext context) : ControllerBase
 
     [HttpGet]
     [HttpGet("/StoreCodes/GetStoreCodes")]
+    [Authorize(Roles = Managers)]
     public async Task<IActionResult> GetStoreCodes([FromQuery] int? manufacturingCompanyId, CancellationToken ct)
     {
-        var query = context.StoreCodeFolders.AsNoTracking().AsQueryable();
-        if (manufacturingCompanyId is > 0)
-            query = query.Where(x => x.ManufacturingCompanyId == manufacturingCompanyId);
-        return Ok(await query.OrderByDescending(x => x.UpdatedAt).ToListAsync(ct));
+        return Ok(await GetFolderRows(false, manufacturingCompanyId, ct: ct));
     }
 
     [HttpGet("/StoreCodes/Index")]
