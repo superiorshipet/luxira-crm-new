@@ -194,6 +194,7 @@ public sealed class StoreScriptController(ApplicationDbContext context, IWebHost
     public Task<IActionResult> RestoreAjax([FromForm] string entityType, [FromForm] int id, CancellationToken ct) => SetDeleted(entityType, id, false, ct);
 
     [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [HttpGet("/StoreScript/ClearScriptDataAjax")]
     [HttpPost("/StoreScript/ClearScriptDataAjax")]
     public async Task<IActionResult> ClearScriptDataAjax([FromForm] int folderId, CancellationToken ct)
     {

@@ -204,6 +204,10 @@ public class EmployeeTask
     public string? Description { get; set; }
     public int DurationMinutes { get; set; }
     public string Priority { get; set; } = "Important";
+    public string TaskCategory { get; set; } = "Normal";
+    public string? TargetPageKey { get; set; }
+    public string? TargetPageName { get; set; }
+    public string? TargetPageUrl { get; set; }
     public string? AttachmentUrl { get; set; }
     public string? AttachmentS3Key { get; set; }
     public string? AttachmentType { get; set; }
@@ -216,6 +220,21 @@ public class EmployeeTask
     public string? UpdatedByName { get; set; }
     public ICollection<EmployeeTaskAssignment> Assignments { get; set; } = new List<EmployeeTaskAssignment>();
 }
+
+public class SystemDevelopmentTask
+{
+    public int Id { get; set; } public string Title { get; set; } = string.Empty; public string? Description { get; set; } public byte Category { get; set; } = 1; public byte? PreviousCategory { get; set; } public int SortOrder { get; set; } public bool IsCompleted { get; set; } public bool IsDeleted { get; set; }
+    public string? CreatedByUserId { get; set; } public string? CreatedByName { get; set; } public DateTime CreatedAt { get; set; } public string? UpdatedByUserId { get; set; } public string? UpdatedByName { get; set; } public DateTime? UpdatedAt { get; set; } public string? DeletedByUserId { get; set; } public string? DeletedByName { get; set; } public DateTime? DeletedAt { get; set; } public byte[] RowVersion { get; set; } = [];
+    public int? EstimatedMinutes { get; set; } public bool IsPinned { get; set; } public DateTime? PinnedAt { get; set; }
+    public ICollection<SystemDevelopmentTaskImage> Images { get; set; } = [];
+}
+public class SystemDevelopmentTaskImage { public int Id { get; set; } public int DevelopmentTaskId { get; set; } public SystemDevelopmentTask? Task { get; set; } public string ImageUrl { get; set; } = string.Empty; public string? OriginalFileName { get; set; } public int SortOrder { get; set; } public DateTime CreatedAt { get; set; } }
+public class SystemDevelopmentTaskAuditLog { public long Id { get; set; } public int? DevelopmentTaskId { get; set; } public string TaskTitle { get; set; } = string.Empty; public string ActionType { get; set; } = string.Empty; public string ActionText { get; set; } = string.Empty; public string? OldDataJson { get; set; } public string? NewDataJson { get; set; } public string? ChangedByUserId { get; set; } public string? ChangedByName { get; set; } public DateTime ChangedAt { get; set; } }
+public class DevelopmentTaskAssignment { public int Id { get; set; } public int TaskId { get; set; } public int EmployeeId { get; set; } public string EmployeeName { get; set; } = string.Empty; public DateTimeOffset AssignedAt { get; set; } public string? AssignedByUserId { get; set; } public string? AssignedByName { get; set; } public byte DeveloperStatus { get; set; } public DateTimeOffset? StartedAt { get; set; } public bool TimerStartedManually { get; set; } public DateTimeOffset? CompletedAt { get; set; } }
+public class DevelopmentTaskComment { public long Id { get; set; } public int TaskId { get; set; } public int EmployeeId { get; set; } public string EmployeeName { get; set; } = string.Empty; public string CommentText { get; set; } = string.Empty; public DateTimeOffset CreatedAt { get; set; } }
+public class MarketingWorkReport { public long Id { get; set; } public int EmployeeId { get; set; } public string EmployeeName { get; set; } = string.Empty; public bool IsCompleted { get; set; } public string ReportText { get; set; } = string.Empty; public DateTimeOffset CreatedAt { get; set; } }
+public class DevelopmentTaskReviewSubmission { public int Id { get; set; } public int TaskId { get; set; } public int EmployeeId { get; set; } public string? OriginalFileName { get; set; } public string? StoredFileName { get; set; } public string? FilePath { get; set; } public string? ContentType { get; set; } public long? FileSize { get; set; } public DateTimeOffset SubmittedAt { get; set; } public string? SubmissionType { get; set; } public string? AccomplishedText { get; set; } public string? NotAccomplishedText { get; set; } public ICollection<DevelopmentTaskReviewFile> Files { get; set; } = []; }
+public class DevelopmentTaskReviewFile { public int Id { get; set; } public int SubmissionId { get; set; } public DevelopmentTaskReviewSubmission? Submission { get; set; } public string OriginalFileName { get; set; } = string.Empty; public string StoredFileName { get; set; } = string.Empty; public string FilePath { get; set; } = string.Empty; public string? ContentType { get; set; } public long FileSize { get; set; } public int SortOrder { get; set; } public DateTimeOffset CreatedAt { get; set; } }
 
 public class EmployeeTaskAssignment
 {

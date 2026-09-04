@@ -69,6 +69,14 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeBonusPayment> EmployeeBonusPayments => Set<EmployeeBonusPayment>();
     public DbSet<EmployeeTask> EmployeeTasks => Set<EmployeeTask>();
     public DbSet<EmployeeTaskAssignment> EmployeeTaskAssignments => Set<EmployeeTaskAssignment>();
+    public DbSet<SystemDevelopmentTask> SystemDevelopmentTasks => Set<SystemDevelopmentTask>();
+    public DbSet<SystemDevelopmentTaskImage> SystemDevelopmentTaskImages => Set<SystemDevelopmentTaskImage>();
+    public DbSet<SystemDevelopmentTaskAuditLog> SystemDevelopmentTaskAuditLogs => Set<SystemDevelopmentTaskAuditLog>();
+    public DbSet<DevelopmentTaskAssignment> DevelopmentTaskAssignments => Set<DevelopmentTaskAssignment>();
+    public DbSet<DevelopmentTaskComment> DevelopmentTaskComments => Set<DevelopmentTaskComment>();
+    public DbSet<MarketingWorkReport> MarketingWorkReports => Set<MarketingWorkReport>();
+    public DbSet<DevelopmentTaskReviewSubmission> DevelopmentTaskReviewSubmissions => Set<DevelopmentTaskReviewSubmission>();
+    public DbSet<DevelopmentTaskReviewFile> DevelopmentTaskReviewFiles => Set<DevelopmentTaskReviewFile>();
     public DbSet<EmployeeError> EmployeeErrors => Set<EmployeeError>();
     public DbSet<EmployeeErrorEditHistory> EmployeeErrorEditHistories => Set<EmployeeErrorEditHistory>();
     public DbSet<EmployeeTransaction> EmployeeTransactions => Set<EmployeeTransaction>();

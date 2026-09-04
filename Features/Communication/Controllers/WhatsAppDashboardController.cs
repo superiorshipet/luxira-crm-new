@@ -19,6 +19,7 @@ public sealed class WhatsAppDashboardController(ApplicationDbContext context, La
     [HttpGet]
     [HttpGet("Index")]
     [HttpGet("/WhatsAppDashboard/Index")]
+    [HttpPost("/WhatsAppDashboard/Index")]
     public async Task<IActionResult> Index(DateTime? logsFrom, DateTime? logsTo, int logsPage = 1, CancellationToken ct = default)
     {
         const int pageSize = 20;
