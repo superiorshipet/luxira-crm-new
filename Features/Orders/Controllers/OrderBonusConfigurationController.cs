@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Orders.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+[Authorize(Roles = "Admin,Administrator")]
 [Route("api/v1/orders/bonus-configurations")]
 [Route("OrderBonusConfiguration")]
 public class OrderBonusConfigurationController : ControllerBase

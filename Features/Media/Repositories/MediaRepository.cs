@@ -15,7 +15,7 @@ public class MediaRepository
 
     public async Task<S3StoredObject?> GetByKeyAsync(string s3Key, CancellationToken ct = default)
     {
-        return await _context.S3StoredObjects.AsNoTracking().FirstOrDefaultAsync(s => s.Key == s3Key, ct);
+        return await _context.S3StoredObjects.AsNoTracking().FirstOrDefaultAsync(s => s.Key == s3Key && !s.IsDeleted, ct);
     }
 
     public async Task<S3StoredObject> AddAsync(S3StoredObject media, CancellationToken ct = default)

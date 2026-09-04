@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Luxira.Api.Features.Warehouses.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
 [Route("api/v1/warehouses/main")]
 [Route("MainWareHouse")]
 public class MainWareHouseController : ControllerBase

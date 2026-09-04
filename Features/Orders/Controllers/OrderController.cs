@@ -106,6 +106,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPut("{id:int}/status")]
     [HttpPost("/Order/UpdateStatus/{id:int}")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter,OrderPreparer,DeliveryCompany,DeliveryRepresentative")]
     public async Task<ActionResult<OrderDto>> UpdateStatus(
         [RouteOrRequest] int id,
         [FromBody] UpdateOrderStatusRequest request,
@@ -157,6 +158,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("filter-counts")]
     [HttpGet("/Order/GetFilterCounts")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter,OrderPreparer")]
     public async Task<IActionResult> GetFilterCounts([FromQuery] int? country, CancellationToken ct)
     {
         var query = _context.Orders.AsNoTracking().AsQueryable();
@@ -180,6 +182,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("failure-reason-counts")]
     [HttpGet("/Order/GetFailureReasonCounts")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> GetFailureReasonCounts([FromQuery] int? country, CancellationToken ct)
     {
         var failureStatuses = OrderStatusCodes.FailureStatuses;
@@ -225,6 +228,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("status-counts")]
     [HttpGet("/Order/GetOrderStatusCounts")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
     public async Task<IActionResult> GetOrderStatusCounts([FromQuery] int? country, CancellationToken ct)
     {
         var query = _context.Orders.AsNoTracking().AsQueryable();
@@ -240,6 +244,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("in-delivery-count")]
     [HttpGet("/Order/GetInDeliveryStatusUpdateCount")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter,DeliveryCompany,DeliveryRepresentative")]
     public async Task<IActionResult> GetInDeliveryStatusUpdateCount([FromQuery] int? deliveryCompanyId, CancellationToken ct)
     {
         var query = _context.Orders
@@ -306,6 +311,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("validate-min-price")]
     [HttpGet("/Order/ValidateProductMinimumSellingPrice")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
     public async Task<IActionResult> ValidateProductMinimumSellingPrice([FromQuery] int productId, [FromQuery] int country, [FromQuery] decimal price, CancellationToken ct)
     {
         var minSetting = await _context.ProductMinimumSellingPrices
@@ -321,6 +327,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("pricing-selection/{id:int}")]
     [HttpGet("/Order/GetOrderPricingSelection")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
     public async Task<IActionResult> GetOrderPricingSelection([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
@@ -343,6 +350,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("create-warehouses")]
     [HttpGet("/Order/GetCreateOrderWarehouses")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
     public async Task<IActionResult> GetCreateOrderWarehouses([FromQuery] int? country, CancellationToken ct)
     {
         var warehouses = await _context.Warehouses
@@ -356,6 +364,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("delivery-parties-by-country")]
     [HttpGet("/Order/GetCreateOrderDeliveryPartiesByCountry")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
     public async Task<IActionResult> GetCreateOrderDeliveryPartiesByCountry([FromQuery] int country, CancellationToken ct)
     {
         var companies = await _context.DeliveryCompanies
@@ -400,6 +409,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("delivery-companies-filter")]
     [HttpGet("/Order/GetDeliveryCompaniesForAllStatusesFilter")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
     public async Task<IActionResult> GetDeliveryCompaniesForAllStatusesFilter([FromQuery] int? countryId, [FromQuery] string? cityId, CancellationToken ct)
     {
         var query = _context.DeliveryCompanies.Where(d => d.IsShown).AsNoTracking().AsQueryable();
@@ -411,6 +421,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("delivery-costs")]
     [HttpGet("/Order/DeliveryCostsByOrderIds")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter,DeliveryCompany,DeliveryRepresentative")]
     public async Task<IActionResult> DeliveryCostsByOrderIds([FromQuery] string ids, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(ids)) return Ok(new { totalDeliveryCost = 0m, count = 0 });
@@ -430,6 +441,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("status-selection/save")]
     [HttpPost("/Order/SaveStatusUpdateSelection")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> SaveStatusUpdateSelection(
         [FromBody] StatusSelectionRequest request,
         CancellationToken ct)
@@ -441,6 +453,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("status-selection/clear-mine")]
     [HttpPost("/Order/ClearMyStatusUpdateSelections")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> ClearMyStatusUpdateSelections(CancellationToken ct)
     {
         await _cache.InvalidateAsync(StatusSelectionKey(), ct);
@@ -449,6 +462,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("status-selection/clear/{orderId:int}")]
     [HttpPost("/Order/ClearStatusUpdateSelection")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> ClearStatusUpdateSelection([RouteOrRequest] int orderId, CancellationToken ct)
     {
         var key = StatusSelectionKey();
@@ -464,6 +478,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("status-selections")]
     [HttpGet("/Order/GetStatusUpdateSelections")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> GetStatusUpdateSelections(CancellationToken ct)
     {
         var selections = await _cache.GetOrCreateAsync(
@@ -509,6 +524,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("{id:int}/move-to-yesterday-ratings")]
     [HttpPost("/Order/MoveOrderToYesterdayRatings")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> MoveOrderToYesterdayRatings([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
@@ -522,6 +538,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("{id:int}/block-duplicate")]
     [HttpPost("/Order/BlockDuplicateOrder")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> BlockDuplicateOrder([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
@@ -546,6 +563,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("hidden")]
     [HttpGet("/Order/HiddenOrders")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> HiddenOrders([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
     {
         var query = _context.Orders.Where(o => o.IsHidden).OrderByDescending(o => o.CreatedDate).AsNoTracking();
@@ -556,6 +574,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("{id:int}/delivered")]
     [HttpPost("/Order/UpdateDelivered")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> UpdateDelivered([RouteOrRequest] int id, [FromQuery] int? orderId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
@@ -572,6 +591,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("{id:int}/failed-delivery")]
     [HttpPost("/Order/UpdateFailedDelivery")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> UpdateFailedDelivery([RouteOrRequest] int id, [FromQuery] int? orderId, [FromBody] FailedDeliveryRequest request, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (orderId ?? 0);
@@ -860,6 +880,7 @@ public partial class OrderController : ControllerBase
 
     [HttpPost("/Order/UploadCreateOrderDraftImage")]
     [RequestSizeLimit(30 * 1024 * 1024)]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
     public async Task<IActionResult> UploadCreateOrderDraftImage(
         [FromForm] string draftId,
         [FromForm] string imageType,
@@ -907,6 +928,7 @@ public partial class OrderController : ControllerBase
     }
 
     [HttpGet("/Order/GetOrderFollowUpStatus")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter,Accountant,Observer,OrderPreparer,WareHouse")]
     public async Task<IActionResult> GetOrderFollowUpStatus([FromQuery] int orderId, [FromQuery] string requestType = "Complaint", CancellationToken ct = default)
     {
         var type = NormalizeFollowUpType(requestType);
@@ -928,6 +950,7 @@ public partial class OrderController : ControllerBase
     }
 
     [HttpPost("/Order/CreateOrderFollowUpRequest")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter,Accountant,Observer,OrderPreparer,WareHouse")]
     public async Task<IActionResult> CreateOrderFollowUpRequest([FromBody] CreateFollowUpRequest request, CancellationToken ct)
     {
         var type = NormalizeFollowUpType(request.RequestType);
@@ -1017,6 +1040,7 @@ public partial class OrderController : ControllerBase
 
     [HttpGet("/Order/UpdateStatusForMultiple")]
     [HttpPost("/Order/UpdateStatusForMultiple")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter,OrderPreparer,DeliveryCompany,DeliveryRepresentative")]
     public async Task<IActionResult> UpdateStatusForMultiple(
         [FromForm] List<int>? ids,
         [FromForm] int orderStatus,
@@ -1034,6 +1058,7 @@ public partial class OrderController : ControllerBase
     }
 
     [HttpPost("/Order/AdvanceFailureStatus")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,DeliveryCompany,DeliveryRepresentative")]
     public async Task<IActionResult> AdvanceFailureStatus([FromForm] List<int>? ids, [FromForm] string? reason, CancellationToken ct)
     {
         var orderIds = (ids ?? []).Where(id => id > 0).Distinct().Take(5_000).ToList();
@@ -1051,6 +1076,7 @@ public partial class OrderController : ControllerBase
     }
 
     [HttpPost("/Order/MarkAsPrepared")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,OrderPreparer,DeliveryCompany,DeliveryRepresentative,Accountant")]
     public async Task<IActionResult> MarkAsPrepared([FromForm] List<int>? ids, CancellationToken ct)
     {
         var orderIds = (ids ?? []).Where(id => id > 0).Distinct().Take(5_000).ToList();

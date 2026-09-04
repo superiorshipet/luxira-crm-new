@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 namespace Luxira.Api.Features.Employees.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
 [Route("api/v1/employees/errors")]
 [Route("EmployeeErrors")]
 [Route("Violations")]

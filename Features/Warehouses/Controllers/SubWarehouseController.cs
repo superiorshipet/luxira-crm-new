@@ -36,6 +36,7 @@ public class SubWarehouseController : ControllerBase
     }
 
     [HttpGet("Index")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Index([FromQuery] int page = 1, [FromQuery] int? pageSize = null, [FromQuery] int? mainwarehouseId = null, CancellationToken ct = default)
     {
         var size = Math.Clamp(pageSize ?? 10, 1, 200);
@@ -47,9 +48,11 @@ public class SubWarehouseController : ControllerBase
     }
 
     [HttpGet("Create")]
+    [Authorize(Roles = "Admin,Administrator")]
     public IActionResult Create() => Ok(new SubWarehouseRequest(null, string.Empty, null, null));
 
     [HttpPost("Create")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Create([FromBody] SubWarehouseRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest(new { message = "حقل الاسم مطلوب." });
@@ -74,6 +77,7 @@ public class SubWarehouseController : ControllerBase
     }
 
     [HttpGet("Edit")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Edit([FromQuery] int id, CancellationToken ct)
     {
         var item = await _context.SubWarehouses.AsNoTracking().FirstOrDefaultAsync(row => row.Id == id, ct);
@@ -81,6 +85,7 @@ public class SubWarehouseController : ControllerBase
     }
 
     [HttpPost("Edit")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Edit([FromQuery] int id, [FromBody] SubWarehouseRequest request, CancellationToken ct)
     {
         if (request.Id.HasValue && request.Id != id) return NotFound();

@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/v1/delivery-companies")]
 [Route("DeliveryCompany")]
 [Route("api/[controller]")]
@@ -32,13 +33,14 @@ public class DeliveryCompanyController : ControllerBase
     [HttpGet("/DeliveryCompany/Index")]
     [HttpPost("/DeliveryCompany/Index")]
     [HttpGet("/DataList/GetDeliveryCompanies")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,Observer,ExecutiveDirector,FollowUpDepartment")]
     public async Task<ActionResult<DeliveryCompanyResult>> GetCompanies([FromQuery] int? countryId, CancellationToken ct)
     {
         var result = await _service.ListCompaniesAsync(countryId, ct);
         return Ok(result);
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost]
     [HttpPost("Create")]
     [HttpPost("/DeliveryCompany/Create")]
@@ -49,11 +51,12 @@ public class DeliveryCompanyController : ControllerBase
         return CreatedAtAction(nameof(GetCompanies), new { id = result.Id }, result);
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpGet("/DeliveryCompany/Create")]
     public IActionResult Create() => Ok(new { isRepresentative = false });
 
     [HttpGet("/DeliveryCompany/Edit")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> Edit([FromQuery] int? id, CancellationToken ct)
     {
         if (!id.HasValue) return NotFound();
@@ -63,6 +66,7 @@ public class DeliveryCompanyController : ControllerBase
 
     [HttpGet("/DeliveryCompany/Details")]
     [HttpPost("/DeliveryCompany/Details")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> Details([FromQuery] int? id, CancellationToken ct)
     {
         if (!id.HasValue) return NotFound();
@@ -74,7 +78,7 @@ public class DeliveryCompanyController : ControllerBase
         return Ok(new { company, warehouseCount });
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("/DeliveryCompany/SetIsActive")]
     public async Task<IActionResult> SetIsActive([FromForm] int Id, [FromForm] bool isActive, CancellationToken ct)
     {
@@ -82,7 +86,7 @@ public class DeliveryCompanyController : ControllerBase
         return changed == 0 ? NotFound() : Ok(new { success = true });
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("/DeliveryCompany/SetIsShown")]
     public async Task<IActionResult> SetIsShown([FromForm] int Id, [FromForm] bool isShown, CancellationToken ct)
     {
@@ -90,7 +94,7 @@ public class DeliveryCompanyController : ControllerBase
         return changed == 0 ? NotFound() : Ok(new { success = true });
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("/DeliveryCompany/HideNewOrders")]
     public async Task<IActionResult> HideNewOrders([FromForm] int Id, [FromForm] bool hideOrders, CancellationToken ct)
     {
@@ -98,7 +102,7 @@ public class DeliveryCompanyController : ControllerBase
         return changed == 0 ? NotFound() : Ok(new { success = true, hideOrders });
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPut("{id:int}")]
     [HttpPost("Edit/{id:int}")]
     [HttpPost("/DeliveryCompany/Edit")]
@@ -118,7 +122,7 @@ public class DeliveryCompanyController : ControllerBase
         return Ok(company);
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpDelete("{id:int}")]
     [HttpPost("Delete/{id:int}")]
     [HttpPost("/DeliveryCompany/Delete")]
@@ -132,7 +136,7 @@ public class DeliveryCompanyController : ControllerBase
         return Ok(new { success = true });
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("ToggleActive/{id:int}")]
     [HttpPost("/DeliveryCompany/ToggleActive")]
     public async Task<IActionResult> ToggleActive([RouteOrRequest] int id, CancellationToken ct)
@@ -184,7 +188,7 @@ public class DeliveryCompanyController : ControllerBase
     }
 
     [HttpPost("RepairInactiveOrders")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize]
     public async Task<IActionResult> RepairInactiveOrders(CancellationToken ct)
     {
         var inactiveIds = await _context.DeliveryCompanies.AsNoTracking().Where(company => !company.IsRepresentative && !company.IsActive).Select(company => company.Id).ToListAsync(ct);

@@ -118,6 +118,7 @@ public class RatingController : ControllerBase
     }
 
     [HttpGet("/Rating/SalesIndicatorPriceLevelSummary")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> SalesIndicatorPriceLevelSummary([FromQuery] RatingOrderFilter filter, CancellationToken ct)
     {
         var items = await SalesIndicatorRows(filter)
@@ -134,6 +135,7 @@ public class RatingController : ControllerBase
     }
 
     [HttpGet("/Rating/SalesIndicatorPriceLevelDetails")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> SalesIndicatorPriceLevelDetails([FromQuery] RatingOrderFilter filter, CancellationToken ct)
     {
         var priceGroup = NormalizePriceGroup(filter.PriceGroup);
@@ -149,6 +151,7 @@ public class RatingController : ControllerBase
 
     [HttpGet("/Rating/StoreList")]
     [HttpPost("/Rating/StoreList")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> StoreList([FromQuery] RatingOrderFilter filter, CancellationToken ct)
     {
         var items = await BuildOrderQuery(filter).Where(order => order.ManufacturingCompanyId != null)
@@ -167,6 +170,7 @@ public class RatingController : ControllerBase
 
     [HttpGet("/Rating/CountryList")]
     [HttpPost("/Rating/CountryList")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> CountryList([FromQuery] RatingOrderFilter filter, CancellationToken ct)
     {
         var items = await BuildOrderQuery(filter).GroupBy(order => order.Country).Select(group => new
@@ -182,6 +186,7 @@ public class RatingController : ControllerBase
 
     [HttpGet("/Rating/ManufactureCompanyDetails")]
     [HttpPost("/Rating/ManufactureCompanyDetails")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> ManufactureCompanyDetails([FromQuery] RatingOrderFilter filter, CancellationToken ct)
     {
         var items = await BuildOrderQuery(filter).Where(order => order.ManufacturingCompanyId != null)
@@ -198,6 +203,7 @@ public class RatingController : ControllerBase
 
     [HttpGet("/Rating/CityByCountryDetails")]
     [HttpPost("/Rating/CityByCountryDetails")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> CityByCountryDetails([FromQuery] RatingOrderFilter filter, CancellationToken ct)
     {
         var items = await BuildOrderQuery(filter).GroupBy(order => new { order.Country, order.State }).Select(group => new
@@ -212,6 +218,7 @@ public class RatingController : ControllerBase
 
     [HttpGet("/Rating/FailedAndDeliveredOrders")]
     [HttpPost("/Rating/FailedAndDeliveredOrders")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> FailedAndDeliveredOrders([FromQuery] RatingOrderFilter filter, CancellationToken ct)
     {
         var relevant = DeliveredStatuses.Concat(OrderStatusCodes.FailureStatuses).ToArray();

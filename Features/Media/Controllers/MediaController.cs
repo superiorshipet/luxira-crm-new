@@ -42,17 +42,31 @@ public class MediaController : ControllerBase
 
     [HttpGet("/Media/File")]
     [HttpGet("file")]
-    public IActionResult ServeFile([FromQuery] string key)
+    public async Task<IActionResult> ServeFile([FromQuery] string key, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(key))
-            return BadRequest("Missing media key.");
+        if (string.IsNullOrWhiteSpace(key) || key.Contains("..", StringComparison.Ordinal) || key.Length > 450)
+            return BadRequest();
 
+        key = key.Trim();
+        var slash = key.IndexOf('/');
+        if (slash <= 0 || slash == key.Length - 1) return BadRequest();
+
+        var prefix = key[..slash];
+        if (MediaModuleRegistry.RestrictedPrefixes.TryGetValue(prefix, out var roles) && !roles.Any(User.IsInRole))
+            return Forbid();
+
+        if (!MediaModuleRegistry.AllPrefixes.Contains(prefix) &&
+            !await _db.S3StoredObjects.AsNoTracking().AnyAsync(item => item.Key == key && !item.IsDeleted, ct))
+            return BadRequest();
+
+        Response.Headers.CacheControl = "no-store, max-age=0";
         var presignedUrl = _s3.GetPresignedUrl(key, 30);
         return Redirect(presignedUrl);
     }
 
     [HttpPost("upload")]
     [HttpPost("/Media/Upload")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> Upload(
         IFormFile file,
         [FromQuery] string? prefix = "uploads",
@@ -77,6 +91,7 @@ public class MediaController : ControllerBase
 
     [HttpGet("presigned-upload-url")]
     [HttpGet("/Media/GetPresignedUploadUrl")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public IActionResult GetPresignedUploadUrl(
         [FromQuery] string fileName,
         [FromQuery] string? contentType,
@@ -85,7 +100,10 @@ public class MediaController : ControllerBase
         if (string.IsNullOrWhiteSpace(fileName))
             return BadRequest("File name is required.");
 
-        var key = $"{prefix?.Trim('/') ?? "uploads"}/{Guid.NewGuid():N}/{fileName}";
+        var safeFileName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(safeFileName)) return BadRequest("File name is required.");
+        var safePrefix = MediaModuleRegistry.PrefixForFolder(prefix ?? "uploads");
+        var key = $"{safePrefix}/{Guid.NewGuid():N}/{safeFileName}";
         var mime = contentType ?? "application/octet-stream";
         var uploadUrl = _s3.GetPresignedUploadUrl(key, mime, 30);
 

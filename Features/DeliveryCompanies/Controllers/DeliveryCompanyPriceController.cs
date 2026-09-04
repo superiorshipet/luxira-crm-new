@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+[Authorize]
 [Route("api/v1/delivery-companies/prices")]
 [Route("DeliveryCompanyPrice")]
 public class DeliveryCompanyPriceController : ControllerBase
@@ -26,6 +26,7 @@ public class DeliveryCompanyPriceController : ControllerBase
     [HttpGet("Index")]
     [HttpGet("/DeliveryCompanyPrice/Index")]
     [HttpPost("/DeliveryCompanyPrice/Index")]
+    [Authorize(Roles = "Admin,Administrator,DeliveryCompany,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> Index([FromQuery] int? deliveryCompanyId, [FromQuery] int? country, CancellationToken ct = default)
     {
         var query = _context.DeliveryCompanyPrices
@@ -42,12 +43,14 @@ public class DeliveryCompanyPriceController : ControllerBase
     }
 
     [HttpGet("/DeliveryCompanyPrice/Create")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
     {
         deliveryCompanies = await _context.DeliveryCompanies.AsNoTracking().Where(item => !item.IsRepresentative && item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name, item.Country }).ToListAsync(ct)
     });
 
     [HttpGet("/DeliveryCompanyPrice/Edit")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> EditForm([FromQuery] int id, CancellationToken ct)
     {
         var price = await _context.DeliveryCompanyPrices.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, ct);
@@ -56,6 +59,7 @@ public class DeliveryCompanyPriceController : ControllerBase
 
     [HttpPost("Create")]
     [HttpPost("/DeliveryCompanyPrice/Create")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> Create([FromBody] CreateDeliveryPriceItemRequest request, CancellationToken ct = default)
     {
         var price = new DeliveryCompanyPrice
@@ -74,6 +78,7 @@ public class DeliveryCompanyPriceController : ControllerBase
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
     [HttpPost("/DeliveryCompanyPrice/Edit")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> Edit([RouteOrRequest] int id, [FromBody] CreateDeliveryPriceItemRequest request, CancellationToken ct = default)
     {
         var price = await _context.DeliveryCompanyPrices.FirstOrDefaultAsync(p => p.Id == id, ct);
@@ -89,6 +94,7 @@ public class DeliveryCompanyPriceController : ControllerBase
 
     [HttpGet("GetAvailableCities")]
     [HttpGet("/DeliveryCompanyPrice/GetAvailableCities")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> GetAvailableCities([FromQuery] int deliveryCompanyId, [FromQuery] string country, CancellationToken ct = default)
     {
         var cities = await _context.CamexCities.AsNoTracking().Select(c => c.CityName).Distinct().ToListAsync(ct);
@@ -97,7 +103,7 @@ public class DeliveryCompanyPriceController : ControllerBase
 }
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+[Authorize]
 [Route("api/v1/delivery-representatives/prices")]
 [Route("DeliveryRepresentativePrice")]
 public class DeliveryRepresentativePriceController : ControllerBase
@@ -113,6 +119,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
     [HttpGet("Index")]
     [HttpGet("/DeliveryRepresentativePrice/Index")]
     [HttpPost("/DeliveryRepresentativePrice/Index")]
+    [Authorize(Roles = "Admin,Administrator,DeliveryRepresentative,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> Index([FromQuery] int? deliveryRepresentativeId, [FromQuery] int? country, CancellationToken ct = default)
     {
         var query = _context.DeliveryCompanyPrices
@@ -129,6 +136,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
     }
 
     [HttpGet("/DeliveryRepresentativePrice/Create")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
     {
         representatives = await _context.DeliveryCompanies.AsNoTracking().Where(item => item.IsRepresentative && item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name, item.Country }).ToListAsync(ct)
@@ -136,6 +144,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
 
     [HttpPost("Create")]
     [HttpPost("/DeliveryRepresentativePrice/Create")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> Create([FromBody] CreateDeliveryPriceItemRequest request, CancellationToken ct = default)
     {
         var price = new DeliveryCompanyPrice
@@ -152,6 +161,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
     }
 
     [HttpGet("/DeliveryRepresentativePrice/Edit")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> EditForm([FromQuery] int id, CancellationToken ct)
     {
         var price = await _context.DeliveryCompanyPrices.AsNoTracking().Include(item => item.DeliveryCompany)
@@ -160,6 +170,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
     }
 
     [HttpPost("/DeliveryRepresentativePrice/Edit")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> Edit([FromQuery] int id, [FromBody] CreateDeliveryPriceItemRequest request, CancellationToken ct)
     {
         var price = await _context.DeliveryCompanyPrices.Include(item => item.DeliveryCompany)
@@ -174,6 +185,7 @@ public class DeliveryRepresentativePriceController : ControllerBase
     }
 
     [HttpGet("/DeliveryRepresentativePrice/GetAvailableDeliveryRepresentatives")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> GetAvailableDeliveryRepresentatives([FromQuery] int country, [FromQuery] string? city, CancellationToken ct)
     {
         var assigned = _context.DeliveryCompanyPrices.AsNoTracking().Where(price => price.Country == country && price.City == city).Select(price => price.DeliveryCompanyId);

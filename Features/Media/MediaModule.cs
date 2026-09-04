@@ -10,5 +10,8 @@ public class MediaModule : IModule
     {
         services.AddScoped<MediaRepository>();
         services.AddScoped<MediaService>();
+        services.AddScoped<MediaMigrationService>();
+        services.AddScoped<MediaReferenceCleanupService>();
+        services.AddHostedService<MediaReferenceCleanupBackgroundService>();
     }
 }

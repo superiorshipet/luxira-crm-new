@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Luxira.Api.Features.ManufacturingCompanies.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector,Observer,OrderPreparer,DeliveryCompany,DeliveryRepresentative")]
 [Route("api/v1/manufacturing-companies")]
 [Route("api/[controller]")]
 public class ManufacturingCompanyController : ControllerBase
@@ -39,6 +39,7 @@ public class ManufacturingCompanyController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<ActionResult<ManufacturingCompanyDto>> CreateCompany([FromBody] CreateManufacturingCompanyRequest request, CancellationToken ct)
     {
         var result = await _service.CreateCompanyAsync(request, ct);
@@ -46,6 +47,7 @@ public class ManufacturingCompanyController : ControllerBase
     }
 
     [HttpGet("/ManufacturingCompany/Create")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> Create(CancellationToken ct) => Ok(new
     {
         mainWarehouses = await _context.MainWarehouses.AsNoTracking().OrderBy(item => item.Name).Select(item => new { item.Id, item.Name }).ToListAsync(ct),
@@ -53,6 +55,7 @@ public class ManufacturingCompanyController : ControllerBase
     });
 
     [HttpPost("/ManufacturingCompany/Create")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> Create(
         [FromForm] string name,
         [FromForm] string? phoneNumber,
@@ -77,6 +80,7 @@ public class ManufacturingCompanyController : ControllerBase
     }
 
     [HttpGet("/ManufacturingCompany/Edit")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Edit([FromQuery] int id, CancellationToken ct)
     {
         var company = await _context.ManufacturingCompanies.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, ct);
@@ -87,6 +91,7 @@ public class ManufacturingCompanyController : ControllerBase
     }
 
     [HttpPost("/ManufacturingCompany/Edit")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Edit(
         [FromQuery] int id,
         [FromForm] string name,
@@ -115,6 +120,7 @@ public class ManufacturingCompanyController : ControllerBase
     }
 
     [HttpPost("/ManufacturingCompany/SetIsShown")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> SetIsShown([FromForm] int manufacturingcompanyId, [FromForm] bool IsShown, CancellationToken ct)
     {
         var changed = await _context.ManufacturingCompanies.Where(item => item.Id == manufacturingcompanyId).ExecuteUpdateAsync(update => update.SetProperty(item => item.IsShown, IsShown), ct);

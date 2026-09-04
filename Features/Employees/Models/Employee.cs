@@ -9,6 +9,10 @@ public class Employee
     public string? CvS3Key { get; set; }
     public string? ImageUrl { get; set; }
     public string? ImageS3Key { get; set; }
+    public string? IdCardFrontImage { get; set; }
+    public string? IdCardFrontImageS3Key { get; set; }
+    public string? IdCardBackImage { get; set; }
+    public string? IdCardBackImageS3Key { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? DisplayName { get; set; }
     public string IdNumber { get; set; } = string.Empty;

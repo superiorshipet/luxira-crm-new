@@ -28,6 +28,7 @@ public class ExpenseController : ControllerBase
     [HttpGet("/Expense/Index")]
     [HttpPost("/Expense/Index")]
     [HttpGet("/Expense/GetExpenses")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,Observer,ExecutiveDirector")]
     public async Task<ActionResult<List<ExpenseDto>>> GetExpenses([FromQuery] ExpenseFilterRequest filter, CancellationToken ct)
     {
         var result = await _service.GetExpensesAsync(filter, ct);
@@ -79,9 +80,11 @@ public class ExpenseController : ControllerBase
     }
 
     [HttpGet("/Expense/Filter")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public IActionResult Filter() => Ok(new { });
 
     [HttpPost("/Expense/Filter")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> Filter([FromForm] int selectedMonth, [FromForm] int selectedYear, [FromForm] int selectedDay, CancellationToken ct)
     {
         var expenses = await _context.Expenses.AsNoTracking()
@@ -92,6 +95,7 @@ public class ExpenseController : ControllerBase
 
     [HttpPost]
     [HttpPost("/Expense/Create")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<ActionResult<ExpenseDto>> CreateExpense([FromBody] CreateExpenseRequest request, CancellationToken ct)
     {
         var userId = Luxira.Api.Utils.Extensions.ClaimsPrincipalExtensions.GetUserId(User) ?? "system";

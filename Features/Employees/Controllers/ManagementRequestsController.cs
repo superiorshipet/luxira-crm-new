@@ -85,12 +85,12 @@ public class ManagementRequestsController : ControllerBase
 
     [HttpPost("{id:int}/review")]
     [HttpPost("ReviewRequest/{id:int}")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public Task<IActionResult> ReviewRequest([RouteOrRequest] int id, [FromBody] ReviewManagementRequest request, CancellationToken ct) =>
         DecideCore(id, request.Approved ? "Approved" : "Rejected", ct);
 
     [HttpPost("Decide")]
-    [Authorize(Roles = "Admin,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public Task<IActionResult> Decide([FromForm] long id, [FromForm] string decision, CancellationToken ct) => DecideCore(id, decision, ct);
 
     [HttpGet("GetNotifications")]

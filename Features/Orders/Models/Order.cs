@@ -242,6 +242,8 @@ public class OrderPost
 
 public class OrderPostImage
 {
+    public const string S3Prefix = "orderposts";
+
     public int Id { get; set; }
     public int OrderPostId { get; set; }
     public OrderPost? OrderPost { get; set; }

@@ -11,7 +11,7 @@ using Luxira.Api.Features.Operations.Models;
 namespace Luxira.Api.Features.Employees.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,Accountant,Observer,ExecutiveDirector")]
 [Route("api/v1/employees/transactions")]
 [Route("EmployeeTransactions")]
 public class EmployeeTransactionsController : ControllerBase
@@ -69,6 +69,7 @@ public class EmployeeTransactionsController : ControllerBase
 
     [HttpPost]
     [HttpPost("Create")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<ActionResult<EmployeeTransaction>> CreateTransaction([FromBody] CreateEmployeeTransactionRequest request, CancellationToken ct)
     {
         var employee = await _context.Employees.FindAsync([request.EmployeeId], ct);
@@ -93,6 +94,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpGet("/EmployeeTransactions/Create")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> Create(CancellationToken ct) => Ok(new
     {
         employees = await _context.Employees.AsNoTracking().Where(employee => employee.IsActive && employee.IsShown)
@@ -102,6 +104,7 @@ public class EmployeeTransactionsController : ControllerBase
 
     [HttpGet("/EmployeeTransactions/GetTransactionForEdit")]
     [HttpGet("/EmployeeTransactions/Edit")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> GetTransactionForEdit([FromQuery] int id, CancellationToken ct)
     {
         var transaction = await TransactionQuery().FirstOrDefaultAsync(item => item.Id == id && !item.IsDeleted, ct);
@@ -118,14 +121,17 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/Edit")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public Task<IActionResult> Edit([FromForm] int id, [FromForm] decimal amount, [FromForm] string transactionType, [FromForm] string? reason, CancellationToken ct) =>
         UpdateTransaction(id, amount, transactionType, reason, ct);
 
     [HttpPost("/EmployeeTransactions/UpdateTransactionFromPopup")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public Task<IActionResult> UpdateTransactionFromPopup([FromBody] UpdateEmployeeTransactionRequest request, CancellationToken ct) =>
         UpdateTransaction(request.Id, request.Amount, request.TransactionType, request.Reason, ct);
 
     [HttpGet("/EmployeeTransactions/TransactionEditHistory")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> TransactionEditHistory([FromQuery] int id, CancellationToken ct)
     {
         var transaction = await _context.EmployeeTransactions.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, ct);
@@ -133,6 +139,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpGet("/EmployeeTransactions/GetTransactionsEditHistory")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> GetTransactionsEditHistory(CancellationToken ct)
     {
         var rows = await TransactionQuery().Where(item => item.EditHistoryJson != null && item.EditHistoryJson != "")
@@ -141,10 +148,12 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpGet("/EmployeeTransactions/GetDeletedTransactions")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> GetDeletedTransactions(CancellationToken ct) => Ok(await TransactionQuery()
         .Where(item => item.IsDeleted).OrderByDescending(item => item.DeletedAt ?? item.Date).Take(1_000).ToListAsync(ct));
 
     [HttpGet("/EmployeeTransactions/GetPermanentlyDeletedTransactions")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> GetPermanentlyDeletedTransactions(CancellationToken ct)
     {
         var rows = await _context.AppLogs.AsNoTracking().Where(item => item.Category == PermanentDeleteCategory).OrderByDescending(item => item.CreatedAtUtc).Take(1000).Select(item => item.Message).ToListAsync(ct);
@@ -164,6 +173,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/RestoreDeleted")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> RestoreDeleted([FromForm] int id, CancellationToken ct)
     {
         var changed = await _context.EmployeeTransactions.Where(item => item.Id == id && item.IsDeleted)
@@ -172,6 +182,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/RestoreAllDeleted")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> RestoreAllDeleted(CancellationToken ct)
     {
         var changed = await _context.EmployeeTransactions.Where(item => item.IsDeleted)
@@ -180,6 +191,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/DeleteSelected")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> DeleteSelected([FromForm] string ids, CancellationToken ct)
     {
         var selected = ParseIds(ids);
@@ -191,6 +203,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/DeleteAllActive")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> DeleteAllActive([FromQuery] int? employeeId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, CancellationToken ct)
     {
         var query = _context.EmployeeTransactions.Where(item => !item.IsDeleted);
@@ -203,6 +216,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/DeleteDeletedPermanently")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> DeleteDeletedPermanently([FromForm] int id, CancellationToken ct)
     {
         var item = await _context.EmployeeTransactions.Include(row => row.Employee).FirstOrDefaultAsync(row => row.Id == id && row.IsDeleted, ct);
@@ -212,6 +226,7 @@ public class EmployeeTransactionsController : ControllerBase
     }
 
     [HttpPost("/EmployeeTransactions/DeleteAllDeletedPermanently")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> DeleteAllDeletedPermanently(CancellationToken ct)
     {
         var items = await _context.EmployeeTransactions.Include(item => item.Employee).Where(item => item.IsDeleted).ToListAsync(ct);
@@ -222,6 +237,7 @@ public class EmployeeTransactionsController : ControllerBase
 
     [HttpPost("/EmployeeTransactions/DeleteConfirmed")]
     [HttpPost("/EmployeeTransactions/Delete")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> DeleteConfirmed([FromForm] int id, CancellationToken ct)
     {
         var changed = await _context.EmployeeTransactions.Where(item => item.Id == id && !item.IsDeleted)

@@ -21,6 +21,8 @@ public class EmployeeDbConfig : IDbConfig<Employee>
         builder.Property(e => e.OrderPackagingDeliveryCompanyIds).HasMaxLength(1000);
         builder.Property(e => e.DeletedByUserId).HasMaxLength(450);
         builder.Property(e => e.DeletedByName).HasMaxLength(250);
+        builder.Property(e => e.IdCardFrontImageS3Key).HasMaxLength(450);
+        builder.Property(e => e.IdCardBackImageS3Key).HasMaxLength(450);
 
         builder.HasMany(e => e.AttendanceLogs)
             .WithOne(a => a.Employee)

@@ -3,6 +3,7 @@ using Luxira.Api.Features.Employees.Models;
 using Luxira.Api.Utils.Exceptions;
 using Luxira.Api.Utils.Extensions;
 using Luxira.Api.Infrastructure.S3;
+using Luxira.Api.Infrastructure.BackgroundServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,12 +21,14 @@ public class ScreenRecordsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly IWebHostEnvironment _environment;
     private readonly S3StorageService _storage;
+    private readonly ScreenRecordFinalizeSignal _finalizeSignal;
 
-    public ScreenRecordsController(ApplicationDbContext context, IWebHostEnvironment environment, S3StorageService storage)
+    public ScreenRecordsController(ApplicationDbContext context, IWebHostEnvironment environment, S3StorageService storage, ScreenRecordFinalizeSignal finalizeSignal)
     {
         _context = context;
         _environment = environment;
         _storage = storage;
+        _finalizeSignal = finalizeSignal;
     }
 
     [HttpGet]
@@ -96,6 +99,7 @@ public class ScreenRecordsController : ControllerBase
         {
             record = new ScreenRecord { EmployeeId = userId, Date = date, StartTime = now, VideoPath = relativePath, CreatedAt = now };
             _context.ScreenRecords.Add(record);
+            _finalizeSignal.Request();
         }
         else record.EndTime = now;
         await _context.SaveChangesAsync(ct);

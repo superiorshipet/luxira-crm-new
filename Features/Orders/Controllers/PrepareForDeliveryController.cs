@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Orders.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,CallCenter,FollowUpDepartment,TeamLeader,ExecutiveDirector")]
 [Route("api/v1/orders/prepare-for-delivery")]
 [Route("PrepareForDelivery")]
 public sealed class PrepareForDeliveryController(
@@ -108,7 +108,6 @@ public sealed class PrepareForDeliveryController(
     }
 
     [HttpGet("DebugEmployeeOrders")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> DebugEmployeeOrders(string employeeId, int? countryId, int? storeId, int? deliveryCompanyId, string? search, CancellationToken ct)
     {
         var query = FilterQueue(VisibleQueue().Where(order => order.OrderStatus == OrderStatusCodes.New && order.ApplicationUserId == employeeId), countryId, storeId, deliveryCompanyId, search);
@@ -169,7 +168,7 @@ public sealed class PrepareForDeliveryController(
     public Task<IActionResult> ScanBarcode([FromBody] ScanBarcodeRequest request, CancellationToken ct) => SubmitOrder(request.OrderId, request.Barcode, null, ct);
 
     [HttpGet("GetDownloadTimingSummary")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
+    [Authorize(Roles = "Admin,Administrator,FollowUpDepartment,TeamLeader,ExecutiveDirector")]
     public async Task<IActionResult> GetDownloadTimingSummary(DateTime? fromDate, DateTime? toDate, CancellationToken ct)
     {
         var start = fromDate?.Date ?? IstanbulTimeHelper.Now.Date;

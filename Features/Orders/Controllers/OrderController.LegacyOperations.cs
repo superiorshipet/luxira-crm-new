@@ -78,7 +78,7 @@ public partial class OrderController
     public Task<IActionResult> GetFailedDeliveryReminderOrders([FromQuery] int offset = 0, [FromQuery] int take = 300, CancellationToken ct = default) => ReminderOrders(true, offset, take, ct);
 
     [HttpGet("/Order/GetIncompleteOrdersNotificationCount")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> GetIncompleteOrdersNotificationCount(CancellationToken ct)
     {
         var statuses = new[] { OrderStatusCodes.New, OrderStatusCodes.WaitingForProcessing, OrderStatusCodes.Processed };

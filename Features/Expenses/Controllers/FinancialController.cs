@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Expenses.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant,DeliveryCompany,DeliveryRepresentative")]
+[Authorize]
 [Route("api/v1/financial")]
 [Route("Financial")]
 public class FinancialController : ControllerBase
@@ -44,7 +44,7 @@ public class FinancialController : ControllerBase
     [HttpGet("Countries")]
     [HttpGet("/Financial/Countries")]
     [HttpPost("/Financial/Countries")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Countries(CancellationToken ct)
     {
         var orders = await _context.Orders
@@ -71,6 +71,7 @@ public class FinancialController : ControllerBase
     [HttpGet("OrderByManfacturingCompanyOnGoingDeliveryCompany")]
     [HttpGet("/Financial/OrderByManfacturingCompanyOnGoingDeliveryCompany")]
     [HttpPost("/Financial/OrderByManfacturingCompanyOnGoingDeliveryCompany")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,DeliveryCompany")]
     public async Task<IActionResult> OrderByManfacturingCompanyOnGoingDeliveryCompany(
         [FromQuery] int? deliveryCompanyId,
         [FromQuery] int? countryId,
@@ -137,6 +138,7 @@ public class FinancialController : ControllerBase
     [HttpGet("OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve")]
     [HttpGet("/Financial/OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve")]
     [HttpPost("/Financial/OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,DeliveryRepresentative,FollowUpDepartment,ExecutiveDirector")]
     public async Task<IActionResult> OrderByManfacturingCompanyOnGoingDeliveryRepresntaitve(
         [FromQuery] int? deliveryCompanyId,
         [FromQuery] int? countryId,
@@ -179,6 +181,7 @@ public class FinancialController : ControllerBase
     [HttpGet("OrderByManafactureCompanyThenDeliveryCompany")]
     [HttpGet("/Financial/OrderByManafactureCompanyThenDeliveryCompany")]
     [HttpPost("/Financial/OrderByManafactureCompanyThenDeliveryCompany")]
+    [Authorize(Roles = "Admin,Administrator,Accountant")]
     public async Task<IActionResult> OrderByManafactureCompanyThenDeliveryCompany(
         [FromQuery] int? deliveryCompanyId,
         [FromQuery] int? manafacturecompanyId,
@@ -213,7 +216,7 @@ public class FinancialController : ControllerBase
     [HttpGet("Employees")]
     [HttpGet("/Financial/Employees")]
     [HttpPost("/Financial/Employees")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator,Accountant")]
     public async Task<IActionResult> Employees(
         [FromQuery] string? userId,
         [FromQuery] DateTime? startDay,
@@ -281,7 +284,7 @@ public class FinancialController : ControllerBase
 
     [HttpPost("PayEmployee")]
     [HttpPost("/Financial/PayEmployee")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator,Accountant")]
     public async Task<IActionResult> PayEmployee([FromBody] PayEmployeeRequest request, CancellationToken ct)
     {
         var employee = await _context.Employees.FirstOrDefaultAsync(e => e.Id == request.EmployeeId, ct);
@@ -302,7 +305,7 @@ public class FinancialController : ControllerBase
     [HttpGet("EmployeeBonusDetails")]
     [HttpGet("/Financial/EmployeeBonusDetails")]
     [HttpPost("/Financial/EmployeeBonusDetails")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator,Accountant")]
     public async Task<IActionResult> EmployeeBonusDetails([FromQuery] int employeeId, CancellationToken ct)
     {
         var employee = await _context.Employees.FirstOrDefaultAsync(e => e.Id == employeeId, ct);
@@ -447,6 +450,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("OrderReports")]
     [HttpGet("/Financial/OrderReports")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,DeliveryCompany,DeliveryRepresentative,ExecutiveDirector")]
     public async Task<IActionResult> OrderReports(
         [FromQuery] int? storeId,
         [FromQuery] int page = 1,
@@ -475,6 +479,7 @@ public class FinancialController : ControllerBase
 
     [HttpGet("OrderReportsRepresentative")]
     [HttpGet("/Financial/OrderReportsRepresentative")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> OrderReportsRepresentative(
         [FromQuery] int? storeId,
         [FromQuery] int page = 1,
@@ -499,6 +504,7 @@ public class FinancialController : ControllerBase
     [HttpGet("DownloadOrderReport/{orderReportId:int}")]
     [HttpGet("/Financial/DownloadOrderReport")]
     [HttpPost("/Financial/DownloadOrderReport")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,DeliveryCompany,ExecutiveDirector")]
     public async Task<IActionResult> DownloadOrderReport([RouteOrRequest] int orderReportId, [FromQuery] int? id, CancellationToken ct)
     {
         var reportId = orderReportId > 0 ? orderReportId : (id ?? 0);
@@ -524,7 +530,7 @@ public class FinancialController : ControllerBase
 
     [HttpPost("GenerateCombinedReport")]
     [HttpPost("/Financial/GenerateCombinedReport")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,DeliveryCompany,ExecutiveDirector")]
     public async Task<IActionResult> GenerateCombinedReport([FromBody] List<int> reportIds, CancellationToken ct)
     {
         var reports = await _context.OrderReports

@@ -128,15 +128,15 @@ public partial class OrderController
     public Task<IActionResult> MarkEmployeeErrorShareNotificationRead([FromForm] int id, CancellationToken ct) => MarkHistoryNotificationRead(id, EmployeeErrorSharePrefix, ct);
 
     [HttpGet("/Order/GetPendingBankTransferFollowUpAdminNotifications")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator")]
     public Task<IActionResult> GetPendingBankTransferFollowUpAdminNotifications(CancellationToken ct) => GetHistoryNotifications(BankTransferFollowUpAdminPrefix, ct);
 
     [HttpPost("/Order/MarkBankTransferFollowUpAdminNotificationRead")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator")]
     public Task<IActionResult> MarkBankTransferFollowUpAdminNotificationRead([FromForm] int id, CancellationToken ct) => MarkHistoryNotificationRead(id, BankTransferFollowUpAdminPrefix, ct);
 
     [HttpGet("/Order/EnsureOperationalReminders")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,CallCenter")]
+    [Authorize]
     public async Task<IActionResult> EnsureOperationalReminders(CancellationToken ct)
     {
         var cutoff = IstanbulTimeHelper.Now.AddHours(-24); var orders = await _context.Orders.AsNoTracking().Where(item => !item.IsHidden && item.LastEditedDate < cutoff && !OrderStatusCodes.ClosedStatuses.Contains(item.OrderStatus)).Select(item => item.Id).Take(100).ToListAsync(ct);

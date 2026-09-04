@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Operations.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "CallCenter,FollowUpDepartment")]
 [Route("api/v1/operations/pending-downloads")]
 [Route("PendingDownloadReminder")]
 public class PendingDownloadReminderController(ApplicationDbContext context) : ControllerBase

@@ -126,6 +126,8 @@ public class ApplicationDbContext : DbContext
 
     // Media & Storage
     public DbSet<S3StoredObject> S3StoredObjects => Set<S3StoredObject>();
+    public DbSet<MediaReferenceCleanupRun> MediaReferenceCleanupRuns => Set<MediaReferenceCleanupRun>();
+    public DbSet<MediaReferenceCleanupSetting> MediaReferenceCleanupSettings => Set<MediaReferenceCleanupSetting>();
 
     // Marketing & Advertising
     public DbSet<AdvertisingCampaign> AdvertisingCampaigns => Set<AdvertisingCampaign>();

@@ -27,7 +27,7 @@ public class ViolationsController : ControllerBase
     [HttpGet("Summary")]
     [HttpGet("/Violations/Index")]
     [HttpGet("/Violations/Summary")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> Summary([FromQuery] int? employeeId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, CancellationToken ct = default)
     {
         var query = _context.EmployeeViolations
@@ -51,7 +51,7 @@ public class ViolationsController : ControllerBase
     [HttpPost]
     [HttpPost("Create")]
     [HttpPost("/Violations/Create")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> Create([FromBody] CreateViolationRequest request, CancellationToken ct)
     {
         var violation = new EmployeeViolation

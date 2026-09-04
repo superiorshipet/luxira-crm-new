@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Marketing.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Marketing")]
+[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
 [Route("api/v1/marketing/sales-indicators")]
 [Route("SalesIndicators")]
 public class SalesIndicatorsController : ControllerBase

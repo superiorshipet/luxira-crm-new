@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Operations.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
 [Route("api/v1/operations/center")]
 [Route("OperationsCenter")]
 public class OperationsCenterController : ControllerBase

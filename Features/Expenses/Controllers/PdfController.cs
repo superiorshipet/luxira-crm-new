@@ -177,7 +177,6 @@ public class PdfController : ControllerBase
     });
 
     [HttpGet("StoreDailyInvoice")]
-    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
     public async Task<IActionResult> StoreDailyInvoice(int? storeId, DateTime? date, CancellationToken ct)
     {
         var targetDate = (date ?? DateTime.UtcNow).Date;
@@ -192,7 +191,6 @@ public class PdfController : ControllerBase
     [HttpGet("TestEmailInvoices")]
     [HttpGet("TestDeliveryCompanyDailyInvoicesService")]
     [HttpGet("TestDeliveryInvoicesEmail")]
-    [Authorize(Roles = "Admin,Administrator")]
     public IActionResult TestInvoiceServices() => Ok(new
     {
         success = true,
@@ -201,16 +199,17 @@ public class PdfController : ControllerBase
     });
 
     [HttpGet("PrintOrdersForDeliveryDetails")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment,DeliveryCompany,DeliveryRepresentative")]
     public Task<IActionResult> PrintOrdersForDeliveryDetails(string? ids, CancellationToken ct) =>
         PrintOrders(null, ids, true, ct);
 
     [HttpGet("PrintFinancialTransfersReceipts")]
-    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator")]
     public Task<IActionResult> PrintFinancialTransfersReceipts(string? ids, CancellationToken ct) =>
         PrintOrders(null, ids, true, ct);
 
     [HttpGet("PrintEmployeeTransactionStatement")]
-    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,Observer,ExecutiveDirector")]
     public async Task<IActionResult> PrintEmployeeTransactionStatement(int id, CancellationToken ct)
     {
         var transaction = await _context.EmployeeTransactions.AsNoTracking().Include(item => item.Employee)
@@ -220,7 +219,7 @@ public class PdfController : ControllerBase
     }
 
     [HttpGet("PrintEmployeeTransactionsStatement")]
-    [Authorize(Roles = "Admin,Administrator,Accountant,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,Observer,ExecutiveDirector")]
     public async Task<IActionResult> PrintEmployeeTransactionsStatement(int employeeId, DateTime? fromDate, DateTime? toDate, CancellationToken ct)
     {
         var query = _context.EmployeeTransactions.AsNoTracking().Include(item => item.Employee)
@@ -237,7 +236,6 @@ public class PdfController : ControllerBase
 
     [HttpGet("PrintAttendanceLog")]
     [HttpPost("PrintAttendanceLog")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> PrintAttendanceLog(string? ids, CancellationToken ct)
     {
         var parsedIds = ParseIds(ids);

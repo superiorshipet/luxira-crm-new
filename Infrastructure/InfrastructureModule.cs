@@ -44,6 +44,7 @@ public class InfrastructureModule : IModule
         services.AddHybridCache();
         services.AddSingleton<Luxira.Api.Infrastructure.Caching.LuxiraCacheService>();
         services.AddSingleton<WebhookSecurity>();
+        services.AddSingleton<ScreenRecordFinalizeSignal>();
 
         // 2. WhatsApp Services (Lavva Cloud API + Infobip)
         services.AddHttpClient<LavvaWhatsAppService>(client =>
@@ -91,6 +92,7 @@ public class InfrastructureModule : IModule
             configuration.GetValue<bool>("BackgroundJobs:ScreenRecordCleanupEnabled"))
         {
             services.AddHostedService<ScreenRecordCleanupService>();
+            services.AddHostedService<ScreenRecordS3UploadService>();
         }
     }
 

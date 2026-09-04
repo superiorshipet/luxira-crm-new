@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Orders.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
 [Route("api/v1/orders/posts/deductions")]
 [Route("OrderPosts")]
 public class OrderPostsDuplicateDeductionController : ControllerBase

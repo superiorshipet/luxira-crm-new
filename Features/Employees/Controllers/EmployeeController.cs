@@ -55,7 +55,7 @@ public class EmployeeController : ControllerBase
     [HttpPost]
     [HttpPost("Create")]
     [HttpPost("/Employee/Create")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize]
     public async Task<ActionResult<EmployeeDto>> CreateEmployee([FromBody] CreateEmployeeRequest request, CancellationToken ct)
     {
         var result = await _service.CreateEmployeeAsync(request, ct);
@@ -75,6 +75,7 @@ public class EmployeeController : ControllerBase
     [HttpGet("stores")]
     [HttpGet("/Employee/EmployeeStores")]
     [HttpPost("/Employee/EmployeeStores")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> EmployeeStores(CancellationToken ct)
     {
         var stores = await _context.ManufacturingCompanies.Where(m => m.IsShown).Select(m => new { m.Id, m.Name }).ToListAsync(ct);
@@ -83,6 +84,7 @@ public class EmployeeController : ControllerBase
 
     [HttpGet("{id:int}/basic-modal")]
     [HttpGet("/Employee/GetEmployeeBasicModalData")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> GetEmployeeBasicModalData([RouteOrRequest] int id, [FromQuery] int? employeeId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (employeeId ?? 0);
@@ -102,7 +104,7 @@ public class EmployeeController : ControllerBase
 
     [HttpPost("update-basic-modal")]
     [HttpPost("/Employee/UpdateEmployeeBasicModal")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> UpdateEmployeeBasicModal([FromBody] UpdateEmployeeBasicModalRequest request, CancellationToken ct)
     {
         var employee = await _context.Employees.FirstOrDefaultAsync(e => e.Id == request.Id, ct);
@@ -119,6 +121,7 @@ public class EmployeeController : ControllerBase
 
     [HttpGet("{id:int}/permissions-modal")]
     [HttpGet("/Employee/GetEmployeePermissionsModalData")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> GetEmployeePermissionsModalData([RouteOrRequest] int id, [FromQuery] int? employeeId, CancellationToken ct)
     {
         var targetId = id > 0 ? id : (employeeId ?? 0);
@@ -192,7 +195,7 @@ public class EmployeeController : ControllerBase
 
     [HttpPost("set-active")]
     [HttpPost("/Employee/SetIsActive")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> SetIsActive([FromQuery] int id, [FromQuery] bool isActive, CancellationToken ct)
     {
         var employee = await _context.Employees.FirstOrDefaultAsync(e => e.Id == id, ct);
@@ -205,7 +208,7 @@ public class EmployeeController : ControllerBase
 
     [HttpPost("set-shown")]
     [HttpPost("/Employee/SetIsShown")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> SetIsShown([FromQuery] int id, [FromQuery] bool isShown, CancellationToken ct)
     {
         var employee = await _context.Employees.FirstOrDefaultAsync(item => item.Id == id, ct);
@@ -292,7 +295,7 @@ public class EmployeeController : ControllerBase
     });
 
     [HttpGet("/Employee/Create")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr,TeamLeader")]
+    [Authorize]
     public async Task<IActionResult> Create(CancellationToken ct) => Ok(new
     {
         users = await _context.Users.AsNoTracking()
@@ -302,9 +305,11 @@ public class EmployeeController : ControllerBase
     });
 
     [HttpGet("/Employee/Edit")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> Edit([FromQuery] int id, CancellationToken ct) => Ok(await _service.GetEmployeeByIdAsync(id, ct));
 
     [HttpPost("/Employee/Edit")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> Edit([FromQuery] int id, [FromBody] UpdateEmployeeRequest request, CancellationToken ct) =>
         Ok(await _service.UpdateEmployeeAsync(id, request, ct));
 
@@ -398,6 +403,7 @@ public class EmployeeController : ControllerBase
     }
 
     [HttpGet("/Employee/GetSoftwareDevelopers")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> GetSoftwareDevelopers(CancellationToken ct)
     {
         string[] roles = ["SoftwareDeveloper", "MarketingDepartment"];
@@ -441,6 +447,7 @@ public class EmployeeController : ControllerBase
     }
 
     [HttpGet("/Employee/GetDevelopmentTaskAssignments")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> GetDevelopmentTaskAssignments(CancellationToken ct) => Ok(new
     {
         success = true,

@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.DeliveryCompanies.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/v1/delivery-representatives")]
 [Route("DeliveryRepresentative")]
 [Route("api/[controller]")]
@@ -31,6 +32,7 @@ public class DeliveryRepresentativeController : ControllerBase
     [HttpGet("/DeliveryRepresentative/Index")]
     [HttpPost("/DeliveryRepresentative/Index")]
     [HttpGet("/DataList/GetDeliveryRepresentatives")]
+    [Authorize(Roles = "Admin,Administrator,Accountant,Observer,ExecutiveDirector,FollowUpDepartment")]
     public async Task<ActionResult<DeliveryRepresentativeResult>> GetRepresentatives([FromQuery] int? countryId, CancellationToken ct)
     {
         var result = await _service.ListRepresentativesAsync(countryId, ct);
@@ -38,9 +40,11 @@ public class DeliveryRepresentativeController : ControllerBase
     }
 
     [HttpGet("/DeliveryRepresentative/Create")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public IActionResult CreateForm() => Ok(new { isRepresentative = true });
 
     [HttpGet("/DeliveryRepresentative/Edit")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> EditForm([FromQuery] int? id, CancellationToken ct)
     {
         if (!id.HasValue) return NotFound();
@@ -50,6 +54,7 @@ public class DeliveryRepresentativeController : ControllerBase
 
     [HttpGet("/DeliveryRepresentative/Details")]
     [HttpPost("/DeliveryRepresentative/Details")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> DetailsLegacy([FromQuery] int? id, CancellationToken ct)
     {
         if (!id.HasValue) return NotFound();
@@ -57,7 +62,7 @@ public class DeliveryRepresentativeController : ControllerBase
         return rep is null ? NotFound() : Ok(rep);
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("Create")]
     [HttpPost("/DeliveryRepresentative/Create")]
     public async Task<IActionResult> Create([FromBody] CreateDeliveryRepresentativeRequest request, CancellationToken ct)
@@ -81,7 +86,7 @@ public class DeliveryRepresentativeController : ControllerBase
         return Ok(rep);
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("Edit/{id:int}")]
     [HttpPut("{id:int}")]
     [HttpPost("/DeliveryRepresentative/Edit")]
@@ -102,6 +107,7 @@ public class DeliveryRepresentativeController : ControllerBase
 
     [HttpGet("Details/{id:int}")]
     [HttpGet("/DeliveryRepresentative/Details/{id:int}")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> Details([RouteOrRequest] int id, CancellationToken ct)
     {
         var rep = await _context.DeliveryCompanies.FirstOrDefaultAsync(d => d.Id == id && d.IsRepresentative, ct);
@@ -109,7 +115,7 @@ public class DeliveryRepresentativeController : ControllerBase
         return Ok(rep);
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("SetIsActive")]
     [HttpPost("/DeliveryRepresentative/SetIsActive")]
     public async Task<IActionResult> SetIsActive([FromQuery] int deliveryRepresentativeId, [FromQuery] bool isActive, CancellationToken ct)
@@ -122,7 +128,7 @@ public class DeliveryRepresentativeController : ControllerBase
         return Ok(new { success = true, id = deliveryRepresentativeId, isActive });
     }
 
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     [HttpPost("SetIsShown")]
     [HttpPost("/DeliveryRepresentative/SetIsShown")]
     public async Task<IActionResult> SetIsShown([FromQuery] int deliveryRepresentativeId, [FromQuery] bool isShown, CancellationToken ct)

@@ -107,7 +107,7 @@ public class CountryMinimumPricesController : ControllerBase
 }
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+[Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
 [Route("api/v1/manufacturing/product-minimum-selling-prices")]
 [Route("ProductMinimumSellingPrices")]
 public class ProductMinimumSellingPricesController : ControllerBase

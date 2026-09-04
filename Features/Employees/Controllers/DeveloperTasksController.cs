@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Employees.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "SoftwareDeveloper,MarketingDepartment")]
 [Route("api/v1/developer-tasks")]
 [Route("DeveloperTasks")]
 public sealed partial class DeveloperTasksController(ApplicationDbContext context) : ControllerBase

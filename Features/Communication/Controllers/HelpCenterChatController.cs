@@ -693,7 +693,7 @@ public class HelpCenterChatController : ControllerBase
     }
 
     [HttpPost("HardDelete")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> HardDelete([FromForm] long id, CancellationToken ct)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Employees.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector,SoftwareDeveloper")]
+[Authorize(Roles = "Admin,Administrator")]
 [Route("api/v1/development-center")]
 [Route("DevelopmentCenter")]
 public sealed class DevelopmentCenterController(ApplicationDbContext context, S3StorageService storage) : ControllerBase

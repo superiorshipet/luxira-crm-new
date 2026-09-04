@@ -24,7 +24,7 @@ public class EmployeeActivityController : ControllerBase
 
     [HttpGet("LoginSessions")]
     [HttpGet("/EmployeeActivity/LoginSessions")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> LoginSessions([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, CancellationToken ct = default)
     {
         var from = fromDate ?? IstanbulTimeHelper.Now.Date;
@@ -42,7 +42,7 @@ public class EmployeeActivityController : ControllerBase
 
     [HttpGet("LiveStatuses")]
     [HttpGet("/EmployeeActivity/LiveStatuses")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> LiveStatuses([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, CancellationToken ct = default)
     {
         var now = IstanbulTimeHelper.Now;
@@ -61,7 +61,7 @@ public class EmployeeActivityController : ControllerBase
 
     [HttpGet("HourlyStatus")]
     [HttpGet("/EmployeeActivity/HourlyStatus")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Hr")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
     public async Task<IActionResult> HourlyStatus([FromQuery] int employeeId, [FromQuery] DateTime activityDate, [FromQuery] string time, CancellationToken ct = default)
     {
         var logs = await _context.EmployeeActivityLogs

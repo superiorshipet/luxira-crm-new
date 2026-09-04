@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Orders.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator")]
 [Route("api/v1/orders/potential")]
 [Route("PotentialOrder")]
 public class PotentialOrderController : ControllerBase

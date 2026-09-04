@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Luxira.Api.Features.Employees.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
 [Route("api/v1/bonuses")]
 [Route("EmployeeBonus")]
 [Route("api/[controller]")]
@@ -79,6 +79,7 @@ public class EmployeeBonusController : ControllerBase
         .OrderByDescending(item => item.DatePaid).Take(200).ToListAsync(ct));
 
     [HttpGet("Create")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> CreateForm(CancellationToken ct) => Ok(new
     {
         employees = await _context.Employees.AsNoTracking().Where(item => item.IsActive && item.IsShown).OrderBy(item => item.Name).Select(item => new { item.Id, Name = item.DisplayName ?? item.Name }).ToListAsync(ct)
@@ -86,7 +87,7 @@ public class EmployeeBonusController : ControllerBase
 
     [HttpPost("pay")]
     [HttpPost("/EmployeeBonus/Pay")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> Pay([FromBody] PayBonusEmployeeRequest request, CancellationToken ct)
     {
         var applicationUserId = await _context.Employees
@@ -110,7 +111,7 @@ public class EmployeeBonusController : ControllerBase
 
     [HttpPost("undo-pay/{paymentId:int}")]
     [HttpPost("/EmployeeBonus/UndoPay")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<IActionResult> UndoPay([RouteOrRequest] int paymentId, [FromQuery] int? id, CancellationToken ct)
     {
         var targetId = paymentId > 0 ? paymentId : (id ?? 0);
@@ -137,6 +138,7 @@ public class EmployeeBonusController : ControllerBase
 
     [HttpPost("toggle-panel")]
     [HttpPost("/EmployeeBonus/ToggleBonusPanel")]
+    [Authorize(Roles = "Admin,Administrator")]
     public IActionResult ToggleBonusPanel([FromQuery] string employeeId, [FromQuery] bool hidden)
     {
         return Ok(new { success = true, employeeId, hidden });
@@ -146,7 +148,7 @@ public class EmployeeBonusController : ControllerBase
     [HttpPost("AwardBonus")]
     [HttpPost("Create")]
     [HttpPost("/EmployeeBonus/Create")]
-    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,Accountant")]
+    [Authorize(Roles = "Admin,Administrator")]
     public async Task<ActionResult<EmployeeBonusPaymentDto>> AwardBonus([FromBody] AwardBonusRequest request, CancellationToken ct)
     {
         var result = await _service.AwardBonusAsync(request, ct);

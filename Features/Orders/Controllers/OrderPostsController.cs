@@ -188,7 +188,7 @@ public class OrderPostsController : ControllerBase
         return Ok(new { problem = counts.GetValueOrDefault(OrderPostType.Problem), editNote = counts.GetValueOrDefault(OrderPostType.EditNote), orderNote = counts.GetValueOrDefault(OrderPostType.OrderNote) });
     }
 
-    private bool CanSeeAll() => User.IsInRole("Admin") || User.IsInRole("FollowUpDepartment") || User.IsInRole("ExecutiveDirector");
+    private bool CanSeeAll() => User.IsInRole("Admin") || User.IsInRole("Administrator") || User.IsInRole("FollowUpDepartment") || User.IsInRole("ExecutiveDirector");
     private static object EmptyPanel() => new { count = 0, groups = Array.Empty<object>() };
     private static string BuildSnippet(string? body, bool hasImages)
     {

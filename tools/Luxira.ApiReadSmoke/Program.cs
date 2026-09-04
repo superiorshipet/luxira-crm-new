@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -101,6 +102,8 @@ using var document = await JsonDocument.ParseAsync(openApiStream);
 var checkedRoutes = 0;
 var serverFailures = new List<string>();
 var timedOutRoutes = new List<string>();
+var routeDurations = new List<double>();
+var totalWatch = Stopwatch.StartNew();
 foreach (var pathProperty in document.RootElement.GetProperty("paths").EnumerateObject())
 {
     if (!pathProperty.Name.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase) ||
@@ -116,10 +119,13 @@ foreach (var pathProperty in document.RootElement.GetProperty("paths").Enumerate
     using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
     try
     {
+        var routeWatch = Stopwatch.StartNew();
         using var response = await client.GetAsync(
             route + query,
             HttpCompletionOption.ResponseHeadersRead,
             timeout.Token);
+        routeWatch.Stop();
+        routeDurations.Add(routeWatch.Elapsed.TotalMilliseconds);
         if ((int)response.StatusCode >= 500)
             serverFailures.Add($"{(int)response.StatusCode} {route}");
     }
@@ -128,6 +134,7 @@ foreach (var pathProperty in document.RootElement.GetProperty("paths").Enumerate
         timedOutRoutes.Add(route);
     }
 }
+totalWatch.Stop();
 
 Console.WriteLine($"Authenticated canonical GET checks: {checkedRoutes}");
 Console.WriteLine($"Authenticated SignalR negotiate checks: {hubPaths.Length}");
@@ -137,9 +144,17 @@ Console.WriteLine($"Server failures: {serverFailures.Count}");
 foreach (var failure in serverFailures) Console.WriteLine(failure);
 Console.WriteLine($"Timed out routes: {timedOutRoutes.Count}");
 foreach (var route in timedOutRoutes) Console.WriteLine($"TIMEOUT {route}");
+if (routeDurations.Count > 0)
+{
+    routeDurations.Sort();
+    Console.WriteLine($"GET latency ms: p50={Percentile(routeDurations, 0.50):0.0}, p95={Percentile(routeDurations, 0.95):0.0}, max={routeDurations[^1]:0.0}, total={totalWatch.Elapsed.TotalMilliseconds:0.0}");
+}
 return realtimeFailures.Count == 0 && serverFailures.Count == 0 && timedOutRoutes.Count == 0
     ? 0
     : 1;
+
+static double Percentile(IReadOnlyList<double> sorted, double percentile) =>
+    sorted[Math.Clamp((int)Math.Ceiling(sorted.Count * percentile) - 1, 0, sorted.Count - 1)];
 
 static string ReplacePathParameters(string route) =>
     Regex.Replace(route, "\\{[^}:]+(?::[^}]+)?\\}", "1");

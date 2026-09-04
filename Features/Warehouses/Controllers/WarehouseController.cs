@@ -31,6 +31,7 @@ public class WarehouseController : ControllerBase
     [HttpGet("/Warehouse/Index")]
     [HttpPost("/Warehouse/Index")]
     [HttpGet("/Warehouse/GetWarehouses")]
+    [Authorize(Roles = "Admin,Administrator,DeliveryCompany,Accountant,OrderPreparer,Observer,ExecutiveDirector,FollowUpDepartment")]
     public async Task<ActionResult<List<WarehouseDto>>> GetWarehouses([FromQuery] int? countryId, [FromQuery] bool? isActive, CancellationToken ct)
     {
         var result = await _service.GetWarehousesAsync(countryId, isActive, ct);
@@ -47,6 +48,7 @@ public class WarehouseController : ControllerBase
 
     [HttpPost]
     [HttpPost("/Warehouse/Create")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<ActionResult<WarehouseDto>> CreateWarehouse([FromBody] CreateWarehouseRequest request, CancellationToken ct)
     {
         var result = await _service.CreateWarehouseAsync(request, ct);
@@ -54,6 +56,7 @@ public class WarehouseController : ControllerBase
     }
 
     [HttpGet("/Warehouse/Create")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> Create(CancellationToken ct) => Ok(new
     {
         subWarehouses = await _context.SubWarehouses.AsNoTracking().OrderBy(item => item.Name).ToListAsync(ct),
@@ -62,6 +65,7 @@ public class WarehouseController : ControllerBase
     });
 
     [HttpGet("/Warehouse/Edit")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> Edit([FromQuery] int id, CancellationToken ct)
     {
         var item = await WarehouseDetailsQuery().FirstOrDefaultAsync(row => row.Id == id, ct);
@@ -69,6 +73,7 @@ public class WarehouseController : ControllerBase
     }
 
     [HttpPost("/Warehouse/Edit")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> Edit([FromQuery] int id, [FromBody] LegacyWarehouseRequest request, CancellationToken ct)
     {
         if (request.Id != 0 && request.Id != id) return NotFound();
@@ -92,6 +97,7 @@ public class WarehouseController : ControllerBase
 
     [HttpGet("/Warehouse/Details")]
     [HttpPost("/Warehouse/Details")]
+    [Authorize(Roles = "Admin,Administrator,DeliveryCompany,ExecutiveDirector,DeliveryRepresentative,FollowUpDepartment")]
     public async Task<IActionResult> Details([FromQuery] int? id, CancellationToken ct)
     {
         if (!id.HasValue) return NotFound();
@@ -109,6 +115,7 @@ public class WarehouseController : ControllerBase
     }
 
     [HttpPost("/Warehouse/SetIsShown")]
+    [Authorize(Roles = "Admin,Administrator,ExecutiveDirector,FollowUpDepartment")]
     public async Task<IActionResult> SetIsShown([FromForm] int WareHouseId, [FromForm] bool isShown, CancellationToken ct)
     {
         var changed = await _context.Warehouses.Where(item => item.Id == WareHouseId).ExecuteUpdateAsync(update => update.SetProperty(item => item.IsShown, isShown), ct);

@@ -3,11 +3,12 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace Luxira.Api.Features.Operations.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Administrator")]
 [Route("api/v1/operations/admin-dashboard")]
 [Route("AdminDashboard")]
 public class AdminDashboardController : ControllerBase
@@ -27,7 +28,7 @@ public class AdminDashboardController : ControllerBase
     public async Task<IActionResult> CompareHomepageSearch([FromQuery] string search, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(search)) return BadRequest(new { message = "search is required" });
-        var normalized = NormalizePhone(search);
+        var normalized = NormalizePhone(search)!;
         var unboundedWatch = Stopwatch.StartNew();
         var unboundedCount = await _context.Orders.AsNoTracking().CountAsync(order =>
             order.TelephoneNumber.Contains(normalized)
@@ -49,12 +50,41 @@ public class AdminDashboardController : ControllerBase
     }
 
     [HttpPost("DryRunPoPhoneNormalization")]
-    public IActionResult DryRunPoPhoneNormalization() =>
-        Ok(new { message = "TODO: implement dry-run logic for PotentialOrder.PhoneNumber normalization." });
+    public async Task<IActionResult> DryRunPoPhoneNormalization(CancellationToken ct)
+    {
+        var rows = await _context.PotentialOrders
+            .AsNoTracking()
+            .Select(order => new { order.Id, order.PhoneNumber })
+            .ToListAsync(ct);
+        var changes = rows
+            .Select(order => new { order.Id, Before = order.PhoneNumber, After = NormalizePhone(order.PhoneNumber) })
+            .Where(order => !string.Equals(order.Before, order.After, StringComparison.Ordinal))
+            .ToList();
+
+        return Ok(new
+        {
+            rowsScanned = rows.Count,
+            rowsThatWouldChange = changes.Count,
+            sample = changes.Take(25).Select(order => new { order.Id, before = order.Before, after = order.After })
+        });
+    }
 
     [HttpPost("ApplyPoPhoneNormalization")]
-    public IActionResult ApplyPoPhoneNormalization() =>
-        Ok(new { message = "TODO: implement apply logic for PotentialOrder.PhoneNumber normalization." });
+    public async Task<IActionResult> ApplyPoPhoneNormalization(CancellationToken ct)
+    {
+        var rows = await _context.PotentialOrders.ToListAsync(ct);
+        var changed = 0;
+        foreach (var order in rows)
+        {
+            var normalized = NormalizePhone(order.PhoneNumber);
+            if (string.Equals(order.PhoneNumber, normalized, StringComparison.Ordinal)) continue;
+            order.PhoneNumber = normalized;
+            changed++;
+        }
+
+        if (changed > 0) await _context.SaveChangesAsync(ct);
+        return Ok(new { rowsScanned = rows.Count, rowsChanged = changed });
+    }
 
     [HttpGet]
     [HttpGet("GetSummary")]
@@ -79,5 +109,45 @@ public class AdminDashboardController : ControllerBase
         });
     }
 
-    private static string NormalizePhone(string value) => new(value.Where(char.IsDigit).ToArray());
+    internal static string? NormalizePhone(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return raw;
+
+        var builder = new StringBuilder(raw.Length);
+        foreach (var character in raw)
+        {
+            if (character is >= '٠' and <= '٩') builder.Append((char)('0' + character - '٠'));
+            else if (character is >= '۰' and <= '۹') builder.Append((char)('0' + character - '۰'));
+            else builder.Append(character);
+        }
+
+        var cleaned = builder.ToString()
+            .Replace("⁦", string.Empty, StringComparison.Ordinal)
+            .Replace("⁧", string.Empty, StringComparison.Ordinal)
+            .Replace("⁨", string.Empty, StringComparison.Ordinal)
+            .Replace("⁩", string.Empty, StringComparison.Ordinal)
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal);
+
+        foreach (var (dialCode, noLeadingZero) in CountryDialCodes)
+        {
+            var internationalPrefix = "00" + dialCode;
+            if (cleaned.StartsWith(internationalPrefix, StringComparison.Ordinal) && cleaned.Length > internationalPrefix.Length)
+                return (noLeadingZero ? string.Empty : "0") + cleaned[internationalPrefix.Length..];
+
+            var plusPrefix = "+" + dialCode;
+            if (cleaned.StartsWith(plusPrefix, StringComparison.Ordinal) && cleaned.Length > plusPrefix.Length)
+                return (noLeadingZero ? string.Empty : "0") + cleaned[plusPrefix.Length..];
+        }
+
+        return cleaned;
+    }
+
+    private static readonly (string DialCode, bool NoLeadingZero)[] CountryDialCodes =
+    [
+        ("964", false), ("971", false), ("974", true), ("218", false),
+        ("968", true), ("970", false), ("962", false), ("965", true),
+        ("973", true), ("966", false), ("216", true), ("212", false),
+        ("213", false), ("961", false), ("20", false), ("90", false)
+    ];
 }

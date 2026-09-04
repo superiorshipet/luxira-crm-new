@@ -6,22 +6,29 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Luxira.Api.Features.SearchKeywords.Services;
 using Luxira.Api.Utils.Extensions;
+using Luxira.Api.Features.Media.Models;
+using Luxira.Api.Features.Media.Services;
+using System.Collections.Concurrent;
 
 namespace Luxira.Api.Features.Operations.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Administrator,ExecutiveDirector")]
+[Authorize(Roles = "Admin,Administrator")]
 [Route("api/v1/operations/s3")]
 [Route("S3Dashboard")]
 public class S3DashboardController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly S3StorageService _s3;
+    private readonly MediaMigrationService _migration;
+    private readonly MediaReferenceCleanupService _cleanup;
 
-    public S3DashboardController(ApplicationDbContext context, S3StorageService s3)
+    public S3DashboardController(ApplicationDbContext context, S3StorageService s3, MediaMigrationService migration, MediaReferenceCleanupService cleanup)
     {
         _context = context;
         _s3 = s3;
+        _migration = migration;
+        _cleanup = cleanup;
     }
 
     [HttpGet("metrics")]
@@ -69,41 +76,47 @@ public class S3DashboardController : ControllerBase
     [HttpPost("/S3Dashboard/RecalculateStorage")]
     public async Task<IActionResult> RecalculateStorage(CancellationToken ct)
     {
-        var (totalBytes, count) = await _s3.GetBucketMetricsAsync(ct);
-        return Ok(new { success = true, totalBytes, objectCount = count });
+        var objects = await _s3.ListObjectsAsync(ct: ct);
+        var totalBytes = objects.Sum(item => item.Size);
+        var indexedObjectCount = await _context.S3StoredObjects.AsNoTracking().CountAsync(item => !item.IsDeleted, ct);
+        return Ok(new { totalBytes, totalGb = Math.Round((double)totalBytes / (1024 * 1024 * 1024), 3), objectCount = objects.Count, indexedObjectCount });
     }
 
     [HttpPost("migration-status")]
     [HttpPost("/S3Dashboard/MigrationStatus")]
     public async Task<IActionResult> MigrationStatus(CancellationToken ct)
     {
-        var indexed = await _context.S3StoredObjects.AsNoTracking().CountAsync(ct);
-        var pendingOrderPostImages = await _context.OrderPostImages.AsNoTracking().CountAsync(image => image.S3Key == null && image.Url != null, ct);
-        return Ok(new { indexedObjectCount = indexed, pendingOrderPostImages });
+        var status = await _migration.GetStatusAsync(ct);
+        return Ok(new
+        {
+            totalImages = status.TotalImages,
+            migratedCount = status.MigratedCount,
+            pendingCount = status.PendingCount,
+            readyCount = status.ReadyCount,
+            readyBytes = status.ReadyBytes,
+            missingFileCount = status.MissingFileCount,
+            notLocalCount = status.NotLocalCount,
+            isEstimateCapped = status.IsEstimateCapped
+        });
     }
 
     [HttpPost("run-migration")]
     [HttpPost("/S3Dashboard/RunMigration")]
-    public async Task<IActionResult> RunMigration([FromQuery] int batchSize = 100, [FromQuery] int afterId = 0, [FromServices] IWebHostEnvironment environment = null!, CancellationToken ct = default)
+    public async Task<IActionResult> RunMigration([FromQuery] int batchSize = 100, [FromQuery] int afterId = 0, CancellationToken ct = default)
     {
-        batchSize = Math.Clamp(batchSize, 1, 200);
-        var images = await _context.OrderPostImages.Where(image => image.Id > afterId && image.S3Key == null && image.Url != null).OrderBy(image => image.Id).Take(batchSize).ToListAsync(ct);
-        var migrated = 0; var missing = 0; var failed = 0;
-        var root = Path.GetFullPath(environment.WebRootPath) + Path.DirectorySeparatorChar;
-        foreach (var image in images)
+        var result = await _migration.MigrateBatchAsync(batchSize, afterId, User.GetUserId(), User.Identity?.Name, ct);
+        return Ok(new
         {
-            var path = Path.GetFullPath(Path.Combine(environment.WebRootPath, image.Url!.TrimStart('/')));
-            if (!path.StartsWith(root, StringComparison.Ordinal) || !System.IO.File.Exists(path)) { missing++; continue; }
-            try
-            {
-                await using var stream = System.IO.File.OpenRead(path);
-                var stored = await _s3.UploadStreamAsync(stream, stream.Length, "order-posts", Path.GetFileName(path), "application/octet-stream", User.GetUserId(), ct);
-                image.S3Key = stored.Key; image.Url = stored.PublicUrl ?? $"/api/v1/media/{Uri.EscapeDataString(stored.Key)}"; migrated++;
-            }
-            catch { failed++; }
-        }
-        await _context.SaveChangesAsync(ct);
-        return Ok(new { examined = images.Count, migrated, missing, failed, nextAfterId = images.LastOrDefault()?.Id ?? afterId, completed = images.Count < batchSize });
+            result.Examined,
+            result.Migrated,
+            result.MigratedBytes,
+            result.SkippedMissingFile,
+            result.SkippedNotLocal,
+            result.FailedCount,
+            result.Errors,
+            nextAfterId = result.LastProcessedId,
+            completed = !result.HasMore
+        });
     }
 
     [HttpPost("disk-usage")]
@@ -120,71 +133,148 @@ public class S3DashboardController : ControllerBase
     [HttpPost("/S3Dashboard/Reconcile")]
     public async Task<IActionResult> Reconcile(CancellationToken ct)
     {
-        var rows = await _context.S3StoredObjects.AsNoTracking().OrderBy(item => item.Id).Take(500).Select(item => new { item.Id, item.Key }).ToListAsync(ct);
-        var missing = new List<object>();
-        foreach (var row in rows) if (!await _s3.ExistsAsync(row.Key, ct)) missing.Add(row);
-        return Ok(new { scanned = rows.Count, missingCount = missing.Count, missing, truncated = rows.Count == 500 });
+        var bucketObjects = await _s3.ListObjectsAsync(ct: ct);
+        var bucket = bucketObjects.GroupBy(item => item.Key, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Size, StringComparer.Ordinal);
+        var indexRows = await _context.S3StoredObjects.AsNoTracking().Where(item => !item.IsDeleted).Select(item => new { item.Key, item.SizeBytes }).ToListAsync(ct);
+        var indexed = indexRows.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+        var orphans = bucket.Keys.Where(key => !indexed.Contains(key)).ToList();
+        var missing = indexRows.Where(item => !bucket.ContainsKey(item.Key)).ToList();
+        return Ok(new
+        {
+            bucketObjectCount = bucket.Count,
+            indexedObjectCount = indexRows.Count,
+            orphanCount = orphans.Count,
+            orphanBytes = orphans.Sum(key => bucket[key]),
+            orphanSample = orphans.Take(50),
+            missingCount = missing.Count,
+            missingSample = missing.Take(50).Select(item => item.Key)
+        });
     }
 
     [HttpPost("repair-index")]
     [HttpPost("/S3Dashboard/RepairIndex")]
     public async Task<IActionResult> RepairIndex(CancellationToken ct)
     {
-        var referencedKeys = await _context.OrderPostImages.AsNoTracking().Where(image => image.S3Key != null).Select(image => image.S3Key!).Distinct().Take(500).ToListAsync(ct);
-        var existing = await _context.S3StoredObjects.AsNoTracking().Where(item => referencedKeys.Contains(item.Key)).Select(item => item.Key).ToListAsync(ct);
-        var missingKeys = referencedKeys.Except(existing, StringComparer.Ordinal).ToList();
-        var repaired = 0;
-        foreach (var key in missingKeys)
+        var result = await _migration.RepairIndexAsync(User.GetUserId(), User.Identity?.Name, ct);
+        return Ok(new
         {
-            if (!await _s3.ExistsAsync(key, ct)) continue;
-            var (bytes, _) = await _s3.DownloadAsync(key, ct);
-            _context.S3StoredObjects.Add(new Features.Media.Models.S3StoredObject { Key = key, Prefix = key.Contains('/') ? key[..key.LastIndexOf('/')] : string.Empty, SizeBytes = bytes.LongLength, UploadedAt = DateTime.UtcNow, UploadedByUserId = User.GetUserId() });
-            repaired++;
-        }
-        await _context.SaveChangesAsync(ct);
-        return Ok(new { referencedKeyCount = referencedKeys.Count, missingFromIndexCount = missingKeys.Count, repairedCount = repaired });
+            result.ReferencedKeyCount,
+            result.MissingFromIndexCount,
+            result.RepairedCount,
+            result.RepairedBytes,
+            result.NotInBucketCount,
+            result.NotInBucketSample,
+            result.FailedCount,
+            result.Errors
+        });
     }
 
     [HttpPost("delete-orphans")]
     [HttpPost("/S3Dashboard/DeleteOrphans")]
-    public IActionResult DeleteOrphans([FromQuery] bool confirm = false)
+    public async Task<IActionResult> DeleteOrphans([FromQuery] bool confirm = false, CancellationToken ct = default)
     {
-        return Ok(new { wasDryRun = true, deletableCount = 0, deletedCount = 0, message = "Bucket listing is unavailable; no objects were deleted." });
+        var bucketObjects = await _s3.ListObjectsAsync(ct: ct);
+        var indexedKeys = await _context.S3StoredObjects.AsNoTracking().Where(item => !item.IsDeleted).Select(item => item.Key).ToHashSetAsync(ct);
+        var referencedKeys = await _context.OrderPostImages.AsNoTracking().Where(item => item.S3Key != null).Select(item => item.S3Key!).Distinct().ToHashSetAsync(ct);
+        var unindexed = bucketObjects.Where(item => !indexedKeys.Contains(item.Key)).ToList();
+        var stillReferenced = unindexed.Where(item => referencedKeys.Contains(item.Key)).ToList();
+        var candidates = unindexed.Where(item => !referencedKeys.Contains(item.Key)).ToList();
+        var deleted = new ConcurrentBag<S3ObjectInfo>();
+        var errors = new ConcurrentBag<object>();
+
+        if (confirm)
+        {
+            await Parallel.ForEachAsync(candidates, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = ct }, async (item, token) =>
+            {
+                try { await _s3.DeleteObjectOnlyAsync(item.Key, token); deleted.Add(item); }
+                catch (Exception exception) { errors.Add(new { item.Key, error = exception.Message }); }
+            });
+        }
+
+        return Ok(new
+        {
+            wasDryRun = !confirm,
+            deletableCount = candidates.Count,
+            deletableBytes = candidates.Sum(item => item.Size),
+            deletedCount = deleted.Count,
+            deletedBytes = deleted.Sum(item => item.Size),
+            deletedSample = candidates.Take(50).Select(item => item.Key),
+            stillReferencedCount = stillReferenced.Count,
+            stillReferencedBytes = stillReferenced.Sum(item => item.Size),
+            stillReferencedSample = stillReferenced.Take(50).Select(item => item.Key),
+            failedCount = errors.Count,
+            errors
+        });
     }
 
     [HttpPost("module-statuses")]
     [HttpPost("/S3Dashboard/ModuleStatuses")]
     public async Task<IActionResult> ModuleStatuses(CancellationToken ct)
     {
-        var modules = new[]
-        {
-            new { Module = "OrderPosts", IndexedCount = await CountIndexedPrefixAsync("OrderPosts/", ct) },
-            new { Module = "ProductImages", IndexedCount = await CountIndexedPrefixAsync("ProductImages/", ct) },
-            new { Module = "Employees", IndexedCount = await CountIndexedPrefixAsync("Employees/", ct) },
-            new { Module = "Warehouses", IndexedCount = await CountIndexedPrefixAsync("Warehouses/", ct) }
-        };
-        return Ok(modules);
+        var statuses = await _migration.GetModuleStatusesAsync(ct);
+        return Ok(new { modules = statuses.Select(item => new { key = item.ModuleKey, item.Label, item.Note, item.Total, item.Migrated, item.Pending }) });
     }
 
     [HttpPost("module-migrate")]
     [HttpPost("/S3Dashboard/ModuleMigrate")]
-    public IActionResult ModuleMigrate([FromBody] object request)
+    public async Task<IActionResult> ModuleMigrate([FromBody] ModuleBatchRequest request, CancellationToken ct)
     {
-        return Accepted(new { success = true, message = "Use RunMigration with a bounded cursor for order-post media." });
+        if (string.IsNullOrWhiteSpace(request.ModuleKey)) return BadRequest(new { message = "الوحدة مطلوبة." });
+        try
+        {
+            var result = await _migration.MigrateModuleBatchAsync(request.ModuleKey, request.BatchSize <= 0 ? 100 : request.BatchSize, request.Cursors, User.GetUserId(), User.Identity?.Name, ct);
+            return Ok(result);
+        }
+        catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
     }
 
     [HttpPost("module-delete-local")]
     [HttpPost("/S3Dashboard/ModuleDeleteLocal")]
-    public IActionResult ModuleDeleteLocal([FromBody] object request)
+    public async Task<IActionResult> ModuleDeleteLocal([FromBody] ModuleDeleteLocalRequest request, CancellationToken ct)
     {
-        return Ok(new { wasDryRun = true, deleted = 0, message = "No local files were deleted without an explicit verified file list." });
+        if (string.IsNullOrWhiteSpace(request.ModuleKey)) return BadRequest(new { message = "الوحدة مطلوبة." });
+        try
+        {
+            var result = await _migration.DeleteLocalModuleBatchAsync(request.ModuleKey, request.BatchSize <= 0 ? 100 : request.BatchSize, request.Cursors, request.Confirm, ct);
+            return Ok(result);
+        }
+        catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
     }
 
     [HttpPost("/S3Dashboard/RunCleanupNow")]
-    public Task<IActionResult> RunCleanupNow(CancellationToken ct) => Reconcile(ct);
+    public async Task<IActionResult> RunCleanupNow(CancellationToken ct)
+    {
+        var run = await _cleanup.RunAsync(User.Identity?.Name ?? "admin", ct);
+        return Ok(new
+        {
+            run.Id,
+            run.IsDryRun,
+            run.RowsScanned,
+            run.WouldClearCount,
+            run.ReferencesCleared,
+            run.SkippedStillInBucket,
+            run.FailedCount,
+            run.WasAborted,
+            run.AbortReason,
+            run.ScanWasCapped,
+            run.DurationMs,
+            run.Error
+        });
+    }
 
     [HttpPost("/S3Dashboard/SetCleanupDryRun")]
-    public IActionResult SetCleanupDryRun([FromForm] bool dryRun) => Ok(new { dryRun = true, requestedDryRun = dryRun, message = "Safety policy keeps cleanup in dry-run mode." });
+    public async Task<IActionResult> SetCleanupDryRun([FromForm] bool dryRun, CancellationToken ct)
+    {
+        var setting = await _cleanup.SetDryRunAsync(dryRun, User.Identity?.Name, ct);
+        return Ok(new
+        {
+            setting.DryRun,
+            setting.UpdatedBy,
+            message = setting.DryRun
+                ? "وضع المعاينة مُفعّل — لن يتم مسح أي مرجع."
+                : "وضع المسح الفعلي مُفعّل — سيتم مسح المراجع الميتة."
+        });
+    }
 
     [HttpPost("/S3Dashboard/PresignedUrl")]
     public IActionResult PresignedUrl([FromForm] string key) => string.IsNullOrWhiteSpace(key) ? BadRequest(new { message = "المفتاح مطلوب." }) : Ok(new { url = _s3.GetPresignedUrl(key) });
@@ -193,7 +283,7 @@ public class S3DashboardController : ControllerBase
     public async Task<IActionResult> Delete([FromForm] string key, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(key)) return BadRequest(new { message = "المفتاح مطلوب." });
-        await _s3.DeleteAsync(key, ct);
+        await _s3.DeleteAsync(key, User.GetUserId(), ct);
         return Ok(new { message = "تم الحذف." });
     }
 
@@ -217,6 +307,15 @@ public class S3DashboardController : ControllerBase
         return Ok(new { processed, failed, remaining = images.Count == 50 });
     }
 
-    private Task<int> CountIndexedPrefixAsync(string prefix, CancellationToken ct) =>
-        _context.S3StoredObjects.AsNoTracking().CountAsync(item => item.Key.StartsWith(prefix), ct);
+    public class ModuleBatchRequest
+    {
+        public string? ModuleKey { get; set; }
+        public int BatchSize { get; set; }
+        public Dictionary<string, int>? Cursors { get; set; }
+    }
+
+    public sealed class ModuleDeleteLocalRequest : ModuleBatchRequest
+    {
+        public bool Confirm { get; set; }
+    }
 }
