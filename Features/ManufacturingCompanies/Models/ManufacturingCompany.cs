@@ -189,3 +189,23 @@ public class StoreCodeStoreGroup
     public string? CreatedByUserId { get; set; }
     public string? CreatedByName { get; set; }
 }
+
+public class TraineeStore
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public ICollection<TraineeStoreManufacturingCompany> ManufacturingCompanies { get; set; } = [];
+}
+
+public class TraineeStoreManufacturingCompany
+{
+    public int Id { get; set; }
+    public int TraineeStoreId { get; set; }
+    public TraineeStore? TraineeStore { get; set; }
+    public int ManufacturingCompanyId { get; set; }
+    public ManufacturingCompany? ManufacturingCompany { get; set; }
+    public DateTime CreatedAt { get; set; }
+}

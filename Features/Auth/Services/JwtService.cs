@@ -49,6 +49,7 @@ public class JwtService
             new(ClaimTypes.NameIdentifier, user.Id),
             new(ClaimTypes.Name, user.UserName ?? string.Empty),
             new(ClaimTypes.Email, user.Email ?? string.Empty),
+            new(LuxiraClaimTypes.SecurityStamp, user.SecurityStamp ?? string.Empty),
             new("AccessId", user.AcessId.ToString(CultureInfo.InvariantCulture)),
             new("CountryId", (user.Country ?? 0).ToString(CultureInfo.InvariantCulture))
         };
@@ -68,10 +69,8 @@ public class JwtService
             {
                 claims.Add(new Claim("role", "Admin"));
                 claims.Add(new Claim("role", "Administrator"));
-                claims.Add(new Claim("role", "ExecutiveDirector"));
                 claims.Add(new Claim(ClaimTypes.Role, "Admin"));
                 claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
-                claims.Add(new Claim(ClaimTypes.Role, "ExecutiveDirector"));
             }
         }
 

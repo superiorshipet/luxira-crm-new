@@ -28,12 +28,32 @@ public class MainWareHouseController : ControllerBase
     }
 
     [HttpGet]
-    [HttpGet("Index")]
     [HttpGet("GetMainWarehouses")]
     public async Task<ActionResult<List<MainWarehouseDto>>> GetMainWarehouses([FromQuery] int? countryId, CancellationToken ct)
     {
         var result = await _service.GetMainWarehousesAsync(countryId, ct);
         return Ok(result);
+    }
+
+    [HttpGet("Index")]
+    public async Task<IActionResult> Index(
+        [FromQuery] int page = 1,
+        [FromQuery] int? pageSize = null,
+        [FromQuery] int? mainwarehouseId = null,
+        CancellationToken ct = default)
+    {
+        page = Math.Max(page, 1);
+        var effectivePageSize = Math.Clamp(pageSize ?? 10, 1, 200);
+        var query = _context.MainWarehouses.AsNoTracking();
+        if (mainwarehouseId.HasValue) query = query.Where(item => item.Id == mainwarehouseId.Value);
+
+        var totalItems = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(item => item.Id)
+            .Skip((page - 1) * effectivePageSize)
+            .Take(effectivePageSize)
+            .Select(item => new { item.Id, item.Name, item.ImageUrl })
+            .ToListAsync(ct);
+        return Ok(new { items, currentPage = page, pageSize = effectivePageSize, totalItems });
     }
 
     [HttpGet("Create")]

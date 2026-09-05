@@ -71,6 +71,7 @@ secrets.json
 *.key
 *.cer
 *.crt
+App_Data/DataProtection-Keys/
 
 # Postman local/current values and generated reports
 postman/local/

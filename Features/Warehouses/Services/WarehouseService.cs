@@ -16,8 +16,7 @@ public class WarehouseService
 
     public async Task<List<WarehouseDto>> GetWarehousesAsync(int? countryId = null, bool? isActive = null, CancellationToken ct = default)
     {
-        var items = await _repository.GetAllAsync(countryId, isActive, ct);
-        return items.Select(MapToDto).ToList();
+        return await _repository.GetAllAsync(countryId, isActive, ct);
     }
 
     public async Task<WarehouseDto> GetWarehouseByIdAsync(int id, CancellationToken ct = default)
@@ -55,14 +54,7 @@ public class WarehouseService
 
     public async Task<List<MainWarehouseDto>> GetMainWarehousesAsync(int? countryId = null, CancellationToken ct = default)
     {
-        var main = await _repository.GetMainWarehousesAsync(countryId, ct);
-        return main.Select(m => new MainWarehouseDto(
-            m.Id,
-            m.Name,
-            m.Country,
-            m.IsActive,
-            m.SubWarehouses.Select(MapToDto).ToList()
-        )).ToList();
+        return await _repository.GetMainWarehousesAsync(countryId, ct);
     }
 
     private static WarehouseDto MapToDto(Warehouse w) => new(

@@ -65,9 +65,9 @@ public class AuthService
             throw new BadRequestException("Username, email, and password are required.");
         }
 
-        if (request.Password.Length < 8)
+        if (!LuxiraPasswordPolicy.IsValid(request.Password))
         {
-            throw new BadRequestException("Password must be at least 8 characters.");
+            throw new BadRequestException(LuxiraPasswordPolicy.ErrorMessage);
         }
 
         var normalizedUsername = request.Username.Trim().ToUpperInvariant();
@@ -91,7 +91,8 @@ public class AuthService
             Country = request.Country,
             AcessId = request.AccessId,
             Role = string.IsNullOrWhiteSpace(request.Role) ? "Employee" : request.Role.Trim(),
-            IsActive = true
+            IsActive = true,
+            SecurityStamp = Guid.NewGuid().ToString(),
         };
         user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
@@ -114,14 +115,18 @@ public class AuthService
 
     public async Task<AuthResponse> SwitchUserAsync(string currentUserId, string targetUserId, CancellationToken ct = default)
     {
+        var currentUser = await _userRepository.GetByIdAsync(currentUserId, ct);
+        var isPrivileged = currentUser?.Roles.Any(IsAccountSwitchAdministrator) == true;
         var targetUser = await _userRepository.GetByIdAsync(targetUserId, ct);
         if (targetUser == null || !targetUser.IsActive)
         {
             throw new NotFoundException("Target user not found or inactive.");
         }
 
-        var groups = await _userRepository.GetSwitchGroupsForUserAsync(currentUserId, ct);
-        bool hasAccess = groups.Any(g => g.Members.Any(m => m.UserId == targetUserId) || g.CreatedByUserId == targetUserId);
+        var groups = isPrivileged
+            ? []
+            : await _userRepository.GetSwitchGroupsForUserAsync(currentUserId, ct);
+        bool hasAccess = isPrivileged || groups.Any(g => g.Members.Any(m => m.UserId == targetUserId) || g.CreatedByUserId == targetUserId);
         
         if (!hasAccess)
         {
@@ -143,6 +148,9 @@ public class AuthService
 
         return new AuthResponse(token, Guid.NewGuid().ToString(), expiresAt, userDto);
     }
+
+    private static bool IsAccountSwitchAdministrator(string role) =>
+        role is "Admin" or "Administrator" or "ExecutiveDirector";
 
     private bool VerifyPassword(
         ApplicationUser user,

@@ -202,6 +202,15 @@ public class EmployeeController : ControllerBase
         if (employee == null) return NotFound("Employee not found.");
 
         employee.IsActive = isActive;
+        if (!string.IsNullOrWhiteSpace(employee.ApplicationUserId))
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(item => item.Id == employee.ApplicationUserId, ct);
+            if (user is not null)
+            {
+                user.LockoutEnd = isActive ? null : DateTimeOffset.MaxValue;
+                user.SecurityStamp = Guid.NewGuid().ToString();
+            }
+        }
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, id, isActive });
     }
@@ -332,7 +341,11 @@ public class EmployeeController : ControllerBase
         if (!string.IsNullOrWhiteSpace(employee.ApplicationUserId))
         {
             var user = await _context.Users.FirstOrDefaultAsync(item => item.Id == employee.ApplicationUserId, ct);
-            if (user is not null) user.LockoutEnd = DateTimeOffset.MaxValue;
+            if (user is not null)
+            {
+                user.LockoutEnd = DateTimeOffset.MaxValue;
+                user.SecurityStamp = Guid.NewGuid().ToString();
+            }
         }
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true });
@@ -353,7 +366,11 @@ public class EmployeeController : ControllerBase
         if (!string.IsNullOrWhiteSpace(employee.ApplicationUserId))
         {
             var user = await _context.Users.FirstOrDefaultAsync(item => item.Id == employee.ApplicationUserId, ct);
-            if (user is not null) user.LockoutEnd = null;
+            if (user is not null)
+            {
+                user.LockoutEnd = null;
+                user.SecurityStamp = Guid.NewGuid().ToString();
+            }
         }
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true });
@@ -374,7 +391,12 @@ public class EmployeeController : ControllerBase
             employee.DeletedByUserId = null;
             employee.DeletedByName = null;
         }
-        await _context.Users.Where(user => userIds.Contains(user.Id)).ExecuteUpdateAsync(setters => setters.SetProperty(user => user.LockoutEnd, (DateTimeOffset?)null), ct);
+        var restoredStamp = Guid.NewGuid().ToString();
+        await _context.Users.Where(user => userIds.Contains(user.Id)).ExecuteUpdateAsync(
+            setters => setters
+                .SetProperty(user => user.LockoutEnd, (DateTimeOffset?)null)
+                .SetProperty(user => user.SecurityStamp, restoredStamp),
+            ct);
         await _context.SaveChangesAsync(ct);
         return Ok(new { success = true, restoredCount = employees.Count });
     }

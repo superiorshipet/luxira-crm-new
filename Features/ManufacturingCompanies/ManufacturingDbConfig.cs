@@ -168,3 +168,40 @@ public class StoreCodeStoreGroupDbConfig : IDbConfig<StoreCodeStoreGroup>
         builder.HasOne(group => group.ManufacturingCompany).WithMany().HasForeignKey(group => group.ManufacturingCompanyId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class TraineeStoreDbConfig : IDbConfig<TraineeStore>
+{
+    public void Configure(EntityTypeBuilder<TraineeStore> builder)
+    {
+        builder.ToTable("TraineeStores");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Name).HasMaxLength(200).IsRequired();
+        builder.Property(item => item.PhoneNumber).HasMaxLength(50);
+        builder.Property(item => item.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+    }
+}
+
+public class TraineeStoreManufacturingCompanyDbConfig : IDbConfig<TraineeStoreManufacturingCompany>
+{
+    public void Configure(EntityTypeBuilder<TraineeStoreManufacturingCompany> builder)
+    {
+        builder.ToTable("TraineeStoreManufacturingCompanies");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+        builder.HasIndex(item => item.TraineeStoreId)
+            .HasDatabaseName("IX_TraineeStoreManufacturingCompanies_TraineeStoreId");
+        builder.HasIndex(item => item.ManufacturingCompanyId)
+            .HasDatabaseName("IX_TraineeStoreManufacturingCompanies_ManufacturingCompanyId");
+        builder.HasIndex(item => new { item.TraineeStoreId, item.ManufacturingCompanyId })
+            .IsUnique()
+            .HasDatabaseName("UX_TraineeStoreManufacturingCompanies_TraineeStoreId_ManufacturingCompanyId");
+        builder.HasOne(item => item.TraineeStore)
+            .WithMany(item => item.ManufacturingCompanies)
+            .HasForeignKey(item => item.TraineeStoreId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(item => item.ManufacturingCompany)
+            .WithMany()
+            .HasForeignKey(item => item.ManufacturingCompanyId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

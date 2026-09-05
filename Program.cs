@@ -3,10 +3,20 @@ using Luxira.Api.Data;
 using Luxira.Api.OpenApi;
 using Luxira.Api.Utils.Middlewares;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var configuredDataProtectionPath = builder.Configuration["DataProtection:KeysPath"];
+var dataProtectionPath = string.IsNullOrWhiteSpace(configuredDataProtectionPath)
+    ? Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtection-Keys")
+    : Path.GetFullPath(configuredDataProtectionPath, builder.Environment.ContentRootPath);
+Directory.CreateDirectory(dataProtectionPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
+    .SetApplicationName("LotusBlueCRM");
 
 // ─── Database Context ────────────────────────────────────────────────────────
 // Uses the existing DB schema — NO migrations are applied at startup.
@@ -105,7 +115,7 @@ builder.Services.AddRateLimiter(options =>
                 "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 300,
+                PermitLimit = builder.Environment.IsEnvironment("Testing") ? 10_000 : 300,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 20,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,

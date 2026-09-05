@@ -120,6 +120,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<StoreCodeFolder> StoreCodeFolders => Set<StoreCodeFolder>();
     public DbSet<StoreCodeStoreGroup> StoreCodeStoreGroups => Set<StoreCodeStoreGroup>();
     public DbSet<StoreCodeEditHistory> StoreCodeEditHistories => Set<StoreCodeEditHistory>();
+    public DbSet<TraineeStore> TraineeStores => Set<TraineeStore>();
+    public DbSet<TraineeStoreManufacturingCompany> TraineeStoreManufacturingCompanies => Set<TraineeStoreManufacturingCompany>();
 
     // Search Keywords
     public DbSet<SearchKeywordOption> SearchKeywordOptions => Set<SearchKeywordOption>();
@@ -140,6 +142,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<MarketingLead> MarketingLeads => Set<MarketingLead>();
     public DbSet<StoreScript> StoreScripts => Set<StoreScript>();
     public DbSet<SeedScriptSetting> SeedScriptSettings => Set<SeedScriptSetting>();
+    public DbSet<ScriptGlobalSetting> ScriptGlobalSettings => Set<ScriptGlobalSetting>();
     public DbSet<ScriptTarget> ScriptTargets => Set<ScriptTarget>();
     public DbSet<ScriptThemeToken> ScriptThemeTokens => Set<ScriptThemeToken>();
     public DbSet<ScriptSetting> ScriptSettings => Set<ScriptSetting>();

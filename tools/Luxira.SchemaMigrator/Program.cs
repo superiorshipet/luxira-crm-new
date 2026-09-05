@@ -26,8 +26,13 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 var sql = await File.ReadAllTextAsync(sqlFile);
+var safetySql = System.Text.RegularExpressions.Regex.Replace(
+    sql,
+    @"\bON\s+DELETE\s+(?:CASCADE|NO\s+ACTION|SET\s+NULL|SET\s+DEFAULT)\b",
+    string.Empty,
+    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 var forbiddenTokens = new[] { "DROP ", "DELETE ", "TRUNCATE ", "ALTER TABLE" };
-if (forbiddenTokens.Any(token => sql.Contains(token, StringComparison.OrdinalIgnoreCase)))
+if (forbiddenTokens.Any(token => safetySql.Contains(token, StringComparison.OrdinalIgnoreCase)))
 {
     Console.Error.WriteLine("Migration rejected because it contains a destructive token.");
     return 4;
